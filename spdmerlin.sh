@@ -13,7 +13,7 @@
 ##         https://github.com/jackyaz/spdMerlin             ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2024-Jul-04
+# Last Modified: 2024-Jul-01
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -2029,18 +2029,10 @@ Generate_CSVs(){
 	renice 0 $$
 }
 
-##----------------------------------------##
-## Modified by Martinski W. [2024-Jul-04] ##
-##----------------------------------------##
-# [Ported code over from "connmon" script] #
-Reset_DB()
-{
+Reset_DB(){
 	SIZEAVAIL="$(df -P -k "$SCRIPT_STORAGE_DIR" | awk '{print $4}' | tail -n 1)"
 	SIZEDB="$(ls -l "$SCRIPT_STORAGE_DIR/spdstats.db" | awk '{print $5}')"
-	SIZEAVAIL="$(echo "$SIZEAVAIL" | awk '{printf("%s", $1 * 1024);}')"
-
-	if [ "$(echo "$SIZEAVAIL $SIZEDB" | awk -F ' ' '{print ($1 < $2)}')" -eq 1 ]
-	then
+	if [ "$SIZEDB" -gt "$((SIZEAVAIL*1024))" ]; then
 		Print_Output true "Database size exceeds available space. $(ls -lh "$SCRIPT_STORAGE_DIR/spdstats.db" | awk '{print $5}')B is required to create backup." "$ERR"
 		return 1
 	else
