@@ -863,7 +863,7 @@ function initial(){
 	SetCurrentPage();
 	LoadCustomSettings();
 	show_menu();
-	$j('#Time_Format').val(GetCookie('Time_Format','number'));
+	$j('#Time_Format').val(GetCookie('Time_Format', 'number'));
 	ScriptUpdateLayout();
 	get_statstitle_file();
 	get_interfaces_file();
@@ -1240,7 +1240,11 @@ function update_spdtest(){
 	});
 }
 
-function PostSpeedTest(){
+/**-------------------------------------**/
+/** Added by Martinski W. [2024-Jul-15] **/
+/**------------------------------- -----**/
+function ClearSpdTableRows()
+{
 	$j('#table_allinterfaces').empty();
 	$j('#rowautomaticspdtest').empty();
 	$j('#rowautospdprefserver').empty();
@@ -1251,8 +1255,16 @@ function PostSpeedTest(){
 	$j('#rowautospdprefserver').remove();
 	$j('#rowautospdprefserverselect').remove();
 	$j('#rowmanualspdtest').remove();
+}
+
+/**----------------------------------------**/
+/** Modified by Martinski W. [2024-Jul-15] **/
+/**----------------------------------------**/
+function PostSpeedTest()
+{
+	ClearSpdTableRows();
 	currentNoCharts = 0;
-	$j('#Time_Format').val(GetCookie('Time_Format','number'));
+	$j('#Time_Format').val(GetCookie('Time_Format', 'number'));
 	get_statstitle_file();
 	setTimeout(get_interfaces_file,3000);
 }
@@ -1557,15 +1569,30 @@ function get_interfaces_file(){
 	});
 }
 
-function get_statstitle_file(){
+/**----------------------------------------**/
+/** Modified by Martinski W. [2024-Jul-15] **/
+/**----------------------------------------**/
+let databaseResetDone = 0;
+function get_statstitle_file()
+{
 	$j.ajax({
 		url: '/ext/spdmerlin/spdtitletext.js',
 		dataType: 'script',
 		error: function(xhr){
-			setTimeout(get_statstitle_file,1000);
+			setTimeout(get_statstitle_file, 2000);
 		},
-		success: function(){
+		success: function()
+		{
 			SetSPDStatsTitle();
+			if (databaseResetDone === 1)
+			{
+				ClearSpdTableRows();
+				currentNoCharts = 0;
+				$j('#Time_Format').val(GetCookie('Time_Format', 'number'));
+				get_interfaces_file();
+				databaseResetDone += 1;
+			}
+			setTimeout(get_statstitle_file, 4000);
 		}
 	});
 }

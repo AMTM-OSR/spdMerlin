@@ -13,7 +13,7 @@
 ##         https://github.com/jackyaz/spdMerlin             ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2024-Jul-07
+# Last Modified: 2024-Jul-15
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -48,7 +48,7 @@ readonly OOKLA_DIR="$SCRIPT_DIR/ookla"
 readonly OOKLA_LICENSE_DIR="$SCRIPT_DIR/ooklalicense"
 readonly OOKLA_HOME_DIR="$HOME_DIR/.config/ookla"
 
-[ -z "$(nvram get odmpid)" ] && ROUTER_MODEL=$(nvram get productid) || ROUTER_MODEL=$(nvram get odmpid)
+[ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
 [ -f /opt/bin/sqlite3 ] && SQLITE3_PATH=/opt/bin/sqlite3 || SQLITE3_PATH=/usr/sbin/sqlite3
 
 if [ "$(uname -m)" = "aarch64" ]; then
@@ -936,7 +936,11 @@ TestSchedule(){
 	esac
 }
 
-ScriptStorageLocation(){
+##----------------------------------------##
+## Modified by Martinski W. [2024-Jul-15] ##
+##----------------------------------------##
+ScriptStorageLocation()
+{
 	case "$1" in
 		usb)
 			sed -i 's/^STORAGELOCATION=.*$/STORAGELOCATION=usb/' "$SCRIPT_CONF"
@@ -944,10 +948,12 @@ ScriptStorageLocation(){
 			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces_user" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
+			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d/.databaseupgraded" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d/config" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d/config.bak" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d/spdtitletext.js" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d/spdstats.db" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
+			mv "/jffs/addons/$SCRIPT_NAME_LOWER.d"/lastx_*.csv "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			SCRIPT_CONF="/opt/share/$SCRIPT_NAME_LOWER.d/config"
 			ScriptStorageLocation load
 		;;
@@ -957,10 +963,12 @@ ScriptStorageLocation(){
 			mv "/opt/share/$SCRIPT_NAME_LOWER.d/csv" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces_user" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
+			mv "/opt/share/$SCRIPT_NAME_LOWER.d/.databaseupgraded" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/opt/share/$SCRIPT_NAME_LOWER.d/config" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/opt/share/$SCRIPT_NAME_LOWER.d/config.bak" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/opt/share/$SCRIPT_NAME_LOWER.d/spdtitletext.js" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv "/opt/share/$SCRIPT_NAME_LOWER.d/spdstats.db" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
+			mv "/opt/share/$SCRIPT_NAME_LOWER.d"/lastx_*.csv "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			SCRIPT_CONF="/jffs/addons/$SCRIPT_NAME_LOWER.d/config"
 			ScriptStorageLocation load
 		;;
@@ -1184,14 +1192,25 @@ WriteSql_ToFile(){
 	fi
 }
 
-WriteStats_ToJS(){
-	echo "function $3(){" >> "$2"
+##----------------------------------------##
+## Modified by Martinski W. [2024-Jul-15] ##
+##----------------------------------------##
+WriteStats_ToJS()
+{
+	if [ $# -lt 4 ] ; then return 1 ; fi
+
+	echo "function $3(){" > "$2"
 	html='document.getElementById("'"$4"'").innerHTML="'
-	while IFS='' read -r line || [ -n "$line" ]; do
-		html="${html}${line}\\r\\n"
+
+	while IFS='' read -r line || [ -n "$line" ]
+	do html="${html}${line}\r\n"
 	done < "$1"
 	html="$html"'"'
-	printf "%s\\r\\n}\\r\\n" "$html" >> "$2"
+
+	if [ $# -lt 5 ] || [ -z "$5" ]
+	then printf "%s\r\n}\r\n" "$html" >> "$2"
+	else printf "%s;\r\n%s\r\n}\r\n" "$html" "$5" >> "$2"
+	fi
 }
 
 GenerateServerList(){
@@ -1724,11 +1743,10 @@ Run_Speedtest(){
 			echo 'var spdteststatus = "GenerateCSV";' > /tmp/detect_spdtest.js
 			Print_Output true "Retrieving data for WebUI charts" "$PASS"
 			Generate_CSVs
-			
+
 			echo "Stats last updated: $timenowfriendly" > /tmp/spdstatstitle.txt
-			rm -f "$SCRIPT_STORAGE_DIR/spdtitletext.js"
 			WriteStats_ToJS /tmp/spdstatstitle.txt "$SCRIPT_STORAGE_DIR/spdtitletext.js" SetSPDStatsTitle statstitle
-			
+
 			if [ "$applyautobw" = "true" ]; then
 				Menu_AutoBW_Update
 			fi
@@ -1787,7 +1805,11 @@ Run_Speedtest_WebUI(){
 	cp -a "$SCRIPT_CONF.bak" "$SCRIPT_CONF"
 }
 
-Process_Upgrade(){
+##----------------------------------------##
+## Modified by Martinski W. [2024-Jul-15] ##
+##----------------------------------------##
+Process_Upgrade()
+{
 	if [ ! -f "$OOKLA_DIR/speedtest" ]; then
 		Download_File "$SCRIPT_REPO/files/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
 		tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
@@ -1796,12 +1818,10 @@ Process_Upgrade(){
 	fi
 	rm -f "$SCRIPT_STORAGE_DIR/spdjs.js"
 	rm -f "$SCRIPT_STORAGE_DIR/.tableupgraded"*
+
 	if [ ! -f "$SCRIPT_STORAGE_DIR/spdtitletext.js" ]; then
-		{
-			echo 'function SetSPDStatsTitle(){';
-			echo 'document.getElementById("statstitle").innerHTML="Stats last updated: Not yet updated\r\n";';
-			echo "}";
-		} > "$SCRIPT_STORAGE_DIR/spdtitletext.js"
+		echo "Stats last updated: Not yet updated" > /tmp/spdstatstitle.txt
+		WriteStats_ToJS /tmp/spdstatstitle.txt "$SCRIPT_STORAGE_DIR/spdtitletext.js" SetSPDStatsTitle statstitle
 	fi
 	if [ ! -f "$SCRIPT_DIR/README.md" ]; then
 		Update_File README.md
@@ -1862,7 +1882,8 @@ Process_Upgrade(){
 }
 
 #$1 iface name
-Generate_LastXResults(){
+Generate_LastXResults()
+{
 	FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5"
 	for IFACE_NAME in $FULL_IFACELIST; do
 		rm -f "$SCRIPT_STORAGE_DIR/lastx_${IFACE_NAME}.htm"
@@ -1875,7 +1896,7 @@ Generate_LastXResults(){
 	"$SQLITE3_PATH" "$SCRIPT_STORAGE_DIR/spdstats.db" < /tmp/spd-lastx.sql
 	rm -f /tmp/spd-lastx.sql
 	sed -i 's/,,/,null,/g;s/"//g;' /tmp/spd-lastx.csv
-	mv /tmp/spd-lastx.csv "$SCRIPT_STORAGE_DIR/lastx_$1.csv"
+	mv /tmp/spd-lastx.csv "$SCRIPT_STORAGE_DIR/lastx_${1}.csv"
 }
 
 Generate_CSVs(){
@@ -2030,7 +2051,7 @@ Generate_CSVs(){
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2024-Jul-07] ##
+## Modified by Martinski W. [2024-Jul-15] ##
 ##----------------------------------------##
 # [Ported code over from "connmon" script] #
 Reset_DB()
@@ -2048,15 +2069,34 @@ Reset_DB()
 		if ! cp -a "$SCRIPT_STORAGE_DIR/spdstats.db" "$SCRIPT_STORAGE_DIR/spdstats.db.bak"; then
 			Print_Output true "Database backup failed, please check storage device" "$WARN"
 		fi
-		
+
+		Print_Output false "Please wait..." "$PASS"
 		tablelist="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5"
 		for dbtable in $tablelist; do
 			echo "DELETE FROM [spdstats_$dbtable];" > /tmp/spd-stats.sql
 			"$SQLITE3_PATH" "$SCRIPT_STORAGE_DIR/spdstats.db" < /tmp/spd-stats.sql
 			rm -f /tmp/spd-stats.sql
 		done
-		
+
+		## Clear/Reset all CSV files ##
+		Generate_CSVs
+
+		## Show "reset" messages on webGUI ##
+		timeDateNow="$(/bin/date +"%c")"
+		extraJScode='databaseResetDone += 1;'
+		echo "Resetting stats: $timeDateNow" > /tmp/spdstatstitle.txt
+		WriteStats_ToJS /tmp/spdstatstitle.txt "$SCRIPT_STORAGE_DIR/spdtitletext.js" SetSPDStatsTitle statstitle "$extraJScode"
+		rm -f /tmp/spdstatstitle.txt
+		sleep 2
 		Print_Output true "Database reset complete" "$WARN"
+		{
+		   sleep 4
+		   timeDateNow="$(/bin/date +"%c")"
+		   extraJScode='databaseResetDone = 0;'
+		   echo "Stats were reset: $timeDateNow" > /tmp/spdstatstitle.txt
+		   WriteStats_ToJS /tmp/spdstatstitle.txt "$SCRIPT_STORAGE_DIR/spdtitletext.js" SetSPDStatsTitle statstitle "$extraJScode"
+		   rm -f /tmp/spdstatstitle.txt
+		} &
 	fi
 }
 
@@ -2155,7 +2195,7 @@ MainMenu(){
 	printf "a.    AutoBW\\n\\n"
 	printf "u.    Check for updates\\n"
 	printf "uf.   Update %s with latest version (force update)\\n\\n" "$SCRIPT_NAME"
-	printf "rt.   Reset %s database / delete all data\\n\\n" "$SCRIPT_NAME"
+	printf "rs.   Reset %s database / delete all data\\n\\n" "$SCRIPT_NAME"
 	printf "e.    Exit %s\\n\\n" "$SCRIPT_NAME"
 	printf "z.    Uninstall %s\\n" "$SCRIPT_NAME"
 	printf "\\n"
@@ -2294,7 +2334,7 @@ MainMenu(){
 				PressEnter
 				break
 			;;
-			rt)
+			rs)
 				printf "\\n"
 				if Check_Lock menu; then
 					Menu_ResetDB
