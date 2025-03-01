@@ -419,7 +419,7 @@ Create_Symlinks(){
 	ln -s "$SCRIPT_INTERFACES_USER"  "$SCRIPT_WEB_DIR/interfaces_user.htm" 2>/dev/null
 	ln -s "$SCRIPT_STORAGE_DIR/spdtitletext.js" "$SCRIPT_WEB_DIR/spdtitletext.js" 2>/dev/null
 	
-	FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5"
+	FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 WGVPN4 WGVPN5"
 	for IFACE_NAME in $FULL_IFACELIST; do
 		ln -s "$SCRIPT_STORAGE_DIR/lastx_${IFACE_NAME}.csv" "$SCRIPT_WEB_DIR/lastx_${IFACE_NAME}.htm"
 	done
@@ -495,6 +495,14 @@ Interfaces_FromSettings(){
 					comment=" #excluded - interface not up#"
 				fi
 				printf "VPNC%s%s\\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
+			done
+
+			for index in 1 2 3 4 5; do
+				comment=" #excluded#"
+				if [ ! -f "/sys/class/net/tun1$index/operstate" ] || [ "$(cat "/sys/class/net/tun1$index/operstate")" = "down" ]; then
+					comment=" #excluded - interface not up#"
+				fi
+				printf "WGVPN%s%s\\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
 			done
 			
 			echo "" > "$SCRIPT_INTERFACES_USER"
@@ -573,6 +581,11 @@ Conf_Exists(){
 		if ! grep -q "LASTXRESULTS" "$SCRIPT_CONF"; then
 			echo "LASTXRESULTS=10" >> "$SCRIPT_CONF"
 		fi
+		if ! grep -q "PREFERREDSERVER_WGVPN" "$SCRIPT_CONF"; then
+			for index in 1 2 3 4 5; do
+				{ echo "PREFERREDSERVER_WGVPN$index=0|None configured"; echo "USEPREFERRED_WGVPN$index=false"; } >> "$SCRIPT_CONF"
+			done
+		fi
 		if ! grep -q "SPEEDTESTBINARY" "$SCRIPT_CONF"; then
 			if [ -f /usr/sbin/ookla ]; then
 				echo "SPEEDTESTBINARY=builtin" >> "$SCRIPT_CONF"
@@ -583,6 +596,9 @@ Conf_Exists(){
 		return 0
 	else
 		{ echo "PREFERREDSERVER_WAN=0|None configured"; echo "USEPREFERRED_WAN=false"; echo "AUTOMATED=true" ; echo "OUTPUTTIMEMODE=unix"; echo "STORAGELOCATION=jffs"; } >> "$SCRIPT_CONF"
+		for index in 1 2 3 4 5; do
+			{ echo "PREFERREDSERVER_VPNC$index=0|None configured"; echo "USEPREFERRED_VPNC$index=false"; } >> "$SCRIPT_CONF"
+		done
 		for index in 1 2 3 4 5; do
 			{ echo "PREFERREDSERVER_VPNC$index=0|None configured"; echo "USEPREFERRED_VPNC$index=false"; } >> "$SCRIPT_CONF"
 		done
@@ -726,6 +742,21 @@ Get_Interface_From_Name(){
 		;;
 		VPNC5)
 			IFACE="tun15"
+		;;
+		WGVPN1)
+			IFACE="wgc1"
+		;;
+		WGVPN2)
+			IFACE="wgc2"
+		;;
+		WGVPN3)
+			IFACE="wgc3"
+		;;
+		WGVPN4)
+			IFACE="wgc4"
+		;;
+		WGVPN5)
+			IFACE="wgc5"
 		;;
 	esac
 	
@@ -1836,7 +1867,7 @@ Process_Upgrade()
 		fi
 	fi
 	
-	FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5"
+	FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 WGVPN4 WGVPN5"
 	for IFACE_NAME in $FULL_IFACELIST; do
 		echo "CREATE TABLE IF NOT EXISTS [spdstats_$IFACE_NAME] ([StatID] INTEGER PRIMARY KEY NOT NULL,[Timestamp] NUMERIC NOT NULL,[Download] REAL NOT NULL,[Upload] REAL NOT NULL,[Latency] REAL,[Jitter] REAL,[PktLoss] REAL,[ResultURL] TEXT,[DataDownload] REAL NOT NULL,[DataUpload] REAL NOT NULL,[ServerID] TEXT,[ServerName] TEXT);" > /tmp/spdstats-upgrade.sql
 		"$SQLITE3_PATH" "$SCRIPT_STORAGE_DIR/spdstats.db" < /tmp/spdstats-upgrade.sql
@@ -1845,7 +1876,7 @@ Process_Upgrade()
 	if [ ! -f "$SCRIPT_STORAGE_DIR/.databaseupgraded" ]; then
 		renice 15 $$
 		Print_Output true "Upgrading database..." "$PASS"
-		FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5"
+		FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 WGVPN4 WGVPN5"
 		for IFACE_NAME in $FULL_IFACELIST; do
 			echo "PRAGMA cache_size=-20000; CREATE INDEX IF NOT EXISTS idx_${IFACE_NAME}_download ON spdstats_${IFACE_NAME} (Timestamp,Download);" > /tmp/spdstats-upgrade.sql
 			"$SQLITE3_PATH" "$SCRIPT_STORAGE_DIR/spdstats.db" < /tmp/spdstats-upgrade.sql
@@ -1884,7 +1915,7 @@ Process_Upgrade()
 #$1 iface name
 Generate_LastXResults()
 {
-	FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5"
+	FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 WGVPN4 WGVPN5"
 	for IFACE_NAME in $FULL_IFACELIST; do
 		rm -f "$SCRIPT_STORAGE_DIR/lastx_${IFACE_NAME}.htm"
 	done
@@ -2071,7 +2102,7 @@ Reset_DB()
 		fi
 
 		Print_Output false "Please wait..." "$PASS"
-		tablelist="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5"
+		tablelist="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 WGVPN4 WGVPN5"
 		for dbtable in $tablelist; do
 			echo "DELETE FROM [spdstats_$dbtable];" > /tmp/spd-stats.sql
 			"$SQLITE3_PATH" "$SCRIPT_STORAGE_DIR/spdstats.db" < /tmp/spd-stats.sql
