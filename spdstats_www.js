@@ -25,6 +25,21 @@ var sortdirVPNC4 = 'desc';
 var arraysortlistlinesVPNC5 = [];
 var sortnameVPNC5 = 'Time';
 var sortdirVPNC5 = 'desc';
+var arraysortlistlinesVPNC1 = [];
+var sortnameVPNC5 = 'Time';
+var sortdirVPNC5 = 'desc';
+var arraysortlistlinesWGVPNC2 = [];
+var sortnameVPNC5 = 'Time';
+var sortdirVPNC5 = 'desc';
+var arraysortlistlinesWGVPNC3 = [];
+var sortnameVPNC5 = 'Time';
+var sortdirVPNC5 = 'desc';
+var arraysortlistlinesWGVPNC4 = [];
+var sortnameVPNC5 = 'Time';
+var sortdirVPNC5 = 'desc';
+var arraysortlistlinesWGVPNC5 = [];
+var sortnameVPNC5 = 'Time';
+var sortdirVPNC5 = 'desc';
 
 var speedtestbinary = "builtin";
 
