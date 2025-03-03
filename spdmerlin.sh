@@ -385,6 +385,18 @@ Create_Symlinks(){
 			printf "VPNC%s%s\\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
 		fi
 	done
+
+	for index in 1 2 3 4 5; do
+		comment=""
+		if [ ! -f "/sys/class/net/wgc$index/operstate" ] || [ "$(cat "/sys/class/net/wgc$index/operstate")" = "down" ]; then
+			comment=" #excluded - interface not up#"
+		fi
+		if [ "$index" -lt 5 ]; then
+			printf "WGVPN%s%s\\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
+		else
+			printf "WGVPN%s%s\\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
+		fi
+	done
 	
 	if [ "$1" = "force" ]; then
 		rm -f "$SCRIPT_INTERFACES_USER"
@@ -499,7 +511,7 @@ Interfaces_FromSettings(){
 
 			for index in 1 2 3 4 5; do
 				comment=" #excluded#"
-				if [ ! -f "/sys/class/net/tun1$index/operstate" ] || [ "$(cat "/sys/class/net/tun1$index/operstate")" = "down" ]; then
+				if [ ! -f "/sys/class/net/wgc$index/operstate" ] || [ "$(cat "/sys/class/net/wgc$index/operstate")" = "down" ]; then
 					comment=" #excluded - interface not up#"
 				fi
 				printf "WGVPN%s%s\\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
@@ -600,7 +612,7 @@ Conf_Exists(){
 			{ echo "PREFERREDSERVER_VPNC$index=0|None configured"; echo "USEPREFERRED_VPNC$index=false"; } >> "$SCRIPT_CONF"
 		done
 		for index in 1 2 3 4 5; do
-			{ echo "PREFERREDSERVER_VPNC$index=0|None configured"; echo "USEPREFERRED_VPNC$index=false"; } >> "$SCRIPT_CONF"
+			{ echo "PREFERREDSERVER_WGVPN$index=0|None configured"; echo "USEPREFERRED_WGVPN$index=false"; } >> "$SCRIPT_CONF"
 		done
 		{ echo "AUTOBW_ENABLED=false"; echo "AUTOBW_SF_DOWN=95"; echo "AUTOBW_SF_UP=95"; echo "AUTOBW_ULIMIT_DOWN=0"; echo "AUTOBW_LLIMIT_DOWN=0"; echo "AUTOBW_ULIMIT_UP=0"; echo "AUTOBW_LLIMIT_UP=0"; echo "AUTOBW_THRESHOLD_UP=10"; echo "AUTOBW_THRESHOLD_DOWN=10"; echo "AUTOBW_AVERAGE_CALC=10"; echo "STORERESULTURL=true"; echo "EXCLUDEFROMQOS=true"; echo "SCHDAYS=*"; echo "SCHHOURS=*"; echo "SCHMINS=12,42"; echo "DAYSTOKEEP=30"; echo "LASTXRESULTS=10";} >> "$SCRIPT_CONF"
 		if [ -f /usr/sbin/ookla ]; then
