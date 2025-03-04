@@ -1537,7 +1537,7 @@ function getConfigFile()
 }
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Mar-02] **/
+/** Modified by Martinski W. [2025-Mar-04] **/
 /**----------------------------------------**/
 function getInterfacesFile()
 {
@@ -1555,7 +1555,8 @@ function getInterfacesFile()
 			showhide('databaseSize_text',true);
 
 			var interfaces = data.split('\n');
-            let interfacename, ifaceNameUpper, ifaceNameLower, ifaceLabel;
+			const styleLeftMarginIndx = [2, 3, 4, 5];
+            let interfacename, ifaceNameUpper, ifaceNameLower, ifaceLabel, ifaceStyle;
 			interfaces = interfaces.filter(Boolean);
 			interfacelist = '';
 			interfacescomplete = [];
@@ -1588,6 +1589,7 @@ function getInterfacesFile()
 					interfacescomplete.push(interfacename);
                     ifaceNameUpper = interfacename.toUpperCase();
                     ifaceNameLower = interfacename.toLowerCase();
+					ifaceStyle = 'style="margin-left:0px;"';
 					ifaceLabel = ifaceNameUpper;
 					var changelabel = 'Change?';
 					var interfacedisabled = '';
@@ -1602,13 +1604,15 @@ function getInterfacesFile()
 
 					// For AUTOMATIC Speedtests //
 					if (breakStartIndex === ifaceIndx) { interfaceconfigtablehtml += '<br>'; }
-					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+'>';
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
 					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
 					if (breakStopIndex === ifaceIndx) { interfaceconfigtablehtml += '</br>'; }
 
 					// For PREFERRED Servers //
 					if (breakStartIndex === ifaceIndx) { prefserverconfigtablehtml += '<br>'; }
-					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+'>';
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
 					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
 					if (breakStopIndex === ifaceIndx) { prefserverconfigtablehtml += '</br>'; }
 
@@ -1621,7 +1625,8 @@ function getInterfacesFile()
 
 					// For MANUAL Speedtests //
 					if (breakStartIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '<br>'; }
-					speedtestifaceconfigtablehtml += '<input autocomplete="off" autocapitalize="off" type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input '+interfacedisabled+' settingvalueradio" value="'+ifaceNameUpper+'" '+interfacedisabled+'>';
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					speedtestifaceconfigtablehtml += '<input autocomplete="off" autocapitalize="off" type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input '+interfacedisabled+' settingvalueradio" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
 					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
 					if (breakStopIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '</br>'; }
 				}
@@ -1631,17 +1636,20 @@ function getInterfacesFile()
 					interfacescomplete.push(interfacename);
                     ifaceNameUpper = interfacename.toUpperCase();
                     ifaceNameLower = interfacename.toLowerCase();
+					ifaceStyle = 'style="margin-left:0px;"';
                     ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
 
 					// For AUTOMATIC Speedtests //
 					if (breakStartIndex === ifaceIndx) { interfaceconfigtablehtml += '<br>'; }
-					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked>';
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked '+ifaceStyle+'>';
 					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
 					if (breakStopIndex === ifaceIndx) { interfaceconfigtablehtml += '</br>'; }
 
 					// For PREFERRED Servers //
 					if (breakStartIndex === ifaceIndx) { prefserverconfigtablehtml += '<br>'; }
-					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked>';
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked '+ifaceStyle+'>';
 					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
 					if (breakStopIndex === ifaceIndx) { prefserverconfigtablehtml += '</br>'; }
 
@@ -1654,7 +1662,8 @@ function getInterfacesFile()
 
 					// For MANUAL Speedtests //
 					if (breakStartIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '<br>'; }
-					speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input settingvalueradio" value="'+ifaceNameUpper+'">';
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input settingvalueradio" value="'+ifaceNameUpper+'" '+ifaceStyle+'>';
 					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
 					if (breakStopIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '</br>'; }
 				}
