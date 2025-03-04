@@ -3,7 +3,7 @@
 ![Shellcheck](https://github.com/jackyaz/spdMerlin/actions/workflows/shellcheck.yml/badge.svg)
 
 ## v4.4.6
-### Updated on 2024-Aug-18
+### Updated on 2025-Mar-03
 ## About
 spdMerlin is an internet speedtest and monitoring tool for AsusWRT Merlin with charts for daily, weekly and monthly summaries. It tracks download/upload bandwidth as well as latency, jitter and packet loss.
 
