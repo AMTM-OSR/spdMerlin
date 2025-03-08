@@ -1102,26 +1102,56 @@ Get_Interface_From_Name()
 	echo "$IFACE"
 }
 
-##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-02] ##
-##----------------------------------------##
-Set_Interface_State()
-{
-	interfaceline="$(sed "$1!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
-	if echo "$interfaceline" | grep -qE "^(VPN|WGVPN)"
-	then
-		if echo "$interfaceline" | grep -q "#excluded"
-		then
-			IFACE_LOWER="$(Get_Interface_From_Name "$(echo "$interfaceline" | cut -f1 -d"#" | sed 's/ *$//')" | tr "A-Z" "a-z")"
-			if [ ! -f "/sys/class/net/$IFACE_LOWER/operstate" ] || \
-			   [ "$(cat "/sys/class/net/$IFACE_LOWER/operstate")" = "down" ]
-			then
-				sed -i "$1"'s/ #excluded#/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
-			else
-				sed -i "$1"'s/ #excluded - interface not up#/ #excluded#/' "$SCRIPT_INTERFACES_USER"
-			fi
-		fi
-	fi
+##-------------------------------------==---##
+## Modified by ExtremeFiretop [2025-Mar-08] ##
+##------------------------------------------##
+Set_Interface_State(){
+    interfaceline="$(sed "$1!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+    
+    # Only process lines that begin with VPNC or WGVPN
+    if echo "$interfaceline" | grep -qE "^(VPNC|WGVPN)"; then
+        IFACE_NAME="$(echo "$interfaceline" | cut -f1 -d"#" | sed 's/ *$//')"
+        IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
+
+        # Check if the interface is up vs down
+        # For WGVPN => use Check_WG_Interface(index)
+        # For VPNC => check /sys/class/net/<interface>/operstate
+        interface_is_up=false
+        if echo "$IFACE_NAME" | grep -q "WGVPN"; then
+            # Extract the numeric suffix (e.g. WGVPN3 => index=3)
+            index="$(echo "$IFACE_NAME" | sed 's/[^0-9]//g')"
+            if Check_WG_Interface "$index"; then
+                interface_is_up=true
+            fi
+        else
+            # This is an OpenVPN client
+            if [ -f "/sys/class/net/$IFACE_LOWER/operstate" ] &&
+               [ "$(cat "/sys/class/net/$IFACE_LOWER/operstate")" = "up" ]; then
+                interface_is_up=true
+            fi
+        fi
+
+        # Decide how to update the #excluded marker based on up/down
+        if echo "$interfaceline" | grep -q "#excluded"; then
+            # The user has explicitly excluded this interface at some point
+            if [ "$interface_is_up" = true ]; then
+                # If it was #excluded - interface not up#, strip off the suffix
+                sed -i "$1 s/#excluded - interface not up#/#excluded#/" "$SCRIPT_INTERFACES_USER"
+            else
+                # The interface is down: ensure we have "#excluded - interface not up#"
+                if echo "$interfaceline" | grep -q "#excluded#$"; then
+                    sed -i "$1 s/#excluded$/#excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
+                fi
+            fi
+
+        else
+            # No “#excluded” marker => user wanted it included
+            if [ "$interface_is_up" = false ]; then
+                # If it’s down, automatically exclude it with “- interface not up#”
+                sed -i "$1 s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
+            fi
+        fi
+    fi
 }
 
 ##----------------------------------------##
@@ -2518,7 +2548,7 @@ Run_Speedtest()
 	Auto_ServiceEvent create 2>/dev/null
 	Shortcut_Script create
 	ScriptStorageLocation load
-	Create_Symlinks force
+	Create_Symlinks
 
 	mode="$1"
 	if [ $# -lt 2 ] || [ -z "$2" ]
@@ -3672,7 +3702,7 @@ MainMenu()
 			c)
 				Generate_Interface_List
 				printf "\n"
-				Create_Symlinks force
+				Create_Symlinks
 				printf "\n"
 				break
 			;;
@@ -3943,7 +3973,7 @@ Menu_Startup()
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load
-	Create_Symlinks force
+	Create_Symlinks
 	Auto_Startup create 2>/dev/null
 	if AutomaticMode check
 	then Auto_Cron create 2>/dev/null
@@ -5354,7 +5384,7 @@ then
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load
-	Create_Symlinks force
+	Create_Symlinks
 
 	Process_Upgrade
 
