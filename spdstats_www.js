@@ -1977,7 +1977,7 @@ function SettingHint (hintID, formField)
 	if (hintID === 1)
 	{
 	    if (formField.name.match(/^WGVPN[1-9]/) !== null)
-	    { hintMsg = 'Wireguard interface is <b>not</b> enabled.'; }
+	    { hintMsg = 'WireGuard interface is <b>not</b> enabled.'; }
 	    else if (formField.name.match(/^VPNC[1-9]/) !== null)
 	    { hintMsg = 'OpenVPN client interface is <b>not</b> enabled.'; }
 	    else
@@ -1986,7 +1986,7 @@ function SettingHint (hintID, formField)
 	else if (hintID === 2)
 	{
 	    if (formField.name.match(/^WGVPN[1-9]/) !== null)
-	    { hintMsg = 'Wireguard interface is enabled.'; }
+	    { hintMsg = 'WireGuard interface is enabled.'; }
 	    else if (formField.name.match(/^VPNC[1-9]/) !== null)
 	    { hintMsg = 'OpenVPN client interface is enabled.'; }
 	    else
