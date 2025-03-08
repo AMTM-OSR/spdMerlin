@@ -13,7 +13,7 @@
 ##         https://github.com/jackyaz/spdMerlin             ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Mar-03
+# Last Modified: 2025-Mar-08
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -499,6 +499,56 @@ Create_Dirs()
 	fi
 }
 
+##############################################################
+# Function: Check_WG_Interface
+#   Checks if wgcX is enabled in nvram AND
+#   verifies that it had a handshake within THRESHOLD seconds.
+#   Returns 0 if "connected" (up), 1 otherwise (down).
+# Added by ExtremeFiretop [2025-Mar-07]
+##############################################################
+Check_WG_Interface()
+{
+	index="$1"          # e.g. 1 => wgc1 #
+	threshold=180       # 180-second cutoff for "connected" #
+	iface="wgc${index}"
+
+	# First confirm NVRAM says it is enabled #
+	# wgc1_enable = 1 => on, 0 => off #
+	if [ "$(nvram get wgc${index}_enable)" != "1" ]
+	then  # NOT enabled #
+	    return 1
+	fi
+
+	# Attempt to read the handshake time from 'wg' #
+	# If no handshake line, consider it "down" #
+	handshake_line="$(wg show "$iface" latest-handshakes 2>/dev/null | head -n1)"
+	[ -z "$handshake_line" ] && return 1
+
+	# Extract numeric epoch from the second column #
+	timestamp="$(echo "$handshake_line" | awk '{print $2}')"
+	# If no timestamp or if it’s explicitly zero, treat as "disconnected" #
+	if [ -z "$timestamp" ] || [ "$timestamp" = "0" ]
+	then
+	    return 1
+	fi
+
+	# Compare to current time #
+	nowtime="$(date +%s)"
+	elapsed="$((nowtime - timestamp))"
+
+	# If handshake was within threshold, call it "up" #
+	if [ "$elapsed" -ge 0 ] && [ "$elapsed" -le "$threshold" ]
+	then
+	    return 0
+	fi
+
+  	# Otherwise, treat as "down" #
+	return 1
+}
+
+##------------------------------------------##
+## Modified by ExtremeFiretop [2025-Mar-07] ##
+##------------------------------------------##
 Create_Symlinks()
 {
 	printf "WAN\n" > "$SCRIPT_INTERFACES"
@@ -520,11 +570,10 @@ Create_Symlinks()
 
 	for index in 1 2 3 4 5
 	do
-		comment=""
-		if [ ! -f "/sys/class/net/wgc$index/operstate" ] || \
-		   [ "$(cat "/sys/class/net/wgc$index/operstate")" = "down" ]
+		comment=" #excluded - interface not up#"
+		if Check_WG_Interface "$index"
 		then
-			comment=" #excluded - interface not up#"
+			comment=""  # empty comment => interface is included #
 		fi
 		if [ "$index" -lt 5 ]; then
 			printf "WGVPN%s%s\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
@@ -650,9 +699,9 @@ Conf_FromSettings()
 	fi
 }
 
-##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-02] ##
-##----------------------------------------##
+##------------------------------------------##
+## Modified by ExtremeFiretop [2025-Mar-07] ##
+##------------------------------------------##
 Interfaces_FromSettings()
 {
 	SETTINGSFILE="/jffs/addons/custom_settings.txt"
@@ -680,13 +729,12 @@ Interfaces_FromSettings()
 
 			for index in 1 2 3 4 5
 			do
-				comment=" #excluded#"
-				if [ ! -f "/sys/class/net/wgc$index/operstate" ] || \
-				   [ "$(cat "/sys/class/net/wgc$index/operstate")" = "down" ]
+				comment=" #excluded - interface not up#"
+				if Check_WG_Interface "$index"
 				then
-					comment=" #excluded - interface not up#"
+					comment=" #excluded#"
 				fi
-				printf "WGVPN%s%s\\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
+				printf "WGVPN%s%s\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
 			done
 
 			echo "" > "$SCRIPT_INTERFACES_USER"
@@ -2470,7 +2518,7 @@ Run_Speedtest()
 	Auto_ServiceEvent create 2>/dev/null
 	Shortcut_Script create
 	ScriptStorageLocation load
-	Create_Symlinks
+	Create_Symlinks force
 
 	mode="$1"
 	if [ $# -lt 2 ] || [ -z "$2" ]
@@ -3624,7 +3672,7 @@ MainMenu()
 			c)
 				Generate_Interface_List
 				printf "\n"
-				Create_Symlinks
+				Create_Symlinks force
 				printf "\n"
 				break
 			;;
@@ -3895,7 +3943,7 @@ Menu_Startup()
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load
-	Create_Symlinks
+	Create_Symlinks force
 	Auto_Startup create 2>/dev/null
 	if AutomaticMode check
 	then Auto_Cron create 2>/dev/null
@@ -5295,19 +5343,21 @@ then
 		opkg update
 		opkg install sqlite3-cli
 	fi
-	
+
 	Create_Dirs
 	Conf_Exists
-	if [ "$(SpeedtestBinary check)" = "builtin" ]; then
+	if [ "$(SpeedtestBinary check)" = "builtin" ]
+	then
 		printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
-	elif [ "$(SpeedtestBinary check)" = "external" ]; then
+	elif [ "$(SpeedtestBinary check)" = "external" ]
+	then
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load
-	Create_Symlinks
-	
+	Create_Symlinks force
+
 	Process_Upgrade
-	
+
 	Auto_Startup create 2>/dev/null
 	if AutomaticMode check
 	then Auto_Cron create 2>/dev/null
