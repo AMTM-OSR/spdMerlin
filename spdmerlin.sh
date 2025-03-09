@@ -13,7 +13,7 @@
 ##         https://github.com/jackyaz/spdMerlin             ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Mar-08
+# Last Modified: 2025-Mar-09
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -499,33 +499,60 @@ Create_Dirs()
 	fi
 }
 
-##############################################################
-# Function: Check_WG_Interface
-#   Checks if wgcX is enabled in nvram AND
-#   verifies that it had a handshake within THRESHOLD seconds.
-#   Returns 0 if "connected" (up), 1 otherwise (down).
-# Added by ExtremeFiretop [2025-Mar-07]
-##############################################################
-Check_WG_Interface()
+##-------------------------------------##
+## Added by Martinski W. [2025-Mar-08] ##
+##-------------------------------------##
+## For both OpenVPN and WAN interfaces ##
+##-------------------------------------##
+_CheckNetClientInterfaceUP_()
 {
-	index="$1"          # e.g. 1 => wgc1 #
-	threshold=180       # 180-second cutoff for "connected" #
-	iface="wgc${index}"
+   if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
+
+   local IFACE_NAME="$1"
+
+   if echo "$1" | grep -qE "^[1-5]$"
+   then IFACE_NAME="tun1$1" ; fi
+
+   if [ ! -f "/sys/class/net/${IFACE_NAME}/operstate" ] || \
+      [ "$(cat "/sys/class/net/${IFACE_NAME}/operstate")" = "down" ]
+   then return 1
+   else return 0
+   fi
+}
+
+##############################################################
+# Checks if 'wgcX' interface is enabled in NVRAM *AND*
+# verifies that it had a handshake within THRESHOLD seconds.
+# Returns 0 if "connected" (up), 1 otherwise (down).
+#-------------------------------------------------------------
+# Modified by Martinski W. [2025-Mar-08]
+##############################################################
+_Check_WG_ClientInterfaceUP_()
+{
+    if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
+    local IFACE_NAME  threshold  handshakeLine
+
+    if echo "$1" | grep -qE "^wgc[1-5]$"
+    then IFACE_NAME="$1"
+    else IFACE_NAME="wgc$1"
+    fi
+
+	threshold=180  # 180-second cutoff for "connected" #
 
 	# First confirm NVRAM says it is enabled #
 	# wgc1_enable = 1 => on, 0 => off #
-	if [ "$(nvram get wgc${index}_enable)" != "1" ]
+	if [ "$(nvram get ${IFACE_NAME}_enable)" != "1" ]
 	then  # NOT enabled #
 	    return 1
 	fi
 
 	# Attempt to read the handshake time from 'wg' #
 	# If no handshake line, consider it "down" #
-	handshake_line="$(wg show "$iface" latest-handshakes 2>/dev/null | head -n1)"
-	[ -z "$handshake_line" ] && return 1
+	handshakeLine="$(wg show "$IFACE_NAME" latest-handshakes 2>/dev/null | head -n1)"
+	[ -z "$handshakeLine" ] && return 1
 
 	# Extract numeric epoch from the second column #
-	timestamp="$(echo "$handshake_line" | awk '{print $2}')"
+	timestamp="$(echo "$handshakeLine" | awk '{print $2}')"
 	# If no timestamp or if it’s explicitly zero, treat as "disconnected" #
 	if [ -z "$timestamp" ] || [ "$timestamp" = "0" ]
 	then
@@ -546,40 +573,34 @@ Check_WG_Interface()
 	return 1
 }
 
-##------------------------------------------##
-## Modified by ExtremeFiretop [2025-Mar-07] ##
-##------------------------------------------##
+##----------------------------------------##
+## Modified by Martinski W. [2025-Mar-08] ##
+##----------------------------------------##
 Create_Symlinks()
 {
 	printf "WAN\n" > "$SCRIPT_INTERFACES"
 
+    local ifaceTagStr
+    local excludedNotUPstr=" #excluded - interface not up#"
+
 	for index in 1 2 3 4 5
 	do
-		comment=""
-		if [ ! -f "/sys/class/net/tun1$index/operstate" ] || \
-		   [ "$(cat "/sys/class/net/tun1$index/operstate")" = "down" ]
+        ifaceTagStr="$excludedNotUPstr"
+		if _CheckNetClientInterfaceUP_ "$index"
 		then
-			comment=" #excluded - interface not up#"
+			ifaceTagStr=""  #Interface is included#
 		fi
-		if [ "$index" -lt 5 ]; then
-			printf "VPNC%s%s\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
-		else
-			printf "VPNC%s%s\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
-		fi
+		printf "VPNC%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 	done
 
 	for index in 1 2 3 4 5
 	do
-		comment=" #excluded - interface not up#"
-		if Check_WG_Interface "$index"
+		ifaceTagStr="$excludedNotUPstr"
+		if _Check_WG_ClientInterfaceUP_ "$index"
 		then
-			comment=""  # empty comment => interface is included #
+			ifaceTagStr=""  #Interface is included#
 		fi
-		if [ "$index" -lt 5 ]; then
-			printf "WGVPN%s%s\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
-		else
-			printf "WGVPN%s%s\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
-		fi
+		printf "WGVPN%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 	done
 
 	if [ $# -gt 0 ] && [ "$1" = "force" ]; then
@@ -598,9 +619,9 @@ Create_Symlinks()
 		fi
 	done < "$SCRIPT_INTERFACES"
 
-	interfacecount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
+	interfaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
 	COUNTER=1
-	until [ "$COUNTER" -gt "$interfacecount" ]
+	until [ "$COUNTER" -gt "$interfaceCount" ]
 	do
 		Set_Interface_State "$COUNTER"
 		COUNTER="$((COUNTER + 1))"
@@ -699,12 +720,16 @@ Conf_FromSettings()
 	fi
 }
 
-##------------------------------------------##
-## Modified by ExtremeFiretop [2025-Mar-07] ##
-##------------------------------------------##
+##----------------------------------------##
+## Modified by Martinski W. [2025-Mar-08] ##
+##----------------------------------------##
 Interfaces_FromSettings()
 {
 	SETTINGSFILE="/jffs/addons/custom_settings.txt"
+
+	local ifaceTagStr  interface_UP
+	local excludedNotUPstr=" #excluded - interface not up#"
+
 	if [ -f "$SETTINGSFILE" ]
 	then
 		if grep -q "spdmerlin_ifaces_enabled" "$SETTINGSFILE"
@@ -714,27 +739,26 @@ Interfaces_FromSettings()
 			SETTINGVALUE="$(grep "spdmerlin_ifaces_enabled" "$SETTINGSFILE" | cut -f2 -d' ')"
 			sed -i "\\~spdmerlin_ifaces_enabled~d" "$SETTINGSFILE"
 
-			printf "WAN #excluded#\\n" > "$SCRIPT_INTERFACES"
+			printf "WAN #excluded#\n" > "$SCRIPT_INTERFACES"
 
 			for index in 1 2 3 4 5
 			do
-				comment=" #excluded#"
-				if [ ! -f "/sys/class/net/tun1$index/operstate" ] || \
-				   [ "$(cat "/sys/class/net/tun1$index/operstate")" = "down" ]
+				ifaceTagStr="$excludedNotUPstr"
+				if _CheckNetClientInterfaceUP_ "$index"
 				then
-					comment=" #excluded - interface not up#"
+				    ifaceTagStr=" #excluded#"
 				fi
-				printf "VPNC%s%s\\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
+				printf "VPNC%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 			done
 
 			for index in 1 2 3 4 5
 			do
-				comment=" #excluded - interface not up#"
-				if Check_WG_Interface "$index"
+				ifaceTagStr="$excludedNotUPstr"
+				if _Check_WG_ClientInterfaceUP_ "$index"
 				then
-					comment=" #excluded#"
+				    ifaceTagStr=" #excluded#"
 				fi
-				printf "WGVPN%s%s\n" "$index" "$comment" >> "$SCRIPT_INTERFACES"
+				printf "WGVPN%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 			done
 
 			echo "" > "$SCRIPT_INTERFACES_USER"
@@ -747,34 +771,42 @@ Interfaces_FromSettings()
 				fi
 			done < "$SCRIPT_INTERFACES"
 
-			interfacecount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
+			interfaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
 			COUNTER=1
-			until [ "$COUNTER" -gt "$interfacecount" ]
+			until [ "$COUNTER" -gt "$interfaceCount" ]
 			do
 				Set_Interface_State "$COUNTER"
 				COUNTER="$((COUNTER + 1))"
 			done
 
-			for iface in $(echo "$SETTINGVALUE" | sed "s/,/ /g")
+			for IFACEname in $(echo "$SETTINGVALUE" | sed "s/,/ /g")
 			do
-				ifacelinenumber="$(grep -n "$iface" "$SCRIPT_INTERFACES_USER" | cut -f1 -d':')"
-				interfaceline="$(sed "$ifacelinenumber!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+				ifacelinenumber="$(grep -n "$IFACEname" "$SCRIPT_INTERFACES_USER" | cut -f1 -d':')"
+				interfaceLine="$(sed "$ifacelinenumber!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+				IFACE_NAME="$(echo "$interfaceLine" | cut -f1 -d"#" | sed 's/ *$//')"
+				IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
 
-				if echo "$interfaceline" | grep -q "#excluded"
+				interface_UP=false
+				if echo "$IFACE_NAME" | grep -q "^WGVPN"
 				then
-					IFACE_LOWER="$(Get_Interface_From_Name "$(echo "$interfaceline" | cut -f1 -d"#" | sed 's/ *$//')" | tr "A-Z" "a-z")"
-					if [ ! -f "/sys/class/net/$IFACE_LOWER/operstate" ] || \
-					   [ "$(cat "/sys/class/net/$IFACE_LOWER/operstate")" = "down" ]
+				    if _Check_WG_ClientInterfaceUP_ "$IFACE_LOWER"
+				    then interface_UP=true ; fi
+				else
+				    if _CheckNetClientInterfaceUP_ "$IFACE_LOWER"
+				    then interface_UP=true ; fi
+				fi
+
+				if echo "$interfaceLine" | grep -q "#excluded"
+				then
+					if "$interface_UP"
 					then
-						sed -i "${ifacelinenumber}s/ #excluded#/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
-					else
 						sed -i "${ifacelinenumber}s/ #excluded - interface not up#//" "$SCRIPT_INTERFACES_USER"
 						sed -i "${ifacelinenumber}s/ #excluded#//" "$SCRIPT_INTERFACES_USER"
+					else
+						sed -i "${ifacelinenumber}s/ #excluded#/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 					fi
 				else
-					IFACE_LOWER="$(Get_Interface_From_Name "$(echo "$interfaceline" | cut -f1 -d"#" | sed 's/ *$//')" | tr "A-Z" "a-z")"
-					if [ ! -f "/sys/class/net/$IFACE_LOWER/operstate" ] || \
-					   [ "$(cat "/sys/class/net/$IFACE_LOWER/operstate")" = "down" ]
+					if ! "$interface_UP"
 					then
 						sed -i "$ifacelinenumber"'s/$/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
 					fi
@@ -1072,82 +1104,83 @@ Auto_Cron()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-02] ##
+## Modified by Martinski W. [2025-Mar-08] ##
 ##----------------------------------------##
 Get_Interface_From_Name()
 {
-	IFACE=""
+	local IFACEname=""
 	case "$1" in
 		WAN)
-			if [ "$(nvram get sw_mode)" -ne 1 ]; then
-				IFACE="br0"
-			elif [ "$(nvram get wan0_proto)" = "pppoe" ] || [ "$(nvram get wan0_proto)" = "pptp" ] || [ "$(nvram get wan0_proto)" = "l2tp" ]; then
-				IFACE="ppp0"
+			if [ "$(nvram get sw_mode)" -ne 1 ]
+			then
+				IFACEname="br0"
+			elif [ "$(nvram get wan0_proto)" = "pppoe" ] || \
+			     [ "$(nvram get wan0_proto)" = "pptp" ] || \
+			     [ "$(nvram get wan0_proto)" = "l2tp" ]
+			then
+				IFACEname="ppp0"
 			else
-				IFACE="$(nvram get wan0_ifname)"
+				IFACEname="$(nvram get wan0_ifname)"
 			fi
 		;;
-		VPNC1) IFACE="tun11" ;;
-		VPNC2) IFACE="tun12" ;;
-		VPNC3) IFACE="tun13" ;;
-		VPNC4) IFACE="tun14" ;;
-		VPNC5) IFACE="tun15" ;;
-		WGVPN1) IFACE="wgc1" ;;
-		WGVPN2) IFACE="wgc2" ;;
-		WGVPN3) IFACE="wgc3" ;;
-		WGVPN4) IFACE="wgc4" ;;
-		WGVPN5) IFACE="wgc5" ;;
+		VPNC1) IFACEname="tun11" ;;
+		VPNC2) IFACEname="tun12" ;;
+		VPNC3) IFACEname="tun13" ;;
+		VPNC4) IFACEname="tun14" ;;
+		VPNC5) IFACEname="tun15" ;;
+		WGVPN1) IFACEname="wgc1" ;;
+		WGVPN2) IFACEname="wgc2" ;;
+		WGVPN3) IFACEname="wgc3" ;;
+		WGVPN4) IFACEname="wgc4" ;;
+		WGVPN5) IFACEname="wgc5" ;;
 	esac
-
-	echo "$IFACE"
+	echo "$IFACEname"
 }
 
-##-------------------------------------==---##
-## Modified by ExtremeFiretop [2025-Mar-08] ##
-##------------------------------------------##
-Set_Interface_State(){
-    interfaceline="$(sed "$1!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
-    
-    # Only process lines that begin with VPNC or WGVPN
-    if echo "$interfaceline" | grep -qE "^(VPNC|WGVPN)"; then
-        IFACE_NAME="$(echo "$interfaceline" | cut -f1 -d"#" | sed 's/ *$//')"
+##------------------------------------=---##
+## Modified by Martinski W. [2025-Mar-08] ##
+##----------------------------------------##
+Set_Interface_State()
+{
+    local interfaceLine  interface_UP  index
+    interfaceLine="$(sed "$1!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+
+    if echo "$interfaceLine" | grep -qE "^(VPNC|WGVPN)"
+    then
+        IFACE_NAME="$(echo "$interfaceLine" | cut -f1 -d"#" | sed 's/ *$//')"
         IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
 
-        # Check if the interface is up vs down
-        # For WGVPN => use Check_WG_Interface(index)
-        # For VPNC => check /sys/class/net/<interface>/operstate
-        interface_is_up=false
-        if echo "$IFACE_NAME" | grep -q "WGVPN"; then
-            # Extract the numeric suffix (e.g. WGVPN3 => index=3)
-            index="$(echo "$IFACE_NAME" | sed 's/[^0-9]//g')"
-            if Check_WG_Interface "$index"; then
-                interface_is_up=true
-            fi
+        # Check if interface is 'up' vs 'down' #
+        interface_UP=false
+        if echo "$IFACE_NAME" | grep -q "^WGVPN"
+        then
+            if _Check_WG_ClientInterfaceUP_ "$IFACE_LOWER"
+            then interface_UP=true ; fi
         else
-            # This is an OpenVPN client
-            if [ -f "/sys/class/net/$IFACE_LOWER/operstate" ] &&
-               [ "$(cat "/sys/class/net/$IFACE_LOWER/operstate")" = "up" ]; then
-                interface_is_up=true
-            fi
+            if _CheckNetClientInterfaceUP_ "$IFACE_LOWER"
+            then interface_UP=true ; fi
         fi
 
-        # Decide how to update the #excluded marker based on up/down
-        if echo "$interfaceline" | grep -q "#excluded"; then
-            # The user has explicitly excluded this interface at some point
-            if [ "$interface_is_up" = true ]; then
-                # If it was #excluded - interface not up#, strip off the suffix
+        # Decide how to update the '#excluded' marker based on up/down #
+        if echo "$interfaceLine" | grep -q "#excluded"
+        then
+            # The user has explicitly excluded this interface at some point #
+            if "$interface_UP"
+            then
+                # If it was '#excluded - interface not up#' strip off the suffix #
                 sed -i "$1 s/#excluded - interface not up#/#excluded#/" "$SCRIPT_INTERFACES_USER"
             else
-                # The interface is down: ensure we have "#excluded - interface not up#"
-                if echo "$interfaceline" | grep -q "#excluded#$"; then
+                # The interface is 'down' so ensure we have "#excluded - interface not up#" #
+                if echo "$interfaceLine" | grep -q "#excluded#$"
+                then
                     sed -i "$1 s/#excluded$/#excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
                 fi
             fi
-
         else
-            # No “#excluded” marker => user wanted it included
-            if [ "$interface_is_up" = false ]; then
-                # If it’s down, automatically exclude it with “- interface not up#”
+            # No '#excluded' marker => user wanted it included #
+            if ! "$interface_UP"
+            then
+                # If it’s 'down' automatically exclude it with '- interface not up#' #
                 sed -i "$1 s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
             fi
         fi
@@ -1155,11 +1188,11 @@ Set_Interface_State(){
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-03] ##
+## Modified by Martinski W. [2025-Mar-08] ##
 ##----------------------------------------##
 Generate_Interface_List()
 {
-    local ifaceCount  ifaceEntryNum  interfaceLine
+    local ifaceCount  ifaceEntryNum  interfaceLine  interface_UP
 	printf "\nRetrieving list of interfaces...\n\n"
 
     _GenerateIFaceList_()
@@ -1196,25 +1229,34 @@ Generate_Interface_List()
 			PressEnter
 		else
 			interfaceLine="$(sed "$ifaceEntryNum!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
-			IFACE_LOWER="$(Get_Interface_From_Name "$(echo "$interfaceLine" | cut -f1 -d"#" | sed 's/ *$//')" | tr "A-Z" "a-z")"
+			IFACE_NAME="$(echo "$interfaceLine" | cut -f1 -d"#" | sed 's/ *$//')"
+			IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
+
+			interface_UP=false
+			if echo "$IFACE_NAME" | grep -q "^WGVPN"
+			then
+			    if _Check_WG_ClientInterfaceUP_ "$IFACE_LOWER"
+			    then interface_UP=true ; fi
+			else
+			    if _CheckNetClientInterfaceUP_ "$IFACE_LOWER"
+			    then interface_UP=true ; fi
+			fi
 
 			if echo "$interfaceLine" | grep -q "#excluded"
             then
-				if [ ! -f "/sys/class/net/$IFACE_LOWER/operstate" ] || \
-				   [ "$(cat "/sys/class/net/$IFACE_LOWER/operstate")" = "down" ]
+				if "$interface_UP"
 				then
-					sed -i "$ifaceEntryNum"'s/ #excluded#/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
-				else
 					sed -i "$ifaceEntryNum"'s/ #excluded - interface not up#//' "$SCRIPT_INTERFACES_USER"
 					sed -i "$ifaceEntryNum"'s/ #excluded#//' "$SCRIPT_INTERFACES_USER"
+				else
+					sed -i "$ifaceEntryNum"'s/ #excluded#/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
 				fi
 			else
-				if [ ! -f "/sys/class/net/$IFACE_LOWER/operstate" ] || \
-				   [ "$(cat "/sys/class/net/$IFACE_LOWER/operstate")" = "down" ]
+				if "$interface_UP"
 				then
-					sed -i "$ifaceEntryNum"'s/$/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
-				else
 					sed -i "$ifaceEntryNum"'s/$/ #excluded#/' "$SCRIPT_INTERFACES_USER"
+				else
+					sed -i "$ifaceEntryNum"'s/$/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
 				fi
 			fi
 			sed -i 's/ *$//' "$SCRIPT_INTERFACES_USER"
@@ -1846,18 +1888,18 @@ GenerateServerList()
 		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
 		LICENSE_STRING=""
 	fi
-	serverlist="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$1")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
-	if [ -z "$serverlist" ]
+	serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$1")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+	if [ -z "$serverList" ]
 	then
 		Print_Output true "Error retrieving server list for for $1" "$CRIT"
 		serverno="exit"
 		return 1
 	fi
-	servercount="$(echo "$serverlist" | jq '.servers | length')"
+	serverCount="$(echo "$serverList" | jq '.servers | length')"
 	COUNTER=1
-	until [ "$COUNTER" -gt "$servercount" ]
+	until [ "$COUNTER" -gt "$serverCount" ]
 	do
-		serverdetails="$(echo "$serverlist" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')|$(echo "$serverlist" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
+		serverdetails="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')|$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
 
 		printf "%2d)  %s\n" "$COUNTER" "$serverdetails"
 		COUNTER="$((COUNTER + 1))"
@@ -1867,7 +1909,7 @@ GenerateServerList()
 
 	while true
 	do
-		printf "\n${BOLD}Please select a server from the list above [1-%s].${CLEARFORMAT}" "$servercount"
+		printf "\n${BOLD}Please select a server from the list above [1-%s].${CLEARFORMAT}" "$serverCount"
 		printf "\n${BOLD}Or press ${GRNct}c${CLRct} to enter a known server ID.${CLEARFORMAT}"
 		printf "\n${BOLD}Enter answer:${CLEARFORMAT}  "
 		read -r server
@@ -1928,13 +1970,13 @@ GenerateServerList()
 				done
 		elif ! Validate_Number "$server"
 		then
-			printf "\n${ERR}Please enter a valid number [1-%s]${CLEARFORMAT}\n" "$servercount"
+			printf "\n${ERR}Please enter a valid number [1-%s]${CLEARFORMAT}\n" "$serverCount"
 		else
-			if [ "$server" -lt 1 ] || [ "$server" -gt "$servercount" ]; then
-				printf "\n${ERR}Please enter a number between 1 and %s.${CLEARFORMAT}\n" "$servercount"
+			if [ "$server" -lt 1 ] || [ "$server" -gt "$serverCount" ]; then
+				printf "\n${ERR}Please enter a number between 1 and %s.${CLEARFORMAT}\n" "$serverCount"
 			else
-				serverno="$(echo "$serverlist" | jq -r --argjson index "$((server-1))" '.servers[$index] | .id')"
-				servername="$(echo "$serverlist" | jq -r --argjson index "$((server-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
+				serverno="$(echo "$serverList" | jq -r --argjson index "$((server-1))" '.servers[$index] | .id')"
+				servername="$(echo "$serverList" | jq -r --argjson index "$((server-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
 				printf "\n"
 				break
 			fi
@@ -1981,23 +2023,23 @@ GenerateServerList_WebUI()
 
 		for IFACE_NAME in $IFACELIST
 		do
-			serverlist="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$IFACE_NAME")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
-			servercount="$(echo "$serverlist" | jq '.servers | length')"
+			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$IFACE_NAME")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+			serverCount="$(echo "$serverList" | jq '.servers | length')"
 			COUNTER=1
-			until [ $COUNTER -gt "$servercount" ]
+			until [ $COUNTER -gt "$serverCount" ]
 			do
-				printf "%s|%s\\n" "$(echo "$serverlist" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')" "$(echo "$serverlist" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"  >> "/tmp/$serverlistfile.tmp"
+				printf "%s|%s\\n" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"  >> "/tmp/$serverlistfile.tmp"
 				COUNTER=$((COUNTER + 1))
 			done
 			printf "-----\\n" >> "/tmp/$serverlistfile.tmp"
 		done
 	else
-		serverlist="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$spdifacename")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
-		servercount="$(echo "$serverlist" | jq '.servers | length')"
+		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$spdifacename")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+		serverCount="$(echo "$serverList" | jq '.servers | length')"
 		COUNTER=1
-		until [ $COUNTER -gt "$servercount" ]
+		until [ $COUNTER -gt "$serverCount" ]
 		do
-			printf "%s|%s\\n" "$(echo "$serverlist" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')" "$(echo "$serverlist" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"  >> "/tmp/$serverlistfile.tmp"
+			printf "%s|%s\\n" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"  >> "/tmp/$serverlistfile.tmp"
 			COUNTER=$((COUNTER + 1))
 		done
 	fi
@@ -2516,7 +2558,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Mar-08] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2653,8 +2695,18 @@ Run_Speedtest()
 			do
 				IFACE="$(Get_Interface_From_Name "$IFACE_NAME")"
 				IFACE_LOWER="$(echo "$IFACE" | tr "A-Z" "a-z")"
-				if [ ! -f "/sys/class/net/$IFACE_LOWER/operstate" ] || \
-				   [ "$(cat "/sys/class/net/$IFACE_LOWER/operstate")" = "down" ]
+
+				interface_UP=false
+				if echo "$IFACE_NAME" | grep -q "^WGVPN"
+				then 
+				    if _Check_WG_ClientInterfaceUP_ "$IFACE_LOWER"
+				    then interface_UP=true ; fi
+				else
+				    if _CheckNetClientInterfaceUP_ "$IFACE_LOWER"
+				    then interface_UP=true ; fi
+				fi
+
+				if ! "$interface_UP"
 				then
 					Print_Output true "$IFACE not up, please check. Skipping speedtest for $IFACE_NAME" "$WARN"
 					continue
@@ -2666,7 +2718,7 @@ Run_Speedtest()
 					elif [ "$mode" = "webui_onetime" ]; then
 						mode="user"
 					fi
-					
+
 					if [ "$mode" = "schedule" ]
 					then
 						if PreferredServer check "$IFACE_NAME"
@@ -3140,7 +3192,7 @@ Process_Upgrade()
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Feb-28] ##
 ##----------------------------------------##
-#$1 iface name
+#$1 IFACE Name
 Generate_LastXResults()
 {
 	for IFACE_NAME in $FULL_IFACELIST;
