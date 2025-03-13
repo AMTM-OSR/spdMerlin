@@ -13,7 +13,7 @@
 ##         https://github.com/jackyaz/spdMerlin             ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Mar-09
+# Last Modified: 2025-Mar-12
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -433,21 +433,22 @@ Update_File()
 	fi
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Mar-12] ##
+##----------------------------------------##
 Validate_Bandwidth()
 {
-	if echo "$1" | /bin/grep -oq "^[0-9]*\.\?[0-9]*$"; then
-		return 0
-	else
-		return 1
+	if echo "$1" | grep -oqE "^([0-9]+([.][0-9]*)?|[0-9]*[.][0-9]+)$"
+	then return 0
+	else return 1
 	fi
 }
 
 Validate_Number()
 {
-	if [ "$1" -eq "$1" ] 2>/dev/null; then
-		return 0
-	else
-		return 1
+	if [ "$1" -eq "$1" ] 2>/dev/null
+	then return 0
+	else return 1
 	fi
 }
 
@@ -2013,9 +2014,11 @@ GenerateServerList_WebUI()
 
 	if [ "$spdifacename" = "ALL" ]
 	then
+		IFACELIST=""
 		while IFS='' read -r line || [ -n "$line" ]
 		do
-			if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]; then
+			if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
+			then
 				IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
 			fi
 		done < "$SCRIPT_INTERFACES_USER"
@@ -2558,7 +2561,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
+## Modified by Martinski W. [2025-Mar-12] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2798,8 +2801,9 @@ Run_Speedtest()
 						fi
 					fi
 
-					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c FAILED $tmpfile)" -gt 0 ]; then
-						Print_Output true "Error running speedtest for $IFACE_NAME" "$CRIT"
+					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c FAILED $tmpfile)" -gt 0 ]
+					then
+						Print_Output true "**ERROR** running speedtest for $IFACE_NAME [No Results]" "$CRIT"
 						continue
 					fi
 
@@ -2811,11 +2815,11 @@ Run_Speedtest()
 					timenow="$(date +'%s')"
 					timenowfriendly="$(date +'%c')"
 
-					## New if-then-else block added to with ookla output when buffer bloat has been added to the human readable output
+					## New if-then-else block added to with ookla output when buffer bloat has been added to the human readable output ##
 					BUFFBLOAT="$(grep "Idle Latency:" "$tmpfile")"
 					if [ -n "$BUFFBLOAT" ]
 					then
-						# Parse human readable output when buffer bloat data is included.
+						# Parse human readable output when buffer bloat data is included.#
 						download="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						latency="$(grep "Idle Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $3}')"
@@ -2847,6 +2851,39 @@ Run_Speedtest()
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
 					fi
 
+
+
+## BEGIN: FOR TESTING/DEBUG ONLY ##
+if true  ##doDEBUG##
+then
+   DEBUG_FILE="/home/root/${SCRIPT_NAME}.DEBUG.txt"
+   cp -fp "$tmpfile" "$DEBUG_FILE"
+   if [ -z "$download" ] || [ -z "$upload" ] || [ -z "$datadownload" ] || [ -z "$dataupload" ]
+   then
+      printf "\n${CRIT}**ERROR** running speedtest for $IFACE_NAME [Empty Values]${CLRct}\n"
+      {
+        printf "\nTIME: $(date +'%c')\n"
+        printf "\n**DEBUG**: Binary:[$SPEEDTEST_BINARY]"
+        printf "\n**DEBUG**: Mode:[$mode]"
+        printf "\n**DEBUG**: Interface:[$IFACE]"
+        printf "\n**DEBUG**: IFaceName:[$IFACE_NAME]"
+        printf "\n**DEBUG**: Download:[$download]"
+        printf "\n**DEBUG**: Upload:[$upload]"
+        printf "\n**DEBUG**: Datadownload:[$datadownload]"
+        printf "\n**DEBUG**: Dataupload:[$dataupload]\n"
+      } >> "$DEBUG_FILE"
+   fi
+fi
+## ENDIN: FOR TESTING/DEBUG ONLY ##
+
+
+
+					if [ -z "$download" ] || [ -z "$upload" ] || [ -z "$datadownload" ] || [ -z "$dataupload" ]
+					then
+						Print_Output true "**ERROR** running speedtest for $IFACE_NAME [Empty Values]" "$CRIT"
+						continue
+					fi
+
 					! Validate_Bandwidth "$download" && download=0;
 					! Validate_Bandwidth "$upload" && upload=0;
 					! Validate_Bandwidth "$latency" && latency="null";
@@ -2869,7 +2906,7 @@ Run_Speedtest()
 						if [ "$curllatency" = "null" ]; then
 							curllatency=0
 						fi
-						
+
 						curlresult=$(curl -fsL  --retry 4 --retry-delay 5 -d "recommendedserverid=$serverid" \
 -d "ping=$(echo "$curllatency" | awk '{printf("%.0f\n", $1);}')" \
 -d "screenresolution=" \
@@ -2886,9 +2923,9 @@ Run_Speedtest()
 -d "bytessent=$(echo "$dataupload" | awk '{printf("%.0f\n", $1*1024);}')" \
 -d "serverid=$serverid" \
 -H "Referer: http://c.speedtest.net/flash/speedtest.swf" https://www.speedtest.net/api/api.php)
-					
+
 						resulturl="https://www.speedtest.net/result/$(echo "$curlresult" | cut -f2 -d'&' | cut -f2 -d'=')"
-						printf " Result URL: %s\\n" "$resulturl" | tee -a "$tmpfile"
+						printf " Result URL: %s\n" "$resulturl" | tee -a "$tmpfile"
 					fi
 
 					spdIndx="$((spdIndx + 1))"
@@ -2916,19 +2953,19 @@ Run_Speedtest()
 					fi
 					_ApplyDatabaseSQLCmds_ /tmp/spdTest-stats.sql "spd2$spdIndx"
 
-					spdtestresult="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};'| awk '{$1=$1};1') - $(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};'| awk '{$1=$1};1')"
+					spdtestresult1="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};'| awk '{$1=$1};1') - $(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};'| awk '{$1=$1};1')"
 					spdtestresult2="$(grep "Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{$1=$1};1') - $(grep "Packet Loss:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{$1=$1};1')"
 
-					printf "\n"
-					Print_Output true "Speedtest results - $spdtestresult" "$PASS"
+					printf "\n$(date +'%c')\n"
+					Print_Output true "Speedtest results - $spdtestresult1" "$PASS"
 					Print_Output true "Connection quality - $spdtestresult2" "$PASS"
 
 					{
-						printf "Speedtest result for %s\\n" "$IFACE_NAME"
-						printf "\\nBandwidth - %s\\n" "$spdtestresult"
-						printf "Quality - %s\\n\\n" "$spdtestresult2"
+						printf "Speedtest result for %s [%s]\n\n" "$IFACE_NAME" "$(date +'%c')"
+						printf "BANDWIDTH\n%s\n" "$spdtestresult1"
+						printf "QUALITY\n%s\n\n" "$spdtestresult2"
 						grep "Result URL" "$tmpfile" | awk '{$1=$1};1'
-						printf "\\n\\n\\n"
+						printf "\n\n\n"
 					} >> "$resultfile"
 
 					extStats="/jffs/addons/extstats.d/mod_spdstats.sh"
@@ -3005,9 +3042,11 @@ Run_Speedtest_WebUI()
 		spdtestserverlist="$(echo "$spdteststring" | cut -f3 -d'_')";
 		if [ "$spdifacename" = "All" ]
 		then
+			IFACELIST=""
 			while IFS='' read -r line || [ -n "$line" ]
 			do
-				if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]; then
+				if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
+				then
 					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
 				fi
 			done < "$SCRIPT_INTERFACES_USER"
@@ -3230,7 +3269,8 @@ Generate_CSVs()
 	STORERESULTURL="$(StoreResultURL check)"
 	IFACELIST=""
 
-	while IFS='' read -r line || [ -n "$line" ]; do
+	while IFS='' read -r line || [ -n "$line" ]
+	do
 		IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
 	done < "$SCRIPT_INTERFACES_USER"
 	IFACELIST="$(echo "$IFACELIST" | cut -c2-)"

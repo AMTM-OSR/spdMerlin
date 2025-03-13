@@ -33,7 +33,7 @@ p{font-weight:bolder}thead.collapsible-jquery{color:#fff;padding:0;width:100%;bo
 <script>
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Mar-08] **/
+/** Modified by Martinski W. [2025-Mar-12] **/
 /**----------------------------------------**/
 
 var custom_settings;
@@ -41,11 +41,11 @@ function LoadCustomSettings()
 {
 	custom_settings = <% get_custom_settings(); %>;
 	for (var prop in custom_settings)
-    {
+	{
 		if (Object.prototype.hasOwnProperty.call(custom_settings,prop))
-        {
+		{
 			if (prop.indexOf('spdmerlin') !== -1 && prop.indexOf('spdmerlin_version') === -1)
-            { eval('delete custom_settings.' + prop); }
+			{ eval('delete custom_settings.' + prop); }
 		}
 	}
 }
@@ -132,8 +132,9 @@ var daysofweek=["Mon","Tues","Wed","Thurs","Fri","Sat","Sun"],maxNoCharts=0,curr
 </tr>
 <tr class="apply_gen" valign="top" height="35px">
 <td colspan="2" class="savebutton">
-<input type="button" onclick="RunSpeedtest();" value="Run speedtest" class="button_gen savebutton" name="btnRunSpeedtest" id="btnRunSpeedtest">
-<img id="imgSpdTest" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>
+<input type="button" class="button_gen savebutton" name="btnRunSpeedtest" id="btnRunSpeedtest"
+   onclick="RunSpeedtest();" style="margin-left:80px !important;" value="Run speedtest">
+<img id="imgSpdTest" style="display:none; vertical-align:middle;" src="images/InternetScan.gif"/>
 &nbsp;&nbsp;&nbsp;
 <span id="spdtest_text" style="display:none;"></span>
 <!--
@@ -141,11 +142,11 @@ var daysofweek=["Mon","Tues","Wed","Thurs","Fri","Sat","Sun"],maxNoCharts=0,curr
 ** Added by Martinski W. [2025-Mar-02] **
 **-------------------------------------**
 -->
-<span id="databaseSize_text" style="margin-left:10px; display:none; font-size: 14px; font-weight: bolder;"></span>
+<span id="databaseSize_text" style="margin-left:12px; display:none; font-size: 14px; font-weight: bolder;"></span>
 </td>
 </tr>
 <tr style="display:none;" class="spdtest_output"><td colspan="2" style="padding: 0px;">
-<textarea cols="63" rows="8" wrap="off" readonly="readonly" id="spdtest_output" class="textarea_log_table" style="border:0px;font-family:Courier New,Courier,mono; font-size:11px;overflow-y:auto;overflow-x:hidden;">Speedtest output</textarea>
+<textarea cols="63" rows="9" wrap="off" readonly="readonly" id="spdtest_output" class="textarea_log_table" style="border:0px;font-family:Courier New,Courier,mono; font-size:11px;overflow-y:auto;overflow-x:hidden;">Speedtest output</textarea>
 </td></tr>
 </table>
 <div style="line-height:10px;">&nbsp;</div>
