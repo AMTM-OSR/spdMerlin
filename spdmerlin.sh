@@ -13,7 +13,7 @@
 ##         https://github.com/jackyaz/spdMerlin             ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Mar-12
+# Last Modified: 2025-Mar-13
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -2561,7 +2561,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-12] ##
+## Modified by Martinski W. [2025-Mar-13] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2603,7 +2603,7 @@ Run_Speedtest()
 	speedtestserverno=""
 	speedtestservername=""
 	MAXwaitTestSecs=120  #2 minutes#
-	local spdIndx=0
+	local spdIndx=0  spdTestOK=0
 
 	CONFIG_STRING=""
 	LICENSE_STRING="--accept-license --accept-gdpr"
@@ -2693,7 +2693,7 @@ Run_Speedtest()
 				applyautobw="true"
 			fi
 
-			spdIndx=0
+			spdIndx=0  spdTestOK=0
 			for IFACE_NAME in $IFACELIST
 			do
 				IFACE="$(Get_Interface_From_Name "$IFACE_NAME")"
@@ -2801,9 +2801,9 @@ Run_Speedtest()
 						fi
 					fi
 
-					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c FAILED $tmpfile)" -gt 0 ]
+					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c 'FAILED' "$tmpfile")" -gt 0 ]
 					then
-						Print_Output true "**ERROR** running speedtest for $IFACE_NAME [No Results]" "$CRIT"
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [No Results]" "$CRIT"
 						continue
 					fi
 
@@ -2851,36 +2851,9 @@ Run_Speedtest()
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
 					fi
 
-
-
-## BEGIN: FOR TESTING/DEBUG ONLY ##
-if true  ##doDEBUG##
-then
-   DEBUG_FILE="/home/root/${SCRIPT_NAME}.DEBUG.txt"
-   cp -fp "$tmpfile" "$DEBUG_FILE"
-   if [ -z "$download" ] || [ -z "$upload" ] || [ -z "$datadownload" ] || [ -z "$dataupload" ]
-   then
-      printf "\n${CRIT}**ERROR** running speedtest for $IFACE_NAME [Empty Values]${CLRct}\n"
-      {
-        printf "\nTIME: $(date +'%c')\n"
-        printf "\n**DEBUG**: Binary:[$SPEEDTEST_BINARY]"
-        printf "\n**DEBUG**: Mode:[$mode]"
-        printf "\n**DEBUG**: Interface:[$IFACE]"
-        printf "\n**DEBUG**: IFaceName:[$IFACE_NAME]"
-        printf "\n**DEBUG**: Download:[$download]"
-        printf "\n**DEBUG**: Upload:[$upload]"
-        printf "\n**DEBUG**: Datadownload:[$datadownload]"
-        printf "\n**DEBUG**: Dataupload:[$dataupload]\n"
-      } >> "$DEBUG_FILE"
-   fi
-fi
-## ENDIN: FOR TESTING/DEBUG ONLY ##
-
-
-
 					if [ -z "$download" ] || [ -z "$upload" ] || [ -z "$datadownload" ] || [ -z "$dataupload" ]
 					then
-						Print_Output true "**ERROR** running speedtest for $IFACE_NAME [Empty Values]" "$CRIT"
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [Empty Values]" "$CRIT"
 						continue
 					fi
 
@@ -2968,6 +2941,7 @@ fi
 						printf "\n\n\n"
 					} >> "$resultfile"
 
+					spdTestOK="$((spdTestOK + 1))"
 					extStats="/jffs/addons/extstats.d/mod_spdstats.sh"
 					if [ -f "$extStats" ]; then
 						sh "$extStats" ext "$download" "$upload"
@@ -2995,10 +2969,12 @@ fi
 				fi
 			fi
 
-			echo 'var spdteststatus = "GenerateCSV";' > /tmp/detect_spdtest.js
-			Print_Output true "Retrieving data for WebUI charts..." "$PASS"
-			Generate_CSVs
-
+			if [ "$spdTestOK" -gt 0 ]
+			then
+				echo 'var spdteststatus = "GenerateCSV";' > /tmp/detect_spdtest.js
+				Print_Output true "Retrieving data for WebUI charts..." "$PASS"
+				Generate_CSVs
+			fi
 			_UpdateDatabaseFileSizeInfo_
 
 			echo "Stats last updated: $timenowfriendly" > /tmp/spdstatstitle.txt
