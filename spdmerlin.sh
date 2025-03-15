@@ -13,7 +13,7 @@
 ##         https://github.com/jackyaz/spdMerlin             ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Mar-14
+# Last Modified: 2025-Mar-15
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -356,7 +356,7 @@ Update_Version()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Mar-15] ##
 ##----------------------------------------##
 Update_File()
 {
@@ -377,7 +377,7 @@ Update_File()
 			chmod 0755 "$OOKLA_DIR/speedtest"
 			Print_Output true "New version of Speedtest CLI downloaded to $OOKLA_DIR/speedtest" "$PASS"
 		fi
-		rm -f "/tmp/speedtest*"
+		rm -f /tmp/speedtest*
 	elif [ "$1" = "spdstats_www.asp" ]
 	then
 		tmpfile="/tmp/$1"
