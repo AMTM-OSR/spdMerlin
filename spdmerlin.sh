@@ -13,7 +13,7 @@
 ##         https://github.com/jackyaz/spdMerlin             ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Mar-09
+# Last Modified: 2025-Mar-15
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -356,7 +356,7 @@ Update_Version()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Mar-15] ##
 ##----------------------------------------##
 Update_File()
 {
@@ -377,7 +377,7 @@ Update_File()
 			chmod 0755 "$OOKLA_DIR/speedtest"
 			Print_Output true "New version of Speedtest CLI downloaded to $OOKLA_DIR/speedtest" "$PASS"
 		fi
-		rm -f "/tmp/speedtest*"
+		rm -f /tmp/speedtest*
 	elif [ "$1" = "spdstats_www.asp" ]
 	then
 		tmpfile="/tmp/$1"
@@ -433,21 +433,22 @@ Update_File()
 	fi
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Mar-12] ##
+##----------------------------------------##
 Validate_Bandwidth()
 {
-	if echo "$1" | /bin/grep -oq "^[0-9]*\.\?[0-9]*$"; then
-		return 0
-	else
-		return 1
+	if echo "$1" | grep -oqE "^([0-9]+([.][0-9]*)?|[0-9]*[.][0-9]+)$"
+	then return 0
+	else return 1
 	fi
 }
 
 Validate_Number()
 {
-	if [ "$1" -eq "$1" ] 2>/dev/null; then
-		return 0
-	else
-		return 1
+	if [ "$1" -eq "$1" ] 2>/dev/null
+	then return 0
+	else return 1
 	fi
 }
 
@@ -835,7 +836,7 @@ _GetDefaultSpeedTestBinary_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-02] ##
+## Modified by Martinski W. [2025-Mar-14] ##
 ##----------------------------------------##
 Conf_Exists()
 {
@@ -885,6 +886,9 @@ Conf_Exists()
 		if ! grep -q "^JFFS_MSGLOGTIME=" "$SCRIPT_CONF"; then
 			echo "JFFS_MSGLOGTIME=0" >> "$SCRIPT_CONF"
 		fi
+		if ! grep -q "^VERBOSE_TEST=" "$SCRIPT_CONF"; then
+			echo "VERBOSE_TEST=0" >> "$SCRIPT_CONF"
+		fi
 		if ! grep -q "^EXCLUDEFROMQOS=" "$SCRIPT_CONF"; then
 			echo "EXCLUDEFROMQOS=true" >> "$SCRIPT_CONF"
 		fi
@@ -916,7 +920,7 @@ Conf_Exists()
 		  echo "OUTPUTTIMEMODE=unix"; echo "STORAGELOCATION=jffs"
 		  echo "SCHDAYS=*" ; echo "SCHHOURS=*" ; echo "SCHMINS=12,42"
 		  echo "DAYSTOKEEP=30" ; echo "LASTXRESULTS=10" ; echo "EXCLUDEFROMQOS=true"
-		  echo "JFFS_MSGLOGTIME=0"
+		  echo "JFFS_MSGLOGTIME=0" ; echo "VERBOSE_TEST=0"
 		} > "$SCRIPT_CONF"
 		for index in 1 2 3 4 5
 		do
@@ -2013,9 +2017,11 @@ GenerateServerList_WebUI()
 
 	if [ "$spdifacename" = "ALL" ]
 	then
+		IFACELIST=""
 		while IFS='' read -r line || [ -n "$line" ]
 		do
-			if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]; then
+			if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
+			then
 				IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
 			fi
 		done < "$SCRIPT_INTERFACES_USER"
@@ -2558,7 +2564,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
+## Modified by Martinski W. [2025-Mar-14] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2597,10 +2603,12 @@ Run_Speedtest()
 	then specificiface=""
 	else specificiface="$2"
 	fi
-	speedtestserverno=""
-	speedtestservername=""
+	speedtestServerIDx=""
+	speedtestServerName=""
 	MAXwaitTestSecs=120  #2 minutes#
-	local spdIndx=0
+	local spdIndx  spdTestOK  verboseNUM  verboseARG
+	verboseNUM="$(grep -E '^VERBOSE_TEST=[0-3]$' "$SCRIPT_CONF" | awk -F '=' '{print $2}')"
+	[ -z "$verboseNUM" ] && verboseNUM=0
 
 	CONFIG_STRING=""
 	LICENSE_STRING="--accept-license --accept-gdpr"
@@ -2624,8 +2632,9 @@ Run_Speedtest()
 
 	tmpfile=/tmp/spd-stats.txt
 	resultfile=/tmp/spd-result.txt
-	rm -f "$resultfile"
-	rm -f "$tmpfile"
+	spdTestLogFile="/tmp/${SCRIPT_NAME}.DEBUG.log"
+	spdTestDBGFile="/tmp/${SCRIPT_NAME}.DEBUG.txt"
+	rm -f "$tmpfile" "$resultfile" "$spdTestLogFile"
 
 	if [ -n "$(pidof "$PROC_NAME")" ]; then
 		killall -q "$PROC_NAME"
@@ -2690,7 +2699,12 @@ Run_Speedtest()
 				applyautobw="true"
 			fi
 
-			spdIndx=0
+			if [ "$verboseNUM" -eq 0 ]
+			then verboseARG=""
+			else verboseARG="$(printf "-%*s" "$((verboseNUM + 1))" ' ' | tr ' ' 'v')"
+			fi
+			spdIndx=0  spdTestOK=0
+
 			for IFACE_NAME in $IFACELIST
 			do
 				IFACE="$(Get_Interface_From_Name "$IFACE_NAME")"
@@ -2723,8 +2737,8 @@ Run_Speedtest()
 					then
 						if PreferredServer check "$IFACE_NAME"
 						then
-							speedtestserverno="$(PreferredServer list "$IFACE_NAME" | cut -f1 -d"|")"
-							speedtestservername="$(PreferredServer list "$IFACE_NAME" | cut -f2 -d"|")"
+							speedtestServerIDx="$(PreferredServer list "$IFACE_NAME" | cut -f1 -d"|")"
+							speedtestServerName="$(PreferredServer list "$IFACE_NAME" | cut -f2 -d"|")"
 						else
 							mode="auto"
 						fi
@@ -2732,16 +2746,16 @@ Run_Speedtest()
 					then
 						GenerateServerList "$IFACE_NAME" no
 						if [ "$serverno" != "exit" ]; then
-							speedtestserverno="$serverno"
-							speedtestservername="$servername"
+							speedtestServerIDx="$serverno"
+							speedtestServerName="$servername"
 						else
 							Clear_Lock
 							return 1
 						fi
 					elif [ "$mode" = "user" ]
 					then
-						speedtestserverno="$(PreferredServer list "$IFACE_NAME" | cut -f1 -d"|")"
-						speedtestservername="$(PreferredServer list "$IFACE_NAME" | cut -f2 -d"|")"
+						speedtestServerIDx="$(PreferredServer list "$IFACE_NAME" | cut -f1 -d"|")"
+						speedtestServerName="$(PreferredServer list "$IFACE_NAME" | cut -f2 -d"|")"
 					fi
 
 					echo 'var spdteststatus = "InProgress_'"$IFACE_NAME"'";' > /tmp/detect_spdtest.js
@@ -2749,8 +2763,8 @@ Run_Speedtest()
 					
 					if [ "$mode" = "auto" ]
 					then
-						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME interface" "$PASS"
-						"$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile" &
+						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
+						"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
 						sleep 2
 						speedTestSecs=0
 						while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
@@ -2761,13 +2775,14 @@ Run_Speedtest()
 						then
 							Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
 							killall -q "$PROC_NAME"
+							if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
 							continue
 						fi
 					else
-						if [ "$speedtestserverno" -ne 0 ]
+						if [ "$speedtestServerIDx" -ne 0 ]
 						then
-							Print_Output true "Starting speedtest using $speedtestservername for $IFACE_NAME interface" "$PASS"
-							"$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE" --server-id="$speedtestserverno" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile" &
+							Print_Output true "Starting speedtest using $speedtestServerName for $IFACE_NAME interface. Please wait..." "$PASS"
+							"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
 							sleep 2
 							speedTestSecs=0
 							while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
@@ -2778,11 +2793,12 @@ Run_Speedtest()
 							then
 								Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
 								killall -q "$PROC_NAME"
+								if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
 								continue
 							fi
 						else
-							Print_Output true "Starting speedtest using using auto-selected server for $IFACE_NAME interface" "$PASS"
-							"$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile" &
+							Print_Output true "Starting speedtest using using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
+							"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
 							sleep 2
 							speedTestSecs=0
 							while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
@@ -2793,13 +2809,16 @@ Run_Speedtest()
 							then
 								Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
 								killall -q "$PROC_NAME"
+								if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
 								continue
 							fi
 						fi
 					fi
 
-					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c FAILED $tmpfile)" -gt 0 ]; then
-						Print_Output true "Error running speedtest for $IFACE_NAME" "$CRIT"
+					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c 'FAILED' "$tmpfile")" -gt 0 ]
+					then
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [No Results]" "$CRIT"
+						if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
 						continue
 					fi
 
@@ -2811,11 +2830,11 @@ Run_Speedtest()
 					timenow="$(date +'%s')"
 					timenowfriendly="$(date +'%c')"
 
-					## New if-then-else block added to with ookla output when buffer bloat has been added to the human readable output
+					## New if-then-else block added to with ookla output when buffer bloat has been added to the human readable output ##
 					BUFFBLOAT="$(grep "Idle Latency:" "$tmpfile")"
 					if [ -n "$BUFFBLOAT" ]
 					then
-						# Parse human readable output when buffer bloat data is included.
+						# Parse human readable output when buffer bloat data is included.#
 						download="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						latency="$(grep "Idle Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $3}')"
@@ -2847,6 +2866,14 @@ Run_Speedtest()
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
 					fi
 
+					if [ -z "$download" ] || [ -z "$upload" ] || [ -z "$datadownload" ] || [ -z "$dataupload" ]
+					then
+						cp -fp "$tmpfile" "$spdTestDBGFile"
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [Empty Values]" "$CRIT"
+						if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+						continue
+					fi
+
 					! Validate_Bandwidth "$download" && download=0;
 					! Validate_Bandwidth "$upload" && upload=0;
 					! Validate_Bandwidth "$latency" && latency="null";
@@ -2869,7 +2896,7 @@ Run_Speedtest()
 						if [ "$curllatency" = "null" ]; then
 							curllatency=0
 						fi
-						
+
 						curlresult=$(curl -fsL  --retry 4 --retry-delay 5 -d "recommendedserverid=$serverid" \
 -d "ping=$(echo "$curllatency" | awk '{printf("%.0f\n", $1);}')" \
 -d "screenresolution=" \
@@ -2886,9 +2913,9 @@ Run_Speedtest()
 -d "bytessent=$(echo "$dataupload" | awk '{printf("%.0f\n", $1*1024);}')" \
 -d "serverid=$serverid" \
 -H "Referer: http://c.speedtest.net/flash/speedtest.swf" https://www.speedtest.net/api/api.php)
-					
+
 						resulturl="https://www.speedtest.net/result/$(echo "$curlresult" | cut -f2 -d'&' | cut -f2 -d'=')"
-						printf " Result URL: %s\\n" "$resulturl" | tee -a "$tmpfile"
+						printf " Result URL: %s\n" "$resulturl" | tee -a "$tmpfile"
 					fi
 
 					spdIndx="$((spdIndx + 1))"
@@ -2916,21 +2943,22 @@ Run_Speedtest()
 					fi
 					_ApplyDatabaseSQLCmds_ /tmp/spdTest-stats.sql "spd2$spdIndx"
 
-					spdtestresult="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};'| awk '{$1=$1};1') - $(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};'| awk '{$1=$1};1')"
+					spdtestresult1="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};'| awk '{$1=$1};1') - $(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};'| awk '{$1=$1};1')"
 					spdtestresult2="$(grep "Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{$1=$1};1') - $(grep "Packet Loss:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{$1=$1};1')"
 
-					printf "\n"
-					Print_Output true "Speedtest results - $spdtestresult" "$PASS"
+					printf "\n$(date +'%c')\n"
+					Print_Output true "Speedtest results - $spdtestresult1" "$PASS"
 					Print_Output true "Connection quality - $spdtestresult2" "$PASS"
 
 					{
-						printf "Speedtest result for %s\\n" "$IFACE_NAME"
-						printf "\\nBandwidth - %s\\n" "$spdtestresult"
-						printf "Quality - %s\\n\\n" "$spdtestresult2"
+						printf "Speedtest result for %s [%s]\n\n" "$IFACE_NAME" "$(date +'%c')"
+						printf "BANDWIDTH\n%s\n" "$spdtestresult1"
+						printf "QUALITY\n%s\n\n" "$spdtestresult2"
 						grep "Result URL" "$tmpfile" | awk '{$1=$1};1'
-						printf "\\n\\n\\n"
+						printf "\n\n\n"
 					} >> "$resultfile"
 
+					spdTestOK="$((spdTestOK + 1))"
 					extStats="/jffs/addons/extstats.d/mod_spdstats.sh"
 					if [ -f "$extStats" ]; then
 						sh "$extStats" ext "$download" "$upload"
@@ -2958,10 +2986,12 @@ Run_Speedtest()
 				fi
 			fi
 
-			echo 'var spdteststatus = "GenerateCSV";' > /tmp/detect_spdtest.js
-			Print_Output true "Retrieving data for WebUI charts..." "$PASS"
-			Generate_CSVs
-
+			if [ "$spdTestOK" -gt 0 ]
+			then
+				echo 'var spdteststatus = "GenerateCSV";' > /tmp/detect_spdtest.js
+				Print_Output true "Retrieving data for WebUI charts..." "$PASS"
+				Generate_CSVs
+			fi
 			_UpdateDatabaseFileSizeInfo_
 
 			echo "Stats last updated: $timenowfriendly" > /tmp/spdstatstitle.txt
@@ -3005,9 +3035,11 @@ Run_Speedtest_WebUI()
 		spdtestserverlist="$(echo "$spdteststring" | cut -f3 -d'_')";
 		if [ "$spdifacename" = "All" ]
 		then
+			IFACELIST=""
 			while IFS='' read -r line || [ -n "$line" ]
 			do
-				if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]; then
+				if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
+				then
 					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
 				fi
 			done < "$SCRIPT_INTERFACES_USER"
@@ -3230,7 +3262,8 @@ Generate_CSVs()
 	STORERESULTURL="$(StoreResultURL check)"
 	IFACELIST=""
 
-	while IFS='' read -r line || [ -n "$line" ]; do
+	while IFS='' read -r line || [ -n "$line" ]
+	do
 		IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
 	done < "$SCRIPT_INTERFACES_USER"
 	IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
