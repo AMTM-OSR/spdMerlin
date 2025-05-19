@@ -1,6 +1,5 @@
 # spdMerlin
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/1e0da6475e3047d59b35e258a18b78fc)](https://www.codacy.com/app/jackyaz/spdMerlin?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=jackyaz/spdMerlin&amp;utm_campaign=Badge_Grade)
-![Shellcheck](https://github.com/jackyaz/spdMerlin/actions/workflows/shellcheck.yml/badge.svg)
+![Shellcheck](https://github.com/AMTM-OSR/spdMerlin/actions/workflows/shellcheck.yml/badge.svg)
 
 ## v4.4.7
 ### Updated on 2025-May-18
@@ -23,7 +22,7 @@ You must be running firmware Merlin 384.15/384.13_4 or Fork 43E5 (or later) [Asu
 Using your preferred SSH client/terminal, copy and paste the following command, then press Enter:
 
 ```sh
-/usr/sbin/curl -fsL --retry 3 "https://raw.githubusercontent.com/AMTM-OSR)/spdMerlin/master/install/spdmerlin.sh" -o /jffs/scripts/spdmerlin && chmod 0755 /jffs/scripts/spdmerlin && /jffs/scripts/spdmerlin install
+/usr/sbin/curl -fsL --retry 3 "https://raw.githubusercontent.com/AMTM-OSR/spdMerlin/master/install/spdmerlin.sh" -o /jffs/scripts/spdmerlin && chmod 0755 /jffs/scripts/spdmerlin && /jffs/scripts/spdmerlin install
 ```
 
 ## Usage
