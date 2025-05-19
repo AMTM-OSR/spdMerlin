@@ -1,5 +1,4 @@
 # spdMerlin
-![Shellcheck](https://github.com/AMTM-OSR/spdMerlin/actions/workflows/shellcheck.yml/badge.svg)
 
 ## v4.4.7
 ### Updated on 2025-May-18
