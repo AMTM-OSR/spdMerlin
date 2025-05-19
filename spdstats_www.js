@@ -1,4 +1,4 @@
-var $j = jQuery.noConflict(); //avoid conflicts on John's fork (state.js)
+
 var daysofweek = ['Mon','Tues','Wed','Thurs','Fri','Sat','Sun'];
 var maxNoCharts = 0;
 var currentNoCharts = 0;
@@ -10,6 +10,7 @@ var interfacesdisabled = [];
 var arraysortlistlinesWAN = [];
 var sortnameWAN = 'Time';
 var sortdirWAN = 'desc';
+/** OpenVPN **/
 var arraysortlistlinesVPNC1 = [];
 var sortnameVPNC1 = 'Time';
 var sortdirVPNC1 = 'desc';
@@ -25,14 +26,36 @@ var sortdirVPNC4 = 'desc';
 var arraysortlistlinesVPNC5 = [];
 var sortnameVPNC5 = 'Time';
 var sortdirVPNC5 = 'desc';
+/** WireGuard **/
+var arraysortlistlinesWGVPN1 = [];
+var sortnameWGVPN1 = 'Time';
+var sortdirWGVPN1 = 'desc';
+var arraysortlistlinesWGVPN2 = [];
+var sortnameWGVPN2 = 'Time';
+var sortdirWGVPN2 = 'desc';
+var arraysortlistlinesWGVPN3 = [];
+var sortnameWGVPN3 = 'Time';
+var sortdirWGVPN3 = 'desc';
+var arraysortlistlinesWGVPN4 = [];
+var sortnameWGVPN4 = 'Time';
+var sortdirWGVPN4 = 'desc';
+var arraysortlistlinesWGVPN5 = [];
+var sortnameWGVPN5 = 'Time';
+var sortdirWGVPN5 = 'desc';
 
 var speedtestbinary = "builtin";
 
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Mar-02] **/
+/**----------------------------------------**/
+let databaseResetDone = 0;
+var sqlDatabaseFileSize = '0 Bytes';
+var jffsAvailableSpaceStr = '0 Bytes';
+var jffsAvailableSpaceLow = 'OK';
+
 var ShowLines = GetCookie('ShowLines','string');
 var ShowFill = GetCookie('ShowFill','string');
-if(ShowFill == ''){
-	ShowFill = 'origin';
-}
+if (ShowFill == '') { ShowFill = 'origin'; }
 
 var DragZoom = true;
 var ChartPan = false;
@@ -53,28 +76,29 @@ var backgroundcolourlist_Quality = ['rgba(83,4,122,0.5)','rgba(7,242,66,0.5)','r
 
 var typelist = ['Combined','Quality'];
 
-function keyHandler(e){
+function keyHandler(e)
+{
 	if(e.keyCode == 82){
-		$j(document).off('keydown');
+		$(document).off('keydown');
 		ResetZoom();
 	}
 	else if(e.keyCode == 68){
-		$j(document).off('keydown');
+		$(document).off('keydown');
 		ToggleDragZoom(document.form.btnDragZoom);
 	}
 	else if(e.keyCode == 70){
-		$j(document).off('keydown');
+		$(document).off('keydown');
 		ToggleFill();
 	}
 	else if(e.keyCode == 76){
-		$j(document).off('keydown');
+		$(document).off('keydown');
 		ToggleLines();
 	}
 }
 
-$j(document).keydown(function(e){keyHandler(e);});
-$j(document).keyup(function(e){
-	$j(document).keydown(function(e){
+$(document).keydown(function(e){keyHandler(e);});
+$(document).keyup(function(e){
+	$(document).keydown(function(e){
 		keyHandler(e);
 	});
 });
@@ -118,10 +142,10 @@ function Draw_Chart(txtchartname,txtcharttype){
 		metric2 = 'PktLoss';
 		showyaxis2 = true;
 	}
-	var chartperiod = getChartPeriod($j('#'+txtchartname+'_Period_'+txtcharttype+' option:selected').val());
-	var chartinterval = getChartInterval($j('#'+txtchartname+'_Interval_'+txtcharttype+' option:selected').val());
-	var txtunitx = timeunitlist[$j('#'+txtchartname+'_Period_'+txtcharttype+' option:selected').val()];
-	var numunitx = intervallist[$j('#'+txtchartname+'_Period_'+txtcharttype+' option:selected').val()];
+	var chartperiod = getChartPeriod($('#'+txtchartname+'_Period_'+txtcharttype+' option:selected').val());
+	var chartinterval = getChartInterval($('#'+txtchartname+'_Interval_'+txtcharttype+' option:selected').val());
+	var txtunitx = timeunitlist[$('#'+txtchartname+'_Period_'+txtcharttype+' option:selected').val()];
+	var numunitx = intervallist[$('#'+txtchartname+'_Period_'+txtcharttype+' option:selected').val()];
 	var zoompanxaxismax = moment();
 	var chartxaxismax = null;
 	var chartxaxismin = moment().subtract(numunitx,txtunitx+'s');
@@ -155,8 +179,8 @@ function Draw_Chart(txtchartname,txtcharttype){
 	
 	var objchartname=window['LineChart_'+txtchartname+'_'+txtcharttype];
 	
-	var timeaxisformat = getTimeFormat($j('#Time_Format option:selected').val(),'axis');
-	var timetooltipformat = getTimeFormat($j('#Time_Format option:selected').val(),'tooltip');
+	var timeaxisformat = getTimeFormat($('#Time_Format option:selected').val(),'axis');
+	var timetooltipformat = getTimeFormat($('#Time_Format option:selected').val(),'tooltip');
 	
 	if(chartinterval == 'day'){
 		charttype = 'bar';
@@ -272,7 +296,7 @@ function Draw_Chart(txtchartname,txtcharttype){
 				}
 			}],
 			yAxes: [{
-				type: getChartScale($j('#'+txtchartname+'_Scale_'+txtcharttype+' option:selected').val()),
+				type: getChartScale($('#'+txtchartname+'_Scale_'+txtcharttype+' option:selected').val()),
 				gridLines: { display: false,color: '#282828' },
 				scaleLabel: { display: false,labelString: txtunity },
 				id: 'left-y-axis',
@@ -288,7 +312,7 @@ function Draw_Chart(txtchartname,txtcharttype){
 				},
 			},
 			{
-				type: getChartScale($j('#'+txtchartname+'_Scale_'+txtcharttype+' option:selected').val()),
+				type: getChartScale($('#'+txtchartname+'_Scale_'+txtcharttype+' option:selected').val()),
 				gridLines: { display: false,color: '#282828' },
 				scaleLabel: { display: false,labelString: txtunity2 },
 				id: 'right-y-axis',
@@ -740,14 +764,14 @@ function SetGlobalDataset(txtchartname,dataobject){
 	if(currentNoCharts == maxNoCharts){
 		var interfacetextarray = interfacelist.split(',');
 		for(var i = 0; i < interfacetextarray.length; i++){
-			$j('#'+interfacetextarray[i]+'_Interval_Combined').val(GetCookie(interfacetextarray[i]+'_Interval_Combined','number'));
-			$j('#'+interfacetextarray[i]+'_Interval_Quality').val(GetCookie(interfacetextarray[i]+'_Interval_Quality','number'));
+			$('#'+interfacetextarray[i]+'_Interval_Combined').val(GetCookie(interfacetextarray[i]+'_Interval_Combined','number'));
+			$('#'+interfacetextarray[i]+'_Interval_Quality').val(GetCookie(interfacetextarray[i]+'_Interval_Quality','number'));
 			changePeriod(document.getElementById(interfacetextarray[i]+'_Interval_Combined'));
 			changePeriod(document.getElementById(interfacetextarray[i]+'_Interval_Quality'));
-			$j('#'+interfacetextarray[i]+'_Period_Combined').val(GetCookie(interfacetextarray[i]+'_Period_Combined','number'));
-			$j('#'+interfacetextarray[i]+'_Period_Quality').val(GetCookie(interfacetextarray[i]+'_Period_Quality','number'));
-			$j('#'+interfacetextarray[i]+'_Scale_Combined').val(GetCookie(interfacetextarray[i]+'_Scale_Combined','number'));
-			$j('#'+interfacetextarray[i]+'_Scale_Quality').val(GetCookie(interfacetextarray[i]+'_Scale_Quality','number'));
+			$('#'+interfacetextarray[i]+'_Period_Combined').val(GetCookie(interfacetextarray[i]+'_Period_Combined','number'));
+			$('#'+interfacetextarray[i]+'_Period_Quality').val(GetCookie(interfacetextarray[i]+'_Period_Quality','number'));
+			$('#'+interfacetextarray[i]+'_Scale_Combined').val(GetCookie(interfacetextarray[i]+'_Scale_Combined','number'));
+			$('#'+interfacetextarray[i]+'_Scale_Quality').val(GetCookie(interfacetextarray[i]+'_Scale_Quality','number'));
 			Draw_Chart(interfacetextarray[i],'Combined');
 			Draw_Chart(interfacetextarray[i],'Quality');
 		}
@@ -805,10 +829,10 @@ function SetCookie(cookiename,cookievalue){
 	cookie.set('spd_'+cookiename,cookievalue,10 * 365);
 }
 
-$j.fn.serializeObject = function(){
+$.fn.serializeObject = function(){
 	var o = custom_settings;
 	var a = this.serializeArray();
-	$j.each(a,function(){
+	$.each(a,function(){
 		if(o[this.name] !== undefined && this.name.indexOf('spdmerlin') != -1 && this.name.indexOf('version') == -1 && this.name.indexOf('spdmerlin_iface_enabled') == -1 && this.name.indexOf('spdmerlin_usepreferred') == -1 && this.name.indexOf('schdays') == -1 && this.name.indexOf('spdmerlin_preferredserver') == -1){
 			if(!o[this.name].push){
 				o[this.name] = [o[this.name]];
@@ -819,7 +843,7 @@ $j.fn.serializeObject = function(){
 		}
 	});
 	
-	$j.each(a,function(){
+	$.each(a,function(){
 		if(o[this.name] !== undefined && this.name.indexOf('spdmerlin_preferredserver') != -1){
 			if(!o[this.name].push){
 				o[this.name] = [o[this.name]];
@@ -832,8 +856,8 @@ $j.fn.serializeObject = function(){
 	
 	
 	var schdays = [];
-	$j.each($j('input[name="spdmerlin_schdays"]:checked'),function(){
-		schdays.push($j(this).val());
+	$.each($('input[name="spdmerlin_schdays"]:checked'),function(){
+		schdays.push($(this).val());
 	});
 	var schdaysstring = schdays.join(',');
 	if(schdaysstring == 'Mon,Tues,Wed,Thurs,Fri,Sat,Sun'){
@@ -841,12 +865,12 @@ $j.fn.serializeObject = function(){
 	}
 	o['spdmerlin_schdays'] = schdaysstring;
 	
-	$j.each($j('input[name^="spdmerlin_usepreferred"]'),function(){
+	$.each($('input[name^="spdmerlin_usepreferred"]'),function(){
 		o[this.id] = this.checked.toString();
 	});
 	
 	var ifacesenabled = [];
-	$j.each($j('input[name="spdmerlin_iface_enabled"]:checked'),function(){
+	$.each($('input[name="spdmerlin_iface_enabled"]:checked'),function(){
 		ifacesenabled.push(this.value);
 	});
 	var ifacesenabledstring = ifacesenabled.join(',');
@@ -854,28 +878,40 @@ $j.fn.serializeObject = function(){
 	return o;
 };
 
-function SetCurrentPage(){
+function SetCurrentPage()
+{
 	document.form.next_page.value = window.location.pathname.substring(1);
 	document.form.current_page.value = window.location.pathname.substring(1);
 }
 
-function initial(){
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Mar-02] **/
+/**----------------------------------------**/
+function initial()
+{
 	SetCurrentPage();
 	LoadCustomSettings();
 	show_menu();
-	$j('#Time_Format').val(GetCookie('Time_Format','number'));
-	ScriptUpdateLayout();
-	get_statstitle_file();
-	get_interfaces_file();
+	$('#Time_Format').val(GetCookie('Time_Format', 'number'));
+	scriptUpdateLayout();
+	getStatsTitleFile();
+	getInterfacesFile();
+	showhide('databaseSize_text',true);
+	showhide('jffsFreeSpace_text',true);
+	showhide('jffsFreeSpace_LOW',false);
+	showhide('jffsFreeSpace_WARN',false);
+	showhide('jffsFreeSpace_NOTE',false);
 }
 
-function ScriptUpdateLayout(){
+function scriptUpdateLayout()
+{
 	var localver = GetVersionNumber('local');
 	var serverver = GetVersionNumber('server');
-	$j('#spdmerlin_version_local').text(localver);
+	$('#spdmerlin_version_local').text(localver);
 	
-	if(localver != serverver && serverver != 'N/A'){
-		$j('#spdmerlin_version_server').text('Updated version available: '+serverver);
+	if (localver != serverver && serverver != 'N/A')
+    {
+		$('#spdmerlin_version_server').text('Updated version available: '+serverver);
 		showhide('btnChkUpdate',false);
 		showhide('spdmerlin_version_server',true);
 		showhide('btnDoUpdate',true);
@@ -906,10 +942,10 @@ function changePeriod(e){
 	var type = e.id.substring(e.id.lastIndexOf('_')+1);
 	
 	if(value == 2){
-		$j('select[id="'+name+'_Period_'+type+'"] option:contains(24)').text("Today");
+		$('select[id="'+name+'_Period_'+type+'"] option:contains(24)').text("Today");
 	}
 	else{
-		$j('select[id="'+name+'_Period_'+type+'"] option:contains("Today")').text("Last 24 hours");
+		$('select[id="'+name+'_Period_'+type+'"] option:contains("Today")').text("Last 24 hours");
 	}
 }
 
@@ -981,7 +1017,7 @@ function ExportCSV(){
 }
 
 function update_status(){
-	$j.ajax({
+	$.ajax({
 		url: '/ext/spdmerlin/detect_update.js',
 		dataType: 'script',
 		error: function(xhr){
@@ -995,12 +1031,12 @@ function update_status(){
 				document.getElementById('imgChkUpdate').style.display = 'none';
 				showhide('spdmerlin_version_server',true);
 				if(updatestatus != 'None'){
-					$j('#spdmerlin_version_server').text('Updated version available: '+updatestatus);
+					$('#spdmerlin_version_server').text('Updated version available: '+updatestatus);
 					showhide('btnChkUpdate',false);
 					showhide('btnDoUpdate',true);
 				}
 				else{
-					$j('#spdmerlin_version_server').text('No update available');
+					$('#spdmerlin_version_server').text('No update available');
 					showhide('btnChkUpdate',true);
 					showhide('btnDoUpdate',false);
 				}
@@ -1035,7 +1071,7 @@ function getAllIndexes(arr,val){
 }
 
 function get_spdtestservers_file(ifacename){
-	$j.ajax({
+	$.ajax({
 		url: '/ext/spdmerlin/spdmerlin_serverlist_'+ifacename.toUpperCase()+'.htm?cachebuster='+new Date().getTime(),
 		dataType: 'text',
 		error: function(xhr){
@@ -1043,31 +1079,31 @@ function get_spdtestservers_file(ifacename){
 		},
 		success: function(data){
 			var servers = [];
-			$j.each(data.split('\n').filter(Boolean),function (key,entry){
+			$.each(data.split('\n').filter(Boolean),function (key,entry){
 				var obj = {};
 				obj['id'] = entry.split('|')[0];
 				obj['name'] = entry.split('|')[1];
 				servers.push(obj);
 			});
 			
-			$j('#spdmerlin_preferredserver_'+ifacename).prop('disabled',false);
-			$j('#spdmerlin_preferredserver_'+ifacename).removeClass('disabled');
+			$('#spdmerlin_preferredserver_'+ifacename).prop('disabled',false);
+			$('#spdmerlin_preferredserver_'+ifacename).removeClass('disabled');
 			
-			let dropdown = $j('#spdmerlin_preferredserver_'+ifacename);
+			let dropdown = $('#spdmerlin_preferredserver_'+ifacename);
 			dropdown.empty();
-			$j.each(servers,function (key,entry){
-				dropdown.append($j('<option></option>').attr('value',entry.id+'|'+entry.name).text(entry.id+'|'+entry.name));
+			$.each(servers,function (key,entry){
+				dropdown.append($('<option></option>').attr('value',entry.id+'|'+entry.name).text(entry.id+'|'+entry.name));
 			});
 			dropdown.prop('selectedIndex',0);
 			
-			$j('#spdmerlin_preferredserver_'+ifacename)[0].style.display = '';
+			$('#spdmerlin_preferredserver_'+ifacename)[0].style.display = '';
 			showhide('imgServerList_'+ifacename,false);
 		}
 	});
 }
 
 function get_manualspdtestservers_file(){
-	$j.ajax({
+	$.ajax({
 		url: '/ext/spdmerlin/spdmerlin_manual_serverlist.htm?cachebuster='+new Date().getTime(),
 		dataType: 'text',
 		error: function(xhr){
@@ -1075,7 +1111,7 @@ function get_manualspdtestservers_file(){
 		},
 		success: function(data){
 			var servers = [];
-			$j.each(data.split('\n').filter(Boolean),function (key,entry){
+			$.each(data.split('\n').filter(Boolean),function (key,entry){
 				var obj = {};
 				obj['id'] = entry.split('|')[0];
 				obj['name'] = entry.split('|')[1];
@@ -1085,7 +1121,7 @@ function get_manualspdtestservers_file(){
 			if(document.form.spdtest_enabled.value == 'All'){
 				var arrifaceindex = getAllIndexes(servers,'-----');
 				for(var i = 0; i < arrifaceindex.length; i++){
-					let dropdown = $j($j('select[name^=spdtest_serverprefselect]')[i]);
+					let dropdown = $($('select[name^=spdtest_serverprefselect]')[i]);
 					dropdown.empty();
 					var arrtmp = [];
 					if(i == 0){
@@ -1097,25 +1133,25 @@ function get_manualspdtestservers_file(){
 					else{
 						arrtmp = servers.slice(arrifaceindex[i-1]+1,arrifaceindex[i]);
 					}
-					$j.each(arrtmp,function (key,entry){
-						dropdown.append($j('<option></option>').attr('value',entry.id+'|'+entry.name).text(entry.id+'|'+entry.name));
+					$.each(arrtmp,function (key,entry){
+						dropdown.append($('<option></option>').attr('value',entry.id+'|'+entry.name).text(entry.id+'|'+entry.name));
 					});
 					dropdown.prop('selectedIndex',0);
 				}
 				
-				$j.each($j('select[name^=spdtest_serverprefselect]'),function(){
+				$.each($('select[name^=spdtest_serverprefselect]'),function(){
 					this.style.display = 'inline-block';
 				});
-				$j.each($j('span[id^=spdtest_serverprefselectspan]'),function(){
+				$.each($('span[id^=spdtest_serverprefselectspan]'),function(){
 					this.style.display = 'inline-block';
 				});
 				showhide('imgManualServerList',false);
 			}
 			else{
-				let dropdown = $j('select[name=spdtest_serverprefselect]');
+				let dropdown = $('select[name=spdtest_serverprefselect]');
 				dropdown.empty();
-				$j.each(servers,function (key,entry){
-					dropdown.append($j('<option></option>').attr('value',entry.id+'|'+entry.name).text(entry.id+'|'+entry.name));
+				$.each(servers,function (key,entry){
+					dropdown.append($('<option></option>').attr('value',entry.id+'|'+entry.name).text(entry.id+'|'+entry.name));
 				});
 				dropdown.prop('selectedIndex',0);
 				showhide('spdtest_serverprefselect',true);
@@ -1123,20 +1159,20 @@ function get_manualspdtestservers_file(){
 			}
 			for(var i = 0; i < interfacescomplete.length; i++){
 				if(interfacesdisabled.includes(interfacescomplete[i]) == false){
-					$j('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-					$j('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+					$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
+					$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
 				}
 			}
-			$j.each($j('input[name=spdtest_serverpref]'),function(){
-				$j(this).prop('disabled',false);
-				$j(this).removeClass('disabled');
+			$.each($('input[name=spdtest_serverpref]'),function(){
+				$(this).prop('disabled',false);
+				$(this).removeClass('disabled');
 			});
 		}
 	});
 }
 
 function get_spdtestresult_file(){
-	$j.ajax({
+	$.ajax({
 		url: '/ext/spdmerlin/spd-result.htm',
 		dataType: 'text',
 		error: function(xhr){
@@ -1145,14 +1181,14 @@ function get_spdtestresult_file(){
 		success: function(data){
 			var lines = data.trim().split('\n');
 			data = lines.join('\n');
-			$j('#spdtest_output').html(data);
+			$('#spdtest_output').html(data);
 			PostSpeedTest();
 		}
 	});
 }
 
 function get_spdtest_file(){
-	$j.ajax({
+	$.ajax({
 		url: '/ext/spdmerlin/spd-stats.htm',
 		dataType: 'text',
 		error: function(xhr){
@@ -1167,25 +1203,29 @@ function get_spdtest_file(){
 				lines.unshift("Speedtest by Ookla")
 			}
 			if(lines.length > 5){
-				$j('#spdtest_output').html(lines[0]+'\n'+lines[1]+'\n'+lines[2]+'\n'+lines[3]+'\n'+lines[4]+'\n'+arrlastLine[arrlastLine.length-1]+'%');
+				$('#spdtest_output').html(lines[0]+'\n'+lines[1]+'\n'+lines[2]+'\n'+lines[3]+'\n'+lines[4]+'\n'+arrlastLine[arrlastLine.length-1]+'%');
 			}
 			else{
-				$j('#spdtest_output').html('');
+				$('#spdtest_output').html('');
 			}
 		}
 	});
 }
 
-function update_spdtest(){
-	$j.ajax({
+function update_spdtest()
+{
+	$.ajax({
 		url: '/ext/spdmerlin/detect_spdtest.js',
 		dataType: 'script',
 		error: function(xhr){
 			//do nothing
 		},
-		success: function(){
-			if(spdteststatus.indexOf('InProgress') != -1){
-				if(spdteststatus.indexOf('_') != -1){
+		success: function()
+		{
+			if (spdteststatus.indexOf('InProgress') != -1)
+			{
+				if (spdteststatus.indexOf('_') != -1)
+				{
 					showhide('imgSpdTest',true);
 					showhide('spdtest_text',true);
 					document.getElementById('spdtest_text').innerHTML = 'Speedtest in progress for '+spdteststatus.substring(spdteststatus.indexOf('_')+1);
@@ -1193,18 +1233,22 @@ function update_spdtest(){
 					get_spdtest_file();
 				}
 			}
-			else if(spdteststatus == 'GenerateCSV'){
+			else if (spdteststatus == 'GenerateCSV')
+			{
 				document.getElementById('spdtest_text').innerHTML = 'Retrieving data for charts...';
 			}
-			else if(spdteststatus == 'Done'){
+			else if (spdteststatus == 'Done')
+			{
 				clearInterval(myinterval);
-				if(intervalclear == false){
+				if (intervalclear == false)
+				{
 					intervalclear = true;
 					document.getElementById('spdtest_text').innerHTML = 'Refreshing tables and charts...';
 					get_spdtestresult_file();
 				}
 			}
-			else if(spdteststatus == 'LOCKED'){
+			else if (spdteststatus == 'LOCKED')
+			{
 				clearInterval(myinterval);
 				showhide('imgSpdTest',false);
 				document.getElementById('spdtest_text').innerHTML = 'Scheduled speedtest already running!';
@@ -1212,7 +1256,8 @@ function update_spdtest(){
 				document.getElementById('spdtest_output').parentElement.parentElement.style.display = 'none';
 				showhide('btnRunSpeedtest',true);
 			}
-			else if(spdteststatus == 'NoLicense'){
+			else if (spdteststatus == 'NoLicense')
+			{
 				clearInterval(myinterval);
 				showhide('imgSpdTest',false);
 				document.getElementById('spdtest_text').innerHTML = 'Please accept Ookla license at command line via spdmerlin';
@@ -1220,7 +1265,8 @@ function update_spdtest(){
 				document.getElementById('spdtest_output').parentElement.parentElement.style.display = 'none';
 				showhide('btnRunSpeedtest',true);
 			}
-			else if(spdteststatus == 'Error'){
+			else if (spdteststatus == 'Error')
+			{
 				clearInterval(myinterval);
 				showhide('imgSpdTest',false);
 				document.getElementById('spdtest_text').innerHTML = 'Error running speedtest';
@@ -1228,7 +1274,8 @@ function update_spdtest(){
 				document.getElementById('spdtest_output').parentElement.parentElement.style.display = 'none';
 				showhide('btnRunSpeedtest',true);
 			}
-			else if(spdteststatus == 'NoSwap'){
+			else if (spdteststatus == 'NoSwap')
+			{
 				clearInterval(myinterval);
 				showhide('imgSpdTest',false);
 				document.getElementById('spdtest_text').innerHTML = 'No Swap file configured/detected';
@@ -1240,36 +1287,56 @@ function update_spdtest(){
 	});
 }
 
-function PostSpeedTest(){
-	$j('#table_allinterfaces').empty();
-	$j('#rowautomaticspdtest').empty();
-	$j('#rowautospdprefserver').empty();
-	$j('#rowautospdprefserverselect').empty();
-	$j('#rowmanualspdtest').empty();
-	$j('#table_allinterfaces').remove();
-	$j('#rowautomaticspdtest').remove();
-	$j('#rowautospdprefserver').remove();
-	$j('#rowautospdprefserverselect').remove();
-	$j('#rowmanualspdtest').remove();
-	currentNoCharts = 0;
-	$j('#Time_Format').val(GetCookie('Time_Format','number'));
-	get_statstitle_file();
-	setTimeout(get_interfaces_file,3000);
+/**-------------------------------------**/
+/** Added by Martinski W. [2024-Jul-15] **/
+/**------------------------------- -----**/
+function ClearSpdTableRows()
+{
+	$('#table_allinterfaces').empty();
+	$('#rowautomaticspdtest').empty();
+	$('#rowautospdprefserver').empty();
+	$('#rowautospdprefserverselect').empty();
+	$('#rowmanualspdtest').empty();
+	$('#table_allinterfaces').remove();
+	$('#rowautomaticspdtest').remove();
+	$('#rowautospdprefserver').remove();
+	$('#rowautospdprefserverselect').remove();
+	$('#rowmanualspdtest').remove();
 }
 
-function RunSpeedtest(){
+/**----------------------------------------**/
+/** Modified by Martinski W. [2024-Jul-15] **/
+/**----------------------------------------**/
+function PostSpeedTest()
+{
+	ClearSpdTableRows();
+	currentNoCharts = 0;
+	$('#Time_Format').val(GetCookie('Time_Format', 'number'));
+	getStatsTitleFile();
+	setTimeout(getInterfacesFile,3000);
+}
+
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Mar-02] **/
+/**----------------------------------------**/
+function RunSpeedtest()
+{
 	showhide('btnRunSpeedtest',false);
-	$j('#spdtest_output').html('');
+    showhide('databaseSize_text',false);
+	$('#spdtest_output').html('');
 	
 	var spdtestservers = '';
-	if(document.form.spdtest_serverpref.value == 'onetime'){
-		if(document.form.spdtest_enabled.value == 'All'){
-			$j.each($j('select[name^=spdtest_serverprefselect]'),function(){
+	if (document.form.spdtest_serverpref.value == 'onetime')
+	{
+		if (document.form.spdtest_enabled.value == 'All')
+		{
+			$.each($('select[name^=spdtest_serverprefselect]'),function(){
 				spdtestservers += this.value.substring(0,this.value.indexOf('|'))+'+';
 			});
 			spdtestservers = spdtestservers.slice(0,-1);
 		}
-		else{
+		else
+		{
 			spdtestservers = document.form.spdtest_serverprefselect.value.substring(0,document.form.spdtest_serverprefselect.value.indexOf('|'));
 		}
 	}
@@ -1282,51 +1349,67 @@ function RunSpeedtest(){
 
 var myinterval;
 var intervalclear = false;
-function StartSpeedTestInterval(){
+function StartSpeedTestInterval()
+{
 	intervalclear = false;
 	myinterval = setInterval(update_spdtest,1000);
 }
 
-function SaveConfig(){
-	if(Validate_All()){
-		$j('[name*=spdmerlin_]').prop('disabled',false);
-		for(var i = 0; i < interfacescomplete.length; i++){
-			$j('#spdmerlin_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-			$j('#spdmerlin_iface_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
-			$j('#spdmerlin_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-			$j('#spdmerlin_usepreferred_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
-			$j('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-			$j('#changepref_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Mar-02] **/
+/**----------------------------------------**/
+function SaveConfig()
+{
+	if (validateAll())
+	{
+		$('[name*=spdmerlin_]').prop('disabled',false);
+		for (var indx = 0; indx < interfacescomplete.length; indx++)
+		{
+			$('#spdmerlin_iface_enabled_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
+			$('#spdmerlin_iface_enabled_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
+			$('#spdmerlin_usepreferred_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
+			$('#spdmerlin_usepreferred_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
+			$('#changepref_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
+			$('#changepref_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
 		}
-		if(document.form.schedulemode.value == 'EveryX'){
-			if(document.form.everyxselect.value == 'hours'){
-				var everyxvalue = document.form.everyxvalue.value*1;
-				document.form.spdmerlin_schmins.value = 0;
-				if(everyxvalue == 24){
-					document.form.spdmerlin_schhours.value = 0;
+
+		if (document.form.spdmerlin_automaticmode.value === 'true')
+		{
+			if (document.form.schedulemode.value === 'EveryX')
+			{
+				if (document.form.everyxselect.value === 'hours')
+				{
+					var everyxvalue = document.form.everyxvalue.value*1;
+					document.form.spdmerlin_schmins.value = 0;
+					if (everyxvalue == 24)
+					{ document.form.spdmerlin_schhours.value = 0; }
+					else
+					{ document.form.spdmerlin_schhours.value = '*/'+everyxvalue; }
 				}
-				else{
-					document.form.spdmerlin_schhours.value = '*/'+everyxvalue;
+				else if (document.form.everyxselect.value === 'minutes')
+				{
+					document.form.spdmerlin_schhours.value = '*';
+					var everyxvalue = document.form.everyxvalue.value*1;
+					document.form.spdmerlin_schmins.value = '*/'+everyxvalue;
 				}
 			}
-			else if(document.form.everyxselect.value == 'minutes'){
-				document.form.spdmerlin_schhours.value = '*';
-				var everyxvalue = document.form.everyxvalue.value*1;
-				document.form.spdmerlin_schmins.value = '*/'+everyxvalue;
-			}
+        }
+		else
+		{
+			AutomaticInterfaceEnableDisable($('#spdmerlin_auto_'+document.form.spdmerlin_automaticmode.value)[0]);
 		}
-		document.getElementById('amng_custom').value = JSON.stringify($j('form').serializeObject());
+		document.getElementById('amng_custom').value = JSON.stringify($('form').serializeObject());
 		document.form.action_script.value = 'start_spdmerlinconfig';
 		document.form.action_wait.value = 10;
 		showLoading();
 		document.form.submit();
 	}
-	else{
-		return false;
-	}
+	else
+	{ return false; }
 }
 
-function GetVersionNumber(versiontype){
+function GetVersionNumber(versiontype)
+{
 	var versionprop;
 	if(versiontype == 'local'){
 		versionprop = custom_settings.spdmerlin_version_local;
@@ -1343,8 +1426,9 @@ function GetVersionNumber(versiontype){
 	}
 }
 
-function get_autobw_file(){
-	$j.ajax({
+function get_autobw_file()
+{
+	$.ajax({
 		url: '/ext/spdmerlin/autobwoutfile.htm',
 		dataType: 'text',
 		error: function(xhr){
@@ -1355,223 +1439,324 @@ function get_autobw_file(){
 	});
 }
 
-function get_conf_file(){
-	$j.ajax({
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Mar-02] **/
+/**----------------------------------------**/
+function getConfigFile()
+{
+	$.ajax({
 		url: '/ext/spdmerlin/config.htm',
 		dataType: 'text',
 		error: function(xhr){
-			setTimeout(get_conf_file,1000);
+			setTimeout(getConfigFile, 1000);
 		},
-		success: function(data){
-			var configdata=data.split('\n');
+		success: function(data)
+		{
+			let settingname, settingvalue;
+			var configdata = data.split('\n');
 			configdata = configdata.filter(Boolean);
-			
-			for(var i = 0; i < configdata.length; i++){
-				let settingname = configdata[i].split('=')[0].toLowerCase();
-				let settingvalue = configdata[i].split('=')[1].replace(/(\r\n|\n|\r)/gm,'');
-				
-				if(configdata[i].indexOf('SCHDAYS') != -1){
-					if(settingvalue == '*'){
-						for(var i2 = 0; i2 < daysofweek.length; i2++){
-							$j('#spdmerlin_'+daysofweek[i2].toLowerCase()).prop('checked',true);
+
+			for (var indx = 0; indx < configdata.length; indx++)
+			{
+				if (configdata[indx].length === 0 || configdata[indx].match('^[ ]*#') !== null)
+				{ continue; }  //Skip comments & empty lines//
+
+				settingname = configdata[indx].split('=')[0];
+				settingvalue = configdata[indx].split('=')[1].replace(/(\r\n|\n|\r)/gm,'');
+
+				if (settingname.match(/^JFFS_MSGLOGTIME/) != null)
+				{ continue; }  //Skip this config setting//
+
+				settingname = settingname.toLowerCase();
+
+				if (configdata[indx].indexOf('SCHDAYS') != -1)
+				{
+					if (settingvalue == '*')
+					{
+						for (var i2 = 0; i2 < daysofweek.length; i2++){
+							$('#spdmerlin_'+daysofweek[i2].toLowerCase()).prop('checked',true);
 						}
 					}
-					else{
+					else
+					{
 						var schdayarray = settingvalue.split(',');
-						for(var i2 = 0; i2 < schdayarray.length; i2++){
-							$j('#spdmerlin_'+schdayarray[i2].toLowerCase()).prop('checked',true);
+						for (var i2 = 0; i2 < schdayarray.length; i2++){
+							$('#spdmerlin_'+schdayarray[i2].toLowerCase()).prop('checked',true);
 						}
 					}
 				}
-				else if(configdata[i].indexOf('USEPREFERRED') != -1){
-					if(settingvalue == 'true'){
-						eval('document.form.spdmerlin_'+settingname).checked = true;
-					}
-					else if(settingvalue == 'false'){
-						eval('document.form.spdmerlin_'+settingname).checked = false;
-					}
+				else if (configdata[indx].indexOf('USEPREFERRED') != -1)
+				{
+					if (settingvalue === 'true')
+					{ eval('document.form.spdmerlin_'+settingname).checked = true; }
+					else if(settingvalue === 'false')
+					{ eval('document.form.spdmerlin_'+settingname).checked = false; }
 				}
-				else if(configdata[i].indexOf('PREFERREDSERVER') != -1){
-					$j('#span_spdmerlin_'+settingname).html(configdata[i].split('=')[0].split('_')[1]+' - '+settingvalue);
+				else if (configdata[indx].indexOf('PREFERREDSERVER') != -1){
+					$('#span_spdmerlin_'+settingname).html(configdata[indx].split('=')[0].split('_')[1]+' - '+settingvalue);
 				}
-				else if(configdata[i].indexOf('PREFERRED') == -1){
+				else if (configdata[indx].indexOf('PREFERRED') == -1){
 					eval('document.form.spdmerlin_'+settingname).value = settingvalue;
 				}
-				
-				if(configdata[i].indexOf('AUTOMATED') != -1){
-					AutomaticInterfaceEnableDisable($j('#spdmerlin_auto_'+document.form.spdmerlin_automated.value)[0]);
+
+				if (configdata[indx].indexOf('AUTOMATICMODE') != -1){
+					AutomaticInterfaceEnableDisable($('#spdmerlin_auto_'+document.form.spdmerlin_automaticmode.value)[0]);
 				}
-				
-				if(configdata[i].indexOf('AUTOBW') != -1){
-					AutoBWEnableDisable($j('#spdmerlin_autobw_'+document.form.spdmerlin_autobw_enabled.value)[0]);
+
+				if (configdata[indx].indexOf('AUTOBW') != -1){
+					AutoBWEnableDisable($('#spdmerlin_autobw_'+document.form.spdmerlin_autobw_enabled.value)[0]);
 				}
-				
-				if(configdata[i].indexOf('SPEEDTESTBINARY') != -1){
+
+				if (configdata[indx].indexOf('SPEEDTESTBINARY') != -1){
 					speedtestbinary = settingvalue;
 				}
 			}
-			if($j('[name=spdmerlin_schhours]').val().indexOf('/') != -1 && $j('[name=spdmerlin_schmins]').val() == 0){
+			document.getElementById('theDaysToKeepText').textContent = theDaysToKeepTXT;
+			document.getElementById('theLastXResultsText').textContent = theLastXResultsTXT;
+
+			if ($('[name=spdmerlin_schhours]').val().indexOf('/') != -1 && $('[name=spdmerlin_schmins]').val() == 0)
+			{
 				document.form.schedulemode.value = 'EveryX';
 				document.form.everyxselect.value = 'hours';
-				document.form.everyxvalue.value = $j('[name=spdmerlin_schhours]').val().split('/')[1];
+				document.form.everyxvalue.value = $('[name=spdmerlin_schhours]').val().split('/')[1];
 			}
-			else if($j('[name=spdmerlin_schmins]').val().indexOf('/') != -1 && $j('[name=spdmerlin_schhours]').val() == '*'){
+			else if($('[name=spdmerlin_schmins]').val().indexOf('/') != -1 && $('[name=spdmerlin_schhours]').val() == '*')
+			{
 				document.form.schedulemode.value = 'EveryX';
 				document.form.everyxselect.value = 'minutes';
-				document.form.everyxvalue.value = $j('[name=spdmerlin_schmins]').val().split('/')[1];
+				document.form.everyxvalue.value = $('[name=spdmerlin_schmins]').val().split('/')[1];
 			}
-			else{
+			else
+			{
 				document.form.schedulemode.value = 'Custom';
 			}
-			ScheduleModeToggle($j('#schmode_'+$j('[name=schedulemode]:checked').val().toLowerCase())[0]);
+			ScheduleModeToggle($('#schmode_'+$('[name=schedulemode]:checked').val().toLowerCase())[0]);
 		}
 	});
 	get_autobw_file();
 }
 
-function get_interfaces_file(){
-	$j.ajax({
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Mar-04] **/
+/**----------------------------------------**/
+function getInterfacesFile()
+{
+	$.ajax({
 		url: '/ext/spdmerlin/interfaces_user.htm',
 		dataType: 'text',
 		error: function(xhr){
-			setTimeout(get_interfaces_file,1000);
+			setTimeout(getInterfacesFile,1000);
 		},
-		success: function(data){
+		success: function(data)
+		{
 			showhide('spdtest_text',false);
 			showhide('imgSpdTest',false);
 			showhide('btnRunSpeedtest',true);
+			showhide('databaseSize_text',true);
+
 			var interfaces = data.split('\n');
+			const styleLeftMarginIndx = [2, 3, 4, 5];
+            let interfacename, ifaceNameUpper, ifaceNameLower, ifaceLabel, ifaceStyle;
 			interfaces = interfaces.filter(Boolean);
 			interfacelist = '';
 			interfacescomplete = [];
 			interfacesdisabled = [];
-			
+
 			var interfacecharttablehtml='<div style="line-height:10px;">&nbsp;</div>';
 			interfacecharttablehtml += '<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable" id="table_allinterfaces">';
 			interfacecharttablehtml += '<thead class="collapsible-jquery" id="thead_allinterfaces">';
 			interfacecharttablehtml += '<tr><td>Interfaces (click to expand/collapse)</td></tr>';
 			interfacecharttablehtml += '</thead>';
 			interfacecharttablehtml += '<tr><td align="center" style="padding: 0px;">';
-			
-			var interfaceconfigtablehtml = '<tr id="rowautomaticspdtest"><td class="settingname">Interfaces to use for automatic speedtests</th><td class="settingvalue">';
-			
+
+			var interfaceconfigtablehtml  = '<tr id="rowautomaticspdtest"><td class="settingname">Interfaces to use for automatic speedtests</th><td class="settingvalue">';
 			var prefserverconfigtablehtml = '<tr id="rowautospdprefserver"><td class="settingname">Interfaces that use a preferred server</th><td class="settingvalue">';
-			
 			var prefserverselecttablehtml = '<tr id="rowautospdprefserverselect"><td class="settingname">Preferred servers for interfaces</th><td class="settingvalue">';
-			
+
 			var speedtestifaceconfigtablehtml = '<tr id="rowmanualspdtest"><td class="settingname">Interfaces to use for manual speedtest</th><td class="settingvalue">';
 			speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_all" onchange="Change_SpdTestInterface(this)" class="input" settingvalueradio" value="All" checked>';
 			speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_all">All</label>';
-			
-			var interfacecount=interfaces.length;
-			for(var i = 0; i < interfacecount; i++){
-				var interfacename = '';
-				if(interfaces[i].indexOf('#') != -1){
-					interfacename = interfaces[i].substring(0,interfaces[i].indexOf('#')).trim();
+
+			const ifaceMaxCount = interfaces.length;
+			const breakStartIndex = 1, breakStopIndex = 5;
+
+			for (var ifaceIndx = 0; ifaceIndx < ifaceMaxCount; ifaceIndx++)
+			{
+				interfacename = '';
+				if (interfaces[ifaceIndx].indexOf('#') !== -1)
+				{
+					interfacename = interfaces[ifaceIndx].substring(0,interfaces[ifaceIndx].indexOf('#')).trim();
 					interfacescomplete.push(interfacename);
-					var interfacedisabled = '';
-					var ifacelabel = interfacename.toUpperCase();
+                    ifaceNameUpper = interfacename.toUpperCase();
+                    ifaceNameLower = interfacename.toLowerCase();
+					ifaceStyle = 'style="margin-left:0px;"';
+					ifaceLabel = ifaceNameUpper;
 					var changelabel = 'Change?';
-					if(interfaces[i].indexOf('interface not up') != -1){
+					var interfacedisabled = '';
+
+					if (interfaces[ifaceIndx].indexOf('interface not up') !== -1)
+					{
 						interfacesdisabled.push(interfacename);
 						interfacedisabled = 'disabled';
-						ifacelabel = '<a class="hintstyle" href="javascript:void(0);" onclick="SettingHint(1);">'+interfacename.toUpperCase()+'</a>';
-						changelabel = '<a class="hintstyle" href="javascript:void(0);" onclick="SettingHint(1);">Change?</a>';
+						ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(1,this);">'+ifaceNameUpper+'</a>';
+						changelabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(1,this);">Change?</a>';
 					}
-					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+interfacename.toLowerCase()+'" class="input '+interfacedisabled+' settingvalue" value="'+interfacename.toUpperCase()+'" '+interfacedisabled+'>';
-					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+interfacename.toLowerCase()+'">'+ifacelabel+'</label>';
-					
-					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+interfacename.toLowerCase()+'" id="spdmerlin_usepreferred_'+interfacename.toLowerCase()+'" class="input '+interfacedisabled+' settingvalue" value="'+interfacename.toUpperCase()+'" '+interfacedisabled+'>';
-					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+interfacename.toLowerCase()+'">'+ifacelabel+'</label>';
-					
-					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+interfacename.toLowerCase()+'">'+interfacename.toUpperCase()+':</span><br />';
-					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+interfacename.toLowerCase()+'" id="changepref_'+interfacename.toLowerCase()+'" class="input settingvalue '+interfacedisabled+'" '+interfacedisabled+' onchange="Toggle_ChangePrefServer(this)">';
-					prefserverselecttablehtml += '<label for="changepref_'+interfacename.toLowerCase()+'">'+changelabel+'</label>';
-					prefserverselecttablehtml += '<img id="imgServerList_'+interfacename.toLowerCase()+'" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
-					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+interfacename.toLowerCase()+'" id="spdmerlin_preferredserver_'+interfacename.toLowerCase()+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
-					
-					speedtestifaceconfigtablehtml += '<input autocomplete="off" autocapitalize="off" type="radio" name="spdtest_enabled" id="spdtest_enabled_'+interfacename.toLowerCase()+'" onchange="Change_SpdTestInterface(this)" class="input '+interfacedisabled+' settingvalueradio" value="'+interfacename.toUpperCase()+'" '+interfacedisabled+'>';
-					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+interfacename.toLowerCase()+'">'+ifacelabel+'</label>';
+
+					// For AUTOMATIC Speedtests //
+					if (breakStartIndex === ifaceIndx) { interfaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
+					if (breakStopIndex === ifaceIndx) { interfaceconfigtablehtml += '</br>'; }
+
+					// For PREFERRED Servers //
+					if (breakStartIndex === ifaceIndx) { prefserverconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
+					if (breakStopIndex === ifaceIndx) { prefserverconfigtablehtml += '</br>'; }
+
+					// Select a Preferred Server //
+					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+ifaceNameLower+'">'+ifaceNameUpper+':</span><br />';
+					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+ifaceNameLower+'" id="changepref_'+ifaceNameLower+'" class="input settingvalue '+interfacedisabled+'" '+interfacedisabled+' onchange="Toggle_ChangePrefServer(this)">';
+					prefserverselecttablehtml += '<label for="changepref_'+ifaceNameLower+'">'+changelabel+'</label>';
+					prefserverselecttablehtml += '<img id="imgServerList_'+ifaceNameLower+'" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
+					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+ifaceNameLower+'" id="spdmerlin_preferredserver_'+ifaceNameLower+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
+
+					// For MANUAL Speedtests //
+					if (breakStartIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					speedtestifaceconfigtablehtml += '<input autocomplete="off" autocapitalize="off" type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input '+interfacedisabled+' settingvalueradio" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
+					if (breakStopIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '</br>'; }
 				}
-				else{
-					interfacename = interfaces[i].trim();
+				else
+				{
+					interfacename = interfaces[ifaceIndx].trim();
 					interfacescomplete.push(interfacename);
-					
-					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+interfacename.toLowerCase()+'" class="input settingvalue" value="'+interfacename.toUpperCase()+'" checked>';
-					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+interfacename.toLowerCase()+'">'+interfacename.toUpperCase()+'</label>';
-					
-					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+interfacename.toLowerCase()+'" id="spdmerlin_usepreferred_'+interfacename.toLowerCase()+'" class="input settingvalue" value="'+interfacename.toUpperCase()+'" checked>';
-					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+interfacename.toLowerCase()+'">'+interfacename.toUpperCase()+'</label>';
-					
-					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+interfacename.toLowerCase()+'">'+interfacename.toUpperCase()+':</span><br />';
-					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+interfacename.toLowerCase()+'" id="changepref_'+interfacename.toLowerCase()+'" class="input settingvalue" onchange="Toggle_ChangePrefServer(this)">';
-					prefserverselecttablehtml += '<label for="changepref_'+interfacename.toLowerCase()+'">Change?</label>';
-					prefserverselecttablehtml += '<img id="imgServerList_'+interfacename.toLowerCase()+'" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
-					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+interfacename.toLowerCase()+'" id="spdmerlin_preferredserver_'+interfacename.toLowerCase()+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
-					
-					speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_'+interfacename.toLowerCase()+'" onchange="Change_SpdTestInterface(this)" class="input settingvalueradio" value="'+interfacename.toUpperCase()+'">';
-					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+interfacename.toLowerCase()+'">'+interfacename.toUpperCase()+'</label>';
+                    ifaceNameUpper = interfacename.toUpperCase();
+                    ifaceNameLower = interfacename.toLowerCase();
+					ifaceStyle = 'style="margin-left:0px;"';
+                    ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
+
+					// For AUTOMATIC Speedtests //
+					if (breakStartIndex === ifaceIndx) { interfaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked '+ifaceStyle+'>';
+					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
+					if (breakStopIndex === ifaceIndx) { interfaceconfigtablehtml += '</br>'; }
+
+					// For PREFERRED Servers //
+					if (breakStartIndex === ifaceIndx) { prefserverconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked '+ifaceStyle+'>';
+					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
+					if (breakStopIndex === ifaceIndx) { prefserverconfigtablehtml += '</br>'; }
+
+					// Select a Preferred Server //
+					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+ifaceNameLower+'">'+ifaceNameUpper+':</span><br />';
+					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+ifaceNameLower+'" id="changepref_'+ifaceNameLower+'" class="input settingvalue" onchange="Toggle_ChangePrefServer(this)">';
+					prefserverselecttablehtml += '<label for="changepref_'+ifaceNameLower+'">Change?</label>';
+					prefserverselecttablehtml += '<img id="imgServerList_'+ifaceNameLower+'" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
+					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+ifaceNameLower+'" id="spdmerlin_preferredserver_'+ifaceNameLower+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
+
+					// For MANUAL Speedtests //
+					if (breakStartIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input settingvalueradio" value="'+ifaceNameUpper+'" '+ifaceStyle+'>';
+					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
+					if (breakStopIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '</br>'; }
 				}
-				
+
 				interfacecharttablehtml += BuildInterfaceTable(interfacename);
-				
 				interfacelist += interfacename+',';
 			}
-			
+
 			interfacecharttablehtml += '</td></tr></table>';
-			
 			interfaceconfigtablehtml += '</td></tr>';
-			
 			prefserverconfigtablehtml += '</td></tr>';
-			
 			prefserverselecttablehtml += '</td></tr>';
-			
 			speedtestifaceconfigtablehtml += '</td></tr>';
-			
-			$j('#rowautomatedtests').after(prefserverselecttablehtml);
-			$j('#rowautomatedtests').after(prefserverconfigtablehtml);
-			$j('#rowautomatedtests').after(interfaceconfigtablehtml);
-			$j('#thead_manualspeedtests').after(speedtestifaceconfigtablehtml);
-			
+
+			$('#rowautomatedtests').after(prefserverselecttablehtml);
+			$('#rowautomatedtests').after(prefserverconfigtablehtml);
+			$('#rowautomatedtests').after(interfaceconfigtablehtml);
+			$('#thead_manualspeedtests').after(speedtestifaceconfigtablehtml);
+
 			GenerateManualSpdTestServerPrefSelect();
 			document.form.spdtest_serverpref.value = 'auto';
-			
-			if(interfacelist.charAt(interfacelist.length-1) == ','){
-				interfacelist = interfacelist.slice(0,-1);
-			}
-			
-			$j('#table_buttons2').after(interfacecharttablehtml);
+
+			if (interfacelist.charAt(interfacelist.length-1) == ',')
+            { interfacelist = interfacelist.slice(0,-1); }
+
+			$('#table_buttons2').after(interfacecharttablehtml);
 			maxNoCharts = interfacelist.split(',').length*3*3*2;
 			RedrawAllCharts();
-			
+
 			AddEventHandlers();
-			
+
 			var interfacetextarray = interfacelist.split(',');
-			for(var i = 0; i < interfacetextarray.length; i++){
-				$j('#sortTable'+interfacetextarray[i]).empty();
-				$j('#sortTable'+interfacetextarray[i]).append(BuildLastXTableNoData(interfacetextarray[i]));
-				get_lastx_file(interfacetextarray[i]);
+			for (var indx = 0; indx < interfacetextarray.length; indx++)
+			{
+				$('#sortTable'+interfacetextarray[indx]).empty();
+				$('#sortTable'+interfacetextarray[indx]).append(BuildLastXTableNoData(interfacetextarray[indx]));
+				get_lastx_file(interfacetextarray[indx]);
 			}
-			get_conf_file();
+			getConfigFile();
 		}
 	});
 }
 
-function get_statstitle_file(){
-	$j.ajax({
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Mar-02] **/
+/**----------------------------------------**/
+function getStatsTitleFile()
+{
+	$.ajax({
 		url: '/ext/spdmerlin/spdtitletext.js',
 		dataType: 'script',
 		error: function(xhr){
-			setTimeout(get_statstitle_file,1000);
+			setTimeout(getStatsTitleFile, 2000);
 		},
-		success: function(){
+		success: function()
+		{
 			SetSPDStatsTitle();
+			document.getElementById('databaseSize_text').textContent = 'Database Size: '+sqlDatabaseFileSize;
+
+			if (jffsAvailableSpaceLow.match(/^WARNING[0-9]/) === null)
+			{
+				showhide('jffsFreeSpace_LOW',false);
+				showhide('jffsFreeSpace_NOTE',false);
+				showhide('jffsFreeSpace_WARN',false);
+				document.getElementById('jffsFreeSpace_text').textContent = 'JFFS Available: ' + jffsAvailableSpaceStr;
+			}
+			else
+			{
+				document.getElementById('jffsFreeSpace_text').textContent = 'JFFS Available: ';
+				document.getElementById('jffsFreeSpace_LOW').textContent = jffsAvailableSpaceStr;
+				showhide('jffsFreeSpace_LOW',true);
+                if (document.form.connmon_storagelocation.value === 'jffs')
+				{ showhide('jffsFreeSpace_NOTE',false); showhide('jffsFreeSpace_WARN',true); }
+				else
+				{ showhide('jffsFreeSpace_WARN',false); showhide('jffsFreeSpace_NOTE',true); }
+			}
+
+			if (databaseResetDone === 1)
+			{
+				ClearSpdTableRows();
+				currentNoCharts = 0;
+				$('#Time_Format').val(GetCookie('Time_Format', 'number'));
+				getInterfacesFile();
+				databaseResetDone += 1;
+			}
+			setTimeout(getStatsTitleFile, 4000);
 		}
 	});
 }
 
-function get_lastx_file(name){
-	$j.ajax({
+function get_lastx_file(name)
+{
+	$.ajax({
 		url: '/ext/spdmerlin/lastx_'+name+'.htm',
 		dataType: 'text',
 		error: function(xhr){
@@ -1583,11 +1768,13 @@ function get_lastx_file(name){
 	});
 }
 
-function ParseLastXData(name,data){
+function ParseLastXData(name,data)
+{
 	var arraysortlines = data.split('\n');
 	arraysortlines = arraysortlines.filter(Boolean);
 	window['arraysortlistlines'+name] = [];
-	for(var i = 0; i < arraysortlines.length; i++){
+	for(var i = 0; i < arraysortlines.length; i++)
+	{
 		try{
 			var resultfields = arraysortlines[i].split(',');
 			var parsedsortline = new Object();
@@ -1611,7 +1798,8 @@ function ParseLastXData(name,data){
 	SortTable('sortTable'+name,'arraysortlistlines'+name,eval('sortname'+name)+' '+eval('sortdir'+name).replace('desc','↑').replace('asc','↓').trim(),'sortname'+name,'sortdir'+name);
 }
 
-function SortTable(tableid,arrayid,sorttext,sortname,sortdir){
+function SortTable(tableid,arrayid,sorttext,sortname,sortdir)
+{
 	window[sortname] = sorttext.replace('↑','').replace('↓','').trim();
 	var sorttype = 'number';
 	var sortfield = window[sortname];
@@ -1668,10 +1856,10 @@ function SortTable(tableid,arrayid,sorttext,sortname,sortdir){
 		}
 	}
 	
-	$j('#'+tableid).empty();
-	$j('#'+tableid).append(BuildLastXTable(tableid.replace('sortTable','')));
+	$('#'+tableid).empty();
+	$('#'+tableid).append(BuildLastXTable(tableid.replace('sortTable','')));
 	
-	$j('#'+tableid).find('.sortable').each(function(index,element){
+	$('#'+tableid).find('.sortable').each(function(index,element){
 		if(element.innerHTML.replace(/ \(.*\)/,'').replace(' ','') == window[sortname]){
 			if(window[sortdir] == 'asc'){
 				element.innerHTML = element.innerHTML+' ↑';
@@ -1762,7 +1950,8 @@ function changeAllCharts(e){
 	}
 }
 
-function changeChart(e){
+function changeChart(e)
+{
 	value = e.value * 1;
 	name = e.id.substring(0,e.id.indexOf('_'));
 	SetCookie(e.id,value);
@@ -1774,20 +1963,45 @@ function changeChart(e){
 	}
 }
 
-function SettingHint(hintid){
+
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Mar-03] **/
+/**----------------------------------------**/
+function SettingHint (hintID, formField)
+{
 	var tag_name = document.getElementsByTagName('a');
-	for(var i=0;i<tag_name.length;i++){
-		tag_name[i].onmouseout=nd;
+	for (var i = 0; i < tag_name.length; i++)
+	{ tag_name[i].onmouseout=nd; }
+
+	let hintMsg = '';
+	if (hintID === 1)
+	{
+	    if (formField.name.match(/^WGVPN[1-9]/) !== null)
+	    { hintMsg = 'WireGuard interface is <b>not</b> enabled.'; }
+	    else if (formField.name.match(/^VPNC[1-9]/) !== null)
+	    { hintMsg = 'OpenVPN client interface is <b>not</b> enabled.'; }
+	    else
+	    { hintMsg = 'Interface is <b>not</b> enabled.'; }
 	}
-	hinttext='My text goes here';
-	if(hintid == 1) hinttext='Interface not enabled';
-	if(hintid == 2) hinttext='Hour(s) of day to run speedtest<br />* for all<br />Valid numbers between 0 and 23<br />comma (,) separate for multiple<br />dash (-) separate for a range';
-	if(hintid == 3) hinttext='Minute(s) of day to run speedtest<br />(* for all<br />Valid numbers between 0 and 59<br />comma (,) separate for multiple<br />dash (-) separate for a range';
-	
-	return overlib(hinttext,0,0);
+	else if (hintID === 2)
+	{
+	    if (formField.name.match(/^WGVPN[1-9]/) !== null)
+	    { hintMsg = 'WireGuard interface is enabled.'; }
+	    else if (formField.name.match(/^VPNC[1-9]/) !== null)
+	    { hintMsg = 'OpenVPN client interface is enabled.'; }
+	    else
+	    { hintMsg = 'Interface is enabled.'; }
+	}
+	else if (hintID === 3)
+	{ hintMsg = 'Hour(s) of day to run speedtests.<br />Use an asterisk (<b>*</b>) to run every hour.<br />Valid numbers are between 0 and 23.<br />Use commas (<b>,</b>) for multiple entries.<br />Use a hyphen (<b>-</b>) to indicate a range.'; }
+	else if (hintID === 4)
+	{ hintMsg = 'Minute(s) of day to run speedtests.<br />Use an asterisk (<b>*</b>) to run every minute.<br />Valid numbers are between 0 and 59.<br />Use commas (<b>,</b>) for multiple entries.<br />Use a hyphen (<b>-</b>) to indicate a range.'; }
+
+	return overlib(hintMsg,0,0);
 }
 
-function BuildInterfaceTable(name){
+function BuildInterfaceTable(name)
+{
 	var charthtml = '<div style="line-height:10px;">&nbsp;</div>';
 	charthtml += '<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable" id="table_interfaces_'+name+'">';
 	charthtml += '<thead class="collapsible-jquery" id="'+name+'">';
@@ -1907,7 +2121,8 @@ function BuildInterfaceTable(name){
 	return charthtml;
 }
 
-function AutomaticInterfaceEnableDisable(forminput){
+function AutomaticInterfaceEnableDisable(forminput)
+{
 	var inputname = forminput.name;
 	var inputvalue = forminput.value;
 	var prefix = inputname.substring(0,inputname.lastIndexOf('_'));
@@ -1915,64 +2130,76 @@ function AutomaticInterfaceEnableDisable(forminput){
 	var fieldnames = ['schhours','schmins'];
 	var fieldnames2 = ['schedulemode','everyxselect','everyxvalue'];
 	
-	if(inputvalue == 'false'){
-		for(var i = 0; i < interfacescomplete.length; i++){
-			$j('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$j('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
-			$j('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$j('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
-			$j('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$j('#changepref_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
+	if (inputvalue == 'false')
+	{
+		for (var i = 0; i < interfacescomplete.length; i++)
+		{
+			$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
+			$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
+			$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
+			$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
+			$('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
+			$('#changepref_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
 		}
-		for (var i = 0; i < fieldnames.length; i++){
-			$j('input[name='+prefix+'_'+fieldnames[i]+']').addClass('disabled');
-			$j('input[name='+prefix+'_'+fieldnames[i]+']').prop('disabled',true);
+		for (var i = 0; i < fieldnames.length; i++)
+		{
+			$('input[name='+prefix+'_'+fieldnames[i]+']').addClass('disabled');
+			$('input[name='+prefix+'_'+fieldnames[i]+']').prop('disabled',true);
 		}
-		for (var i = 0; i < daysofweek.length; i++){
-			$j('#'+prefix+'_'+daysofweek[i].toLowerCase()).prop('disabled',true);
+		for (var i = 0; i < daysofweek.length; i++)
+		{
+			$('#'+prefix+'_'+daysofweek[i].toLowerCase()).prop('disabled',true);
 		}
-		for (var i = 0; i < fieldnames2.length; i++){
-			$j('[name='+fieldnames2[i]+']').addClass('disabled');
-			$j('[name='+fieldnames2[i]+']').prop('disabled',true);
+		for (var i = 0; i < fieldnames2.length; i++)
+		{
+			$('[name='+fieldnames2[i]+']').addClass('disabled');
+			$('[name='+fieldnames2[i]+']').prop('disabled',true);
 		}
 	}
-	else if(inputvalue == 'true'){
-		for(var i = 0; i < interfacescomplete.length; i++){
-			if(interfacesdisabled.includes(interfacescomplete[i]) == false){
-				$j('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$j('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
-				$j('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$j('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
-				$j('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$j('#changepref_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+	else if (inputvalue == 'true')
+	{
+		for (var i = 0; i < interfacescomplete.length; i++)
+		{
+			if (interfacesdisabled.includes(interfacescomplete[i]) == false)
+			{
+				$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
+				$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+				$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
+				$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+				$('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
+				$('#changepref_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
 			}
 		}
-		for (var i = 0; i < fieldnames.length; i++){
-			$j('input[name='+prefix+'_'+fieldnames[i]+']').removeClass('disabled');
-			$j('input[name='+prefix+'_'+fieldnames[i]+']').prop('disabled',false);
+		for (var i = 0; i < fieldnames.length; i++)
+		{
+			$('input[name='+prefix+'_'+fieldnames[i]+']').removeClass('disabled');
+			$('input[name='+prefix+'_'+fieldnames[i]+']').prop('disabled',false);
 		}
-		for (var i = 0; i < daysofweek.length; i++){
-			$j('#'+prefix+'_'+daysofweek[i].toLowerCase()).prop('disabled',false);
+		for (var i = 0; i < daysofweek.length; i++)
+		{
+			$('#'+prefix+'_'+daysofweek[i].toLowerCase()).prop('disabled',false);
 		}
-		for (var i = 0; i < fieldnames2.length; i++){
-			$j('[name='+fieldnames2[i]+']').removeClass('disabled');
-			$j('[name='+fieldnames2[i]+']').prop('disabled',false);
+		for (var i = 0; i < fieldnames2.length; i++)
+		{
+			$('[name='+fieldnames2[i]+']').removeClass('disabled');
+			$('[name='+fieldnames2[i]+']').prop('disabled',false);
 		}
 	}
 }
 
-function ScheduleModeToggle(forminput){
+function ScheduleModeToggle(forminput)
+{
 	var inputname = forminput.name;
 	var inputvalue = forminput.value;
 	
 	if(inputvalue == 'EveryX'){
 		showhide('schfrequency',true);
 		showhide('schcustom',false);
-		if($j('#everyxselect').val() == 'hours'){
+		if($('#everyxselect').val() == 'hours'){
 			showhide('spanxhours',true);
 			showhide('spanxminutes',false);
 		}
-		else if($j('#everyxselect').val() == 'minutes'){
+		else if($('#everyxselect').val() == 'minutes'){
 			showhide('spanxhours',false);
 			showhide('spanxminutes',true);
 		}
@@ -1996,7 +2223,7 @@ function EveryXToggle(forminput){
 		showhide('spanxminutes',true);
 	}
 	
-	Validate_ScheduleValue($j('[name=everyxvalue]')[0]);
+	Validate_ScheduleValue($('[name=everyxvalue]')[0]);
 }
 
 function AutoBWEnableDisable(forminput){
@@ -2008,22 +2235,22 @@ function AutoBWEnableDisable(forminput){
 	
 	if(inputvalue == 'false'){
 		for (var i = 0; i < fieldnames.length; i++){
-			$j('input[name^='+prefix+'_'+fieldnames[i]+']').addClass('disabled');
-			$j('input[name^='+prefix+'_'+fieldnames[i]+']').prop('disabled',true);
+			$('input[name^='+prefix+'_'+fieldnames[i]+']').addClass('disabled');
+			$('input[name^='+prefix+'_'+fieldnames[i]+']').prop('disabled',true);
 		}
 		
-		$j('input[name^='+prefix+'_excludefromqos]').removeClass('disabled');
-		$j('input[name^='+prefix+'_excludefromqos]').prop('disabled',false);
+		$('input[name^='+prefix+'_excludefromqos]').removeClass('disabled');
+		$('input[name^='+prefix+'_excludefromqos]').prop('disabled',false);
 	}
 	else if(inputvalue == 'true'){
 		for (var i = 0; i < fieldnames.length; i++){
-			$j('input[name^='+prefix+'_'+fieldnames[i]+']').removeClass('disabled');
-			$j('input[name^='+prefix+'_'+fieldnames[i]+']').prop('disabled',false);
+			$('input[name^='+prefix+'_'+fieldnames[i]+']').removeClass('disabled');
+			$('input[name^='+prefix+'_'+fieldnames[i]+']').prop('disabled',false);
 		}
 		
 		document.form.spdmerlin_excludefromqos.value = true;
-		$j('input[name^='+prefix+'_excludefromqos]').addClass('disabled');
-		$j('input[name^='+prefix+'_excludefromqos]').prop('disabled',true);
+		$('input[name^='+prefix+'_excludefromqos]').addClass('disabled');
+		$('input[name^='+prefix+'_excludefromqos]').prop('disabled',true);
 	}
 }
 
@@ -2040,9 +2267,9 @@ function Toggle_ChangePrefServer(forminput){
 		setTimeout(get_spdtestservers_file,2000,ifacename);
 	}
 	else{
-		$j('#spdmerlin_preferredserver_'+ifacename)[0].style.display = 'none';
-		$j('#spdmerlin_preferredserver_'+ifacename).prop('disabled',true);
-		$j('#spdmerlin_preferredserver_'+ifacename).addClass('disabled');
+		$('#spdmerlin_preferredserver_'+ifacename)[0].style.display = 'none';
+		$('#spdmerlin_preferredserver_'+ifacename).prop('disabled',true);
+		$('#spdmerlin_preferredserver_'+ifacename).addClass('disabled');
 	}
 }
 
@@ -2062,33 +2289,33 @@ function Toggle_SpdTestServerPref(forminput){
 		document.formScriptActions.action_script.value='start_spdmerlinserverlistmanual_'+document.form.spdtest_enabled.value;
 		document.formScriptActions.submit();
 		for(var i = 0; i < interfacescomplete.length; i++){
-			$j('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$j('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
+			$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
+			$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
 		}
-		$j.each($j('input[name=spdtest_serverpref]'),function(){
-			$j(this).prop('disabled',true);
-			$j(this).addClass('disabled');
+		$.each($('input[name=spdtest_serverpref]'),function(){
+			$(this).prop('disabled',true);
+			$(this).addClass('disabled');
 		});
 		showhide('rowmanualserverprefselect',true);
 		showhide('imgManualServerList',true);
 		
 		if(document.form.spdtest_enabled.value == 'All'){
-			$j.each($j('select[name^=spdtest_serverprefselect]'),function(){
-				$j(this).empty();
+			$.each($('select[name^=spdtest_serverprefselect]'),function(){
+				$(this).empty();
 			});
 		}
 		else{
-			$j('select[name=spdtest_serverprefselect]').empty();
+			$('select[name=spdtest_serverprefselect]').empty();
 		}
 		setTimeout(get_manualspdtestservers_file,2000);
 	}
 	else{
 		showhide('rowmanualserverprefselect',false);
 		if(document.form.spdtest_enabled.value == 'All'){
-			$j.each($j('select[name^=spdtest_serverprefselect]'),function(){
+			$.each($('select[name^=spdtest_serverprefselect]'),function(){
 				showhide(this.id,false);
 			});
-			$j.each($j('span[id^=spdtest_serverprefselectspan]'),function(){
+			$.each($('span[id^=spdtest_serverprefselectspan]'),function(){
 				showhide(this.id,false);
 			});
 		}
@@ -2100,7 +2327,7 @@ function Toggle_SpdTestServerPref(forminput){
 }
 
 function GenerateManualSpdTestServerPrefSelect(){
-	$j('#rowmanualserverprefselect').remove();
+	$('#rowmanualserverprefselect').remove();
 	var serverprefhtml = '<tr class="even" id="rowmanualserverprefselect" style="display:none;">';
 	serverprefhtml += '<td class="settingname">Choose a server</th><td class="settingvalue"><img id="imgManualServerList" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
 	
@@ -2117,208 +2344,254 @@ function GenerateManualSpdTestServerPrefSelect(){
 	}
 	
 	serverprefhtml += '</td></tr>';
-	$j('#rowmanualserverpref').after(serverprefhtml);
+	$('#rowmanualserverpref').after(serverprefhtml);
 }
 
-function Validate_All(){
+/**-------------------------------------**/
+/** Added by Martinski W. [2025-Mar-02] **/
+/**-------------------------------------**/
+//Between 15 and 365 days, Default: 30//
+const theDaysToKeepMIN = 15;
+const theDaysToKeepDEF = 30;
+const theDaysToKeepMAX = 365;
+const theDaysToKeepTXT = `(between ${theDaysToKeepMIN} and ${theDaysToKeepMAX}, default: ${theDaysToKeepDEF})`;
+
+//Between 5 and 100 results, Default: 10//
+const theLastXResultsMIN = 5;
+const theLastXResultsDEF = 10;
+const theLastXResultsMAX = 100;
+const theLastXResultsTXT = `(between ${theLastXResultsMIN} and ${theLastXResultsMAX}, default: ${theLastXResultsDEF})`;
+
+function validateAll()
+{
 	var validationfailed = false;
-	
-	if(! Validate_Number_Setting(document.form.spdmerlin_autobw_sf_down,100,0)) validationfailed=true;
-	if(! Validate_Number_Setting(document.form.spdmerlin_autobw_sf_up,100,0)) validationfailed=true;
-	if(! Validate_Number_Setting(document.form.spdmerlin_autobw_threshold_down,100,0)) validationfailed=true;
-	if(! Validate_Number_Setting(document.form.spdmerlin_autobw_threshold_up,100,0)) validationfailed=true;
-	if(! Validate_Number_Setting(document.form.spdmerlin_autobw_average_calc,30,1)) validationfailed=true;
-	
-	if(document.form.schedulemode.value == 'EveryX'){
-		if(! Validate_ScheduleValue(document.form.everyxvalue)) validationfailed=true;
-	}
-	else if(document.form.schedulemode.value == 'Custom'){
-		if(! Validate_Schedule(document.form.spdmerlin_schhours,'hours')) validationfailed=true;
-		if(! Validate_Schedule(document.form.spdmerlin_schmins,'mins')) validationfailed=true;
-	}
-	
-	if(validationfailed){
-		alert('Validation for some fields failed. Please correct invalid values and try again.');
+
+	if (!Validate_Number_Setting(document.form.spdmerlin_autobw_sf_down,100,0))
+	{ validationfailed = true; }
+	if (!Validate_Number_Setting(document.form.spdmerlin_autobw_sf_up,100,0))
+	{ validationfailed = true; }
+	if (!Validate_Number_Setting(document.form.spdmerlin_autobw_threshold_down,100,0))
+	{ validationfailed = true; }
+	if (!Validate_Number_Setting(document.form.spdmerlin_autobw_threshold_up,100,0))
+	{ validationfailed = true; }
+	if (!Validate_Number_Setting(document.form.spdmerlin_autobw_average_calc,30,1))
+	{ validationfailed = true; }
+	if (!Validate_Number_Setting(document.form.spdmerlin_lastxresults, theLastXResultsMAX, theLastXResultsMIN))
+	{ validationfailed = true; }
+	if (!Validate_Number_Setting(document.form.spdmerlin_daystokeep, theDaysToKeepMAX, theDaysToKeepMIN))
+	{ validationfailed = true; }
+
+	if (document.form.spdmerlin_automaticmode.value === 'true')
+	{
+		if (document.form.schedulemode.value === 'EveryX')
+		{
+			if (!Validate_ScheduleValue(document.form.everyxvalue)) validationfailed=true;
+		}
+		else if (document.form.schedulemode.value === 'Custom')
+		{
+			if (!Validate_Schedule(document.form.spdmerlin_schhours,'hours'))
+			{ validationfailed = true; }
+			if (!Validate_Schedule(document.form.spdmerlin_schmins,'mins'))
+			{ validationfailed = true; }
+		}
+    }
+	if (validationfailed)
+    {
+		alert('**ERROR**\nValidation for some fields failed.\nPlease correct invalid values and try again.');
 		return false;
 	}
-	else{
-		return true;
-	}
+	else
+    { return true; }
 }
 
-function Validate_Schedule(forminput,hoursmins){
+function Validate_Schedule (forminput,hoursmins)
+{
 	var inputname = forminput.name;
 	var inputvalues = forminput.value.split(',');
 	var upperlimit = 0;
-	
-	if(hoursmins == 'hours'){
-		upperlimit = 23;
-	}
-	else if (hoursmins == 'mins'){
-		upperlimit = 59;
-	}
-	
+
+	if (hoursmins == 'hours')
+	{ upperlimit = 23; }
+	else if (hoursmins == 'mins')
+	{ upperlimit = 59; }
+
 	showhide('btnfixhours',false);
 	showhide('btnfixmins',false);
-	
+
 	var validationfailed = 'false';
-	for(var i=0; i < inputvalues.length; i++){
-		if(inputvalues[i] == '*' && i == 0){
+	for (var i = 0; i < inputvalues.length; i++)
+	{
+		if (inputvalues[i] == '*' && i == 0)
+		{
 			validationfailed = 'false';
 		}
-		else if(inputvalues[i] == '*' && i != 0){
+		else if (inputvalues[i] == '*' && i != 0)
+		{
 			validationfailed = 'true';
 		}
-		else if(inputvalues[0] == '*' && i > 0){
+		else if (inputvalues[0] == '*' && i > 0)
+		{
 			validationfailed = 'true';
 		}
-		else if(inputvalues[i] == ''){
+		else if (inputvalues[i] == '')
+		{
 			validationfailed = 'true';
 		}
-		else if(inputvalues[i].startsWith('*/')){
-			if(! isNaN(inputvalues[i].replace('*/','')*1)){
-				if((inputvalues[i].replace('*/','')*1) > upperlimit || (inputvalues[i].replace('*/','')*1) < 0){
-					validationfailed = 'true';
-				}
+		else if (inputvalues[i].startsWith('*/'))
+        {
+			if (!isNaN(inputvalues[i].replace('*/','')*1))
+			{
+				if ((inputvalues[i].replace('*/','')*1) > upperlimit || (inputvalues[i].replace('*/','')*1) < 0)
+				{ validationfailed = 'true'; }
 			}
-			else{
-				validationfailed = 'true';
-			}
+			else
+			{ validationfailed = 'true'; }
 		}
-		else if(inputvalues[i].indexOf('-') != -1){
-			if(inputvalues[i].startsWith('-')){
-				validationfailed = 'true';
-			}
-			else{
+		else if (inputvalues[i].indexOf('-') != -1)
+        {
+			if (inputvalues[i].startsWith('-'))
+			{ validationfailed = 'true'; }
+			else
+			{
 				var inputvalues2 = inputvalues[i].split('-');
-				for(var i2=0; i2 < inputvalues2.length; i2++){
-					if(inputvalues2[i2] == ''){
+				for (var i2=0; i2 < inputvalues2.length; i2++)
+				{
+					if (inputvalues2[i2] == ''){
 						validationfailed = 'true';
 					}
-					else if(! isNaN(inputvalues2[i2]*1)){
-						if((inputvalues2[i2]*1) > upperlimit || (inputvalues2[i2]*1) < 0){
+					else if (! isNaN(inputvalues2[i2]*1))
+					{
+						if ((inputvalues2[i2]*1) > upperlimit || (inputvalues2[i2]*1) < 0)
+						{
 							validationfailed = 'true';
 						}
-						else if((inputvalues2[i2+1]*1) < (inputvalues2[i2]*1)){
+						else if ((inputvalues2[i2+1]*1) < (inputvalues2[i2]*1))
+						{
 							validationfailed = 'true';
-							if(hoursmins == 'hours'){
-								showhide('btnfixhours',true)
-							}
-							else if (hoursmins == 'mins'){
-								showhide('btnfixmins',true)
-							}
+							if (hoursmins == 'hours')
+							{ showhide('btnfixhours',true); }
+							else if (hoursmins == 'mins')
+							{ showhide('btnfixmins',true); }
 						}
 					}
-					else{
-						validationfailed = 'true';
-					}
+					else
+					{ validationfailed = 'true'; }
 				}
 			}
 		}
-		else if(! isNaN(inputvalues[i]*1)){
-			if((inputvalues[i]*1) > upperlimit || (inputvalues[i]*1) < 0){
-				validationfailed = 'true';
-			}
+		else if (! isNaN(inputvalues[i]*1))
+		{
+			if ((inputvalues[i]*1) > upperlimit || (inputvalues[i]*1) < 0)
+			{ validationfailed = 'true'; }
 		}
-		else{
-			validationfailed = 'true';
-		}
+		else
+		{ validationfailed = 'true'; }
 	}
-	
-	if(validationfailed == 'true'){
-		$j(forminput).addClass('invalid');
+
+	if (validationfailed == 'true')
+	{
+		$(forminput).addClass('invalid');
 		return false;
 	}
-	else{
-		$j(forminput).removeClass('invalid');
+	else
+	{
+		$(forminput).removeClass('invalid');
 		return true;
 	}
 }
 
-function Validate_ScheduleValue(forminput){
+function Validate_ScheduleValue(forminput)
+{
 	var inputname = forminput.name;
 	var inputvalue = forminput.value*1;
-	
+
 	var upperlimit = 0;
 	var lowerlimit = 1;
-	
-	var unittype = $j('#everyxselect').val();
-	
-	if(unittype == 'hours'){
-		upperlimit = 24;
-	}
-	else if(unittype == 'minutes'){
-		upperlimit = 30;
-	}
-	
-	if(inputvalue > upperlimit || inputvalue < lowerlimit || forminput.value.length < 1){
-		$j(forminput).addClass('invalid');
+	var unittype = $('#everyxselect').val();
+
+	if (unittype == 'hours')
+	{ upperlimit = 24; }
+	else if (unittype == 'minutes')
+	{ upperlimit = 30; }
+
+	if (inputvalue > upperlimit || inputvalue < lowerlimit || forminput.value.length < 1)
+	{
+		$(forminput).addClass('invalid');
 		return false;
 	}
-	else{
-		$j(forminput).removeClass('invalid');
+	else
+	{
+		$(forminput).removeClass('invalid');
 		return true;
 	}
 }
 
-function Validate_Number_Setting(forminput,upperlimit,lowerlimit){
+function Validate_Number_Setting(forminput,upperlimit,lowerlimit)
+{
 	var inputname = forminput.name;
 	var inputvalue = forminput.value*1;
 
-	if(inputvalue > upperlimit || inputvalue < lowerlimit){
-		$j(forminput).addClass('invalid');
+	if (inputvalue > upperlimit || inputvalue < lowerlimit)
+	{
+		$(forminput).addClass('invalid');
 		return false;
 	}
-	else{
-		$j(forminput).removeClass('invalid');
+	else
+	{
+		$(forminput).removeClass('invalid');
 		return true;
 	}
 }
 
-function Format_Number_Setting(forminput){
+function Format_Number_Setting(forminput)
+{
 	var inputname = forminput.name;
 	var inputvalue = forminput.value*1;
 
-	if(forminput.value.length == 0 || inputvalue == NaN){
-		return false;
-	}
-	else{
+	if (forminput.value.length == 0 || inputvalue == NaN)
+	{ return false; }
+	else
+	{
 		forminput.value = parseInt(forminput.value);
 		return true;
 	}
 }
 
-function FixCron(hoursmins){
-	if(hoursmins == 'hours'){
+function FixCron(hoursmins)
+{
+	if (hoursmins == 'hours')
+	{
 		var origvalue = document.form.spdmerlin_schhours.value;
 		document.form.spdmerlin_schhours.value = origvalue.split('-')[0]+'-23,0-'+origvalue.split('-')[1];
 		Validate_Schedule(document.form.spdmerlin_schhours,'hours');
 	}
-	else if(hoursmins == 'mins'){
+	else if (hoursmins == 'mins')
+	{
 		var origvalue = document.form.spdmerlin_schmins.value;
 		document.form.spdmerlin_schmins.value = origvalue.split('-')[0]+'-59,0-'+origvalue.split('-')[1];
 		Validate_Schedule(document.form.spdmerlin_schmins,'mins');
 	}
 }
 
-function AddEventHandlers(){
-	$j('.collapsible-jquery').off('click').on('click',function(){
-		$j(this).siblings().toggle('fast',function(){
-			if($j(this).css('display') == 'none'){
-				SetCookie($j(this).siblings()[0].id,'collapsed');
+function AddEventHandlers()
+{
+	$('.collapsible-jquery').off('click').on('click',function(){
+		$(this).siblings().toggle('fast',function(){
+			if($(this).css('display') == 'none'){
+				SetCookie($(this).siblings()[0].id,'collapsed');
 			}
 			else{
-				SetCookie($j(this).siblings()[0].id,'expanded');
+				SetCookie($(this).siblings()[0].id,'expanded');
 			}
 		})
 	});
 	
-	$j('.collapsible-jquery').each(function(index,element){
-		if(GetCookie($j(this)[0].id,'string') == 'collapsed'){
-			$j(this).siblings().toggle(false);
+	$('.collapsible-jquery').each(function(index,element){
+		if(GetCookie($(this)[0].id,'string') == 'collapsed'){
+			$(this).siblings().toggle(false);
 		}
 		else{
-			$j(this).siblings().toggle(true);
+			$(this).siblings().toggle(true);
 		}
 	});
 }
