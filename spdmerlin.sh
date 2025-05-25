@@ -10,10 +10,10 @@
 ##        | |                                               ##
 ##        |_|                                               ##
 ##                                                          ##
-##         https://github.com/jackyaz/spdMerlin             ##
+##         https://github.com/AMTM-OSR/spdMerlin            ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-May-18
+# Last Modified: 2025-May-24
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,7 +38,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.7"
-SCRIPT_BRANCH="develop"
+SCRIPT_BRANCH="master"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
 readonly SCRIPT_WEBPAGE_DIR="$(readlink -f /www/user)"
@@ -251,9 +251,9 @@ Update_Check()
 	doupdate="false"
 	localver="$(grep "SCRIPT_VERSION=" "/jffs/scripts/$SCRIPT_NAME_LOWER" | grep -m1 -oE "$scriptVersRegExp")"
 	[ -n "$localver" ] && Set_Version_Custom_Settings local "$localver"
-	curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/404/$SCRIPT_NAME_LOWER.sh" | grep -qF "jackyaz" || \
+	curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" | grep -qF "jackyaz" || \
     { Print_Output true "404 error detected - stopping update" "$ERR"; return 1; }
-	serverver="$(curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/version/$SCRIPT_NAME_LOWER.sh" | grep "SCRIPT_VERSION=" | grep -m1 -oE "$scriptVersRegExp")"
+	serverver="$(curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" | grep "SCRIPT_VERSION=" | grep -m1 -oE "$scriptVersRegExp")"
 	if [ "$localver" != "$serverver" ]
 	then
 		doupdate="version"
@@ -261,7 +261,7 @@ Update_Check()
 		echo 'var updatestatus = "'"$serverver"'";'  > "$SCRIPT_WEB_DIR/detect_update.js"
 	else
 		localmd5="$(md5sum "/jffs/scripts/$SCRIPT_NAME_LOWER" | awk '{print $1}')"
-		remotemd5="$(curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/md5/$SCRIPT_NAME_LOWER.sh" | md5sum | awk '{print $1}')"
+		remotemd5="$(curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" | md5sum | awk '{print $1}')"
 		if [ "$localmd5" != "$remotemd5" ]
 		then
 			doupdate="md5"
@@ -305,7 +305,7 @@ Update_Version()
 					Update_File "$ARCH.tar.gz"
 					Update_File spdstats_www.asp
 					Update_File shared-jy.tar.gz
-					Download_File "$SCRIPT_REPO/update/$SCRIPT_NAME_LOWER.sh" "/jffs/scripts/$SCRIPT_NAME_LOWER" && \
+					Download_File "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" "/jffs/scripts/$SCRIPT_NAME_LOWER" && \
 					Print_Output true "$SCRIPT_NAME successfully updated" "$PASS"
 					chmod 0755 "/jffs/scripts/$SCRIPT_NAME_LOWER"
 					Set_Version_Custom_Settings local "$serverver"
@@ -330,14 +330,14 @@ Update_Version()
 
 	if [ "$1" = "force" ]
 	then
-		serverver="$(curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/version/$SCRIPT_NAME_LOWER.sh" | grep "SCRIPT_VERSION=" | grep -m1 -oE "$scriptVersRegExp")"
+		serverver="$(curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" | grep "SCRIPT_VERSION=" | grep -m1 -oE "$scriptVersRegExp")"
 		Print_Output true "Downloading latest version ($serverver) of $SCRIPT_NAME" "$PASS"
 		Update_File README.md
 		Update_File LICENSE
 		Update_File "$ARCH.tar.gz"
 		Update_File spdstats_www.asp
 		Update_File shared-jy.tar.gz
-		Download_File "$SCRIPT_REPO/update/$SCRIPT_NAME_LOWER.sh" "/jffs/scripts/$SCRIPT_NAME_LOWER" && \
+		Download_File "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" "/jffs/scripts/$SCRIPT_NAME_LOWER" && \
 		Print_Output true "$SCRIPT_NAME successfully updated" "$PASS"
 		chmod 0755 "/jffs/scripts/$SCRIPT_NAME_LOWER"
 		Set_Version_Custom_Settings local "$serverver"
@@ -363,7 +363,7 @@ Update_File()
 	if [ "$1" = "$ARCH.tar.gz" ]
 	then
 		tmpfile="/tmp/$1"
-		Download_File "$SCRIPT_REPO/files/$1" "$tmpfile"
+		Download_File "$SCRIPT_REPO/$1" "$tmpfile"
 		tar -xzf "$tmpfile" -C "/tmp"
 		rm -f "$tmpfile"
 		localmd5="$(md5sum "$OOKLA_DIR/speedtest" | awk '{print $1}')"
@@ -371,7 +371,7 @@ Update_File()
 		if [ "$localmd5" != "$tmpmd5" ]
 		then
 			rm -f "$OOKLA_DIR"/*
-			Download_File "$SCRIPT_REPO/files/$1" "$OOKLA_DIR/$1"
+			Download_File "$SCRIPT_REPO/$1" "$OOKLA_DIR/$1"
 			tar -xzf "$OOKLA_DIR/$1" -C "$OOKLA_DIR"
 			rm -f "$OOKLA_DIR/$1"
 			chmod 0755 "$OOKLA_DIR/speedtest"
@@ -383,19 +383,19 @@ Update_File()
 		tmpfile="/tmp/$1"
 		if [ -f "$SCRIPT_DIR/$1" ]
 		then
-			Download_File "$SCRIPT_REPO/files/$1" "$tmpfile"
+			Download_File "$SCRIPT_REPO/$1" "$tmpfile"
 			if ! diff -q "$tmpfile" "$SCRIPT_DIR/$1" >/dev/null 2>&1
 			then
 				Get_WebUI_Page "$SCRIPT_DIR/$1"
 				sed -i "\\~$MyWebPage~d" "$TEMP_MENU_TREE"
 				rm -f "$SCRIPT_WEBPAGE_DIR/$MyWebPage" 2>/dev/null
-				Download_File "$SCRIPT_REPO/files/$1" "$SCRIPT_DIR/$1"
+				Download_File "$SCRIPT_REPO/$1" "$SCRIPT_DIR/$1"
 				Print_Output true "New version of $1 downloaded" "$PASS"
 				Mount_WebUI
 			fi
 			rm -f "$tmpfile"
 		else
-			Download_File "$SCRIPT_REPO/files/$1" "$SCRIPT_DIR/$1"
+			Download_File "$SCRIPT_REPO/$1" "$SCRIPT_DIR/$1"
 			Print_Output true "New version of $1 downloaded" "$PASS"
 			Mount_WebUI
 		fi
@@ -423,9 +423,9 @@ Update_File()
 	elif [ "$1" = "README.md" ] || [ "$1" = "LICENSE" ]
 	then
 		tmpfile="/tmp/$1"
-		Download_File "$SCRIPT_REPO/files/$1" "$tmpfile"
+		Download_File "$SCRIPT_REPO/$1" "$tmpfile"
 		if ! diff -q "$tmpfile" "$SCRIPT_DIR/$1" >/dev/null 2>&1; then
-			Download_File "$SCRIPT_REPO/files/$1" "$SCRIPT_DIR/$1"
+			Download_File "$SCRIPT_REPO/$1" "$SCRIPT_DIR/$1"
 		fi
 		rm -f "$tmpfile"
 	else
@@ -3071,7 +3071,7 @@ Process_Upgrade()
 
 	if [ ! -f "$OOKLA_DIR/speedtest" ]
 	then
-		Download_File "$SCRIPT_REPO/files/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
+		Download_File "$SCRIPT_REPO/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
 		tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
 		rm -f "$OOKLA_DIR/$ARCH.tar.gz"
 		chmod 0755 "$OOKLA_DIR/speedtest"
@@ -3527,7 +3527,8 @@ ScriptHeader()
 	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
 	printf "${BOLD}##                  %9s on %-18s           ##${CLEARFORMAT}\n" "$SCRIPT_VERSION" "$ROUTER_MODEL"
 	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##            https://github.com/jackyaz/spdMerlin            ##${CLEARFORMAT}\\n"
+	printf "${BOLD}##            https://github.com/AMTM-OSR/spdMerlin           ##${CLEARFORMAT}\\n"
+	printf "${BOLD}##      Forked from: https://github.com/jackyaz/spdMerlin     ##${CLEARFORMAT}\\n"
 	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
 	printf "${BOLD}################################################################${CLEARFORMAT}\\n"
 	printf "\\n"
@@ -3957,7 +3958,7 @@ Menu_Install()
 	Print_Output true "Welcome to $SCRIPT_NAME $SCRIPT_VERSION, a script by JackYaz" "$PASS"
 	sleep 1
 
-	Print_Output true "By installing $SCRIPT_NAME you are agreeing to Ookla's license: $SCRIPT_REPO/files/speedtest-cli-license" "$WARN"
+	Print_Output true "By installing $SCRIPT_NAME you are agreeing to Ookla's license: $SCRIPT_REPO/speedtest-cli-license" "$WARN"
 
 	printf "\n${BOLD}Do you wish to continue? (y/n)${CLEARFORMAT}  " "$SCRIPT_NAME"
 	read -r confirm
@@ -3996,7 +3997,7 @@ Menu_Install()
 	ScriptStorageLocation load
 	Create_Symlinks
 
-	Download_File "$SCRIPT_REPO/files/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
+	Download_File "$SCRIPT_REPO/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
 	tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
 	rm -f "$OOKLA_DIR/$ARCH.tar.gz"
 	chmod 0755 "$OOKLA_DIR/speedtest"
@@ -4017,7 +4018,7 @@ Menu_Install()
 
 	Clear_Lock
 
-	Download_File "$SCRIPT_REPO/install-success/LICENSE" "$SCRIPT_DIR/LICENSE"
+	Download_File "$SCRIPT_REPO/LICENSE" "$SCRIPT_DIR/LICENSE"
 
 	ScriptHeader
 	MainMenu
@@ -5400,7 +5401,7 @@ Help & Support
   https://www.snbforums.com/forums/asuswrt-merlin-addons.60/?prefix_id=19
 
 Source code
-  https://github.com/jackyaz/$SCRIPT_NAME
+  https://github.com/AMTM-OSR/spdMerlin
 EOF
 	printf "\n"
 }
