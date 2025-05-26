@@ -13,7 +13,7 @@
 ##         https://github.com/AMTM-OSR/spdMerlin            ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-May-24
+# Last Modified: 2025-May-26
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -1994,9 +1994,11 @@ GenerateServerList_WebUI()
 	rm -f "/tmp/$serverlistfile.txt"
 	rm -f "$SCRIPT_WEB_DIR/$serverlistfile.htm"
 	SPEEDTEST_BINARY=""
-	if [ "$(SpeedtestBinary check)" = "builtin" ]; then
+	if [ "$(SpeedtestBinary check)" = "builtin" ]
+	then
 		SPEEDTEST_BINARY=/usr/sbin/ookla
-	elif [ "$(SpeedtestBinary check)" = "external" ]; then
+	elif [ "$(SpeedtestBinary check)" = "external" ]
+	then
 		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
 	fi
 	CONFIG_STRING=""
@@ -5248,7 +5250,7 @@ _FindandRemoveMenuAddOnsSection_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-01] ##
+## Modified by Martinski W. [2025-Apr-30] ##
 ##----------------------------------------##
 Menu_Uninstall()
 {
@@ -5257,8 +5259,17 @@ Menu_Uninstall()
 	else
 		ps | grep -v grep | grep -v $$ | grep -i "$SCRIPT_NAME_LOWER" | grep generate | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
 	fi
+
+	SPEEDTEST_BINARY=""
+	if [ "$(SpeedtestBinary check)" = "builtin" ]
+	then
+		SPEEDTEST_BINARY=/usr/sbin/ookla
+	elif [ "$(SpeedtestBinary check)" = "external" ]
+	then
+		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
+	fi
 	PROC_NAME="speedtest"
-	if [ "$SPEEDTEST_BINARY" = /usr/sbin/ookla ]; then
+	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]; then
 		PROC_NAME="ookla"
 	fi
 	if [ -n "$(pidof "$PROC_NAME")" ]; then
