@@ -21,7 +21,7 @@ You must be running firmware Merlin 384.15/384.13_4 or Fork 43E5 (or later) [Asu
 Using your preferred SSH client/terminal, copy and paste the following command, then press Enter:
 
 ```sh
-/usr/sbin/curl -fsL --retry 3 "https://raw.githubusercontent.com/AMTM-OSR/spdMerlin/master/install/spdmerlin.sh" -o /jffs/scripts/spdmerlin && chmod 0755 /jffs/scripts/spdmerlin && /jffs/scripts/spdmerlin install
+/usr/sbin/curl -fsL --retry 3 "https://raw.githubusercontent.com/AMTM-OSR/spdMerlin/master/spdmerlin.sh" -o /jffs/scripts/spdmerlin && chmod 0755 /jffs/scripts/spdmerlin && /jffs/scripts/spdmerlin install
 ```
 
 ## Usage
