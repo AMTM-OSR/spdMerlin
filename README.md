@@ -1,6 +1,6 @@
 # spdMerlin
 
-## v4.4.8
+## v4.4.9
 ### Updated on 2025-Jun-03
 ## About
 spdMerlin is an internet speedtest and monitoring tool for AsusWRT Merlin with charts for daily, weekly and monthly summaries. It tracks download/upload bandwidth as well as latency, jitter and packet loss.
