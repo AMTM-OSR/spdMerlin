@@ -13,7 +13,7 @@
 ##         https://github.com/AMTM-OSR/spdMerlin            ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-May-26
+# Last Modified: 2025-Jun-02
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -37,7 +37,7 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.7"
+readonly SCRIPT_VERSION="v4.4.8"
 SCRIPT_BRANCH="master"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -2993,11 +2993,11 @@ Run_Speedtest()
 				echo 'var spdteststatus = "GenerateCSV";' > /tmp/detect_spdtest.js
 				Print_Output true "Retrieving data for WebUI charts..." "$PASS"
 				Generate_CSVs
+
+				echo "Stats last updated: $timenowfriendly" > /tmp/spdstatstitle.txt
+				WriteStats_ToJS /tmp/spdstatstitle.txt "$SCRIPT_STORAGE_DIR/spdtitletext.js" SetSPDStatsTitle statstitle
 			fi
 			_UpdateDatabaseFileSizeInfo_
-
-			echo "Stats last updated: $timenowfriendly" > /tmp/spdstatstitle.txt
-			WriteStats_ToJS /tmp/spdstatstitle.txt "$SCRIPT_STORAGE_DIR/spdtitletext.js" SetSPDStatsTitle statstitle
 
 			if [ "$applyautobw" = "true" ]; then
 				Menu_AutoBW_Update
@@ -3064,8 +3064,43 @@ Run_Speedtest_WebUI()
 	cp -a "${SCRIPT_CONF}.bak" "$SCRIPT_CONF"
 }
 
+##-------------------------------------##
+## Added by Martinski W. [2025-Jun-02] ##
+##-------------------------------------##
+_FindTableColumnTextInDatabase_()
+{
+   if [ $# -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]
+   then return 1 ; fi
+
+   local retCode
+   local IFACE_ID="$1"
+   local tableInfoFileSQL="/tmp/spdstats-tableinfo.sql"
+   local tableInfoFileLST="/tmp/spdstats-tableinfo.lst"
+
+   {
+      echo ".mode list"
+      echo ".headers off"
+      echo ".separator '|'"
+      echo ".output $tableInfoFileLST"
+      echo "PRAGMA temp_store=1;"
+      echo "PRAGMA cache_size=-20000;"
+      echo "PRAGMA table_info(spdstats_${IFACE_ID});"
+   } > "$tableInfoFileSQL"
+   _ApplyDatabaseSQLCmds_ "$tableInfoFileSQL" "ftc$3"
+
+   if grep -q "|${2}|TEXT|" "$tableInfoFileLST"
+   then
+       retCode=0
+   else
+       retCode=1
+   fi
+
+   rm -f "$tableInfoFileSQL" "$tableInfoFileLST"
+   return "$retCode"
+}
+
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-02] ##
 ##----------------------------------------##
 Process_Upgrade()
 {
@@ -3112,7 +3147,7 @@ Process_Upgrade()
 	if [ ! -f "$SCRIPT_STORAGE_DIR/.databaseupgraded" ]
 	then
 		renice 15 $$
-		Print_Output true "Upgrading database..." "$PASS"
+		Print_Output true "Upgrading database - Please wait..." "$PASS"
 
 		prcIndx=0
 		for IFACE_NAME in $FULL_IFACELIST
@@ -3174,19 +3209,25 @@ Process_Upgrade()
 			} > /tmp/spdstats-upgrade.sql
 			_ApplyDatabaseSQLCmds_ /tmp/spdstats-upgrade.sql "prc09$prcIndx"
 
-			{
-			   echo "PRAGMA temp_store=1;"
-			   echo "PRAGMA cache_size=-20000;"
-			   echo "ALTER TABLE spdstats_${IFACE_NAME} ADD COLUMN [ServerID] TEXT"
-			} > /tmp/spdstats-upgrade.sql
-			_ApplyDatabaseSQLCmds_ /tmp/spdstats-upgrade.sql "prc10$prcIndx"
+			if ! _FindTableColumnTextInDatabase_ "$IFACE_NAME" "ServerID" "10$prcIndx"
+			then
+				{
+				   echo "PRAGMA temp_store=1;"
+				   echo "PRAGMA cache_size=-20000;"
+				   echo "ALTER TABLE spdstats_${IFACE_NAME} ADD COLUMN [ServerID] TEXT"
+				} > /tmp/spdstats-upgrade.sql
+				_ApplyDatabaseSQLCmds_ /tmp/spdstats-upgrade.sql "prc10$prcIndx"
+			fi
 
-			{
-			   echo "PRAGMA temp_store=1;"
-			   echo "PRAGMA cache_size=-20000;"
-			   echo "ALTER TABLE spdstats_${IFACE_NAME} ADD COLUMN [ServerName] TEXT"
-			} > /tmp/spdstats-upgrade.sql
-			_ApplyDatabaseSQLCmds_ /tmp/spdstats-upgrade.sql "prc11$prcIndx"
+			if ! _FindTableColumnTextInDatabase_ "$IFACE_NAME" "ServerName" "11$prcIndx"
+			then
+				{
+				   echo "PRAGMA temp_store=1;"
+				   echo "PRAGMA cache_size=-20000;"
+				   echo "ALTER TABLE spdstats_${IFACE_NAME} ADD COLUMN [ServerName] TEXT"
+				} > /tmp/spdstats-upgrade.sql
+				_ApplyDatabaseSQLCmds_ /tmp/spdstats-upgrade.sql "prc11$prcIndx"
+			fi
 
 			{
 			   echo "PRAGMA temp_store=1;"
