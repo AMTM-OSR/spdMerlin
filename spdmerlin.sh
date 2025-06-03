@@ -13,7 +13,7 @@
 ##         https://github.com/AMTM-OSR/spdMerlin            ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-02
+# Last Modified: 2025-Jun-03
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -37,7 +37,7 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.8"
+readonly SCRIPT_VERSION="v4.4.9"
 SCRIPT_BRANCH="master"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -4818,7 +4818,7 @@ Menu_AutoBW()
 		fi
 		
 		printf "1.    Update QoS bandwidth values now\\n\\n"
-		printf "2.    Configure number of speedtests used to calculate average bandwidth\\n      Currently bandwidth is calculated using the avergae of the last ${SETTING}%s${CLEARFORMAT} speedtest(s)\\n\\n" "$(AutoBWConf check AVERAGE CALC)"
+		printf "2.    Configure number of speedtests used to calculate average bandwidth\\n      Currently bandwidth is calculated using the average of the last ${SETTING}%s${CLEARFORMAT} speedtest(s)\\n\\n" "$(AutoBWConf check AVERAGE CALC)"
 		printf "3.    Configure scale factor\\n      Download: ${SETTING}%s%%${CLEARFORMAT}  -  Upload: ${SETTING}%s%%${CLEARFORMAT}\\n\\n" "$(AutoBWConf check SF DOWN)" "$(AutoBWConf check SF UP)"
 		printf "4.    Configure bandwidth limits\\n      Upper Limit    Download: ${SETTING}%s Mbps${CLEARFORMAT}  -  Upload: ${SETTING}%s Mbps${CLEARFORMAT}\\n      Lower Limit    Download: ${SETTING}%s Mbps${CLEARFORMAT}  -  Upload: ${SETTING}%s Mbps${CLEARFORMAT}\\n\\n" "$(AutoBWConf check ULIMIT DOWN)" "$(AutoBWConf check ULIMIT UP)" "$(AutoBWConf check LLIMIT DOWN)" "$(AutoBWConf check LLIMIT UP)"
 		printf "5.    Configure threshold for updating QoS bandwidth values\\n      Download: ${SETTING}%s%%${CLEARFORMAT} - Upload: ${SETTING}%s%%${CLEARFORMAT}\\n\\n" "$(AutoBWConf check THRESHOLD DOWN)" "$(AutoBWConf check THRESHOLD UP)"
