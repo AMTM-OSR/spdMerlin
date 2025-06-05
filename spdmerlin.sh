@@ -11,9 +11,10 @@
 ##        |_|                                               ##
 ##                                                          ##
 ##         https://github.com/AMTM-OSR/spdMerlin            ##
+##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-03
+# Last Modified: 2025-Jun-04
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -37,8 +38,9 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.9"
-SCRIPT_BRANCH="master"
+readonly SCRIPT_VERSION="v4.4.10"
+readonly SCRIPT_VERSTAG="25060412"
+SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
 readonly SCRIPT_WEBPAGE_DIR="$(readlink -f /www/user)"
@@ -65,6 +67,7 @@ readonly webPageLineTabExp="\{url: \"$webPageFileRegExp\", tabName: "
 readonly webPageLineRegExp="${webPageLineTabExp}\"$SCRIPT_NAME\"\},"
 readonly BEGIN_MenuAddOnsTag="/\*\*BEGIN:_AddOns_\*\*/"
 readonly ENDIN_MenuAddOnsTag="/\*\*ENDIN:_AddOns_\*\*/"
+readonly scriptVERINFO="[${SCRIPT_VERSION}_${SCRIPT_VERSTAG}, Branch: $SCRIPT_BRANCH]"
 
 # For daily CRON job to trim database #
 readonly defTrimDB_Hour=3
@@ -81,6 +84,13 @@ readonly ni9MByte=9437184
 readonly tenMByte=10485760
 readonly oneGByte=1073741824
 readonly SHARE_TEMP_DIR="/opt/share/tmp"
+
+##-------------------------------------##
+## Added by Martinski W. [2025-Jun-04] ##
+##-------------------------------------##
+readonly sqlDBLogFileSize=102400
+readonly sqlDBLogDateTime="%Y-%m-%d %H:%M:%S"
+readonly sqlDBLogFileName="${SCRIPT_NAME}_DBSQL_DEBUG.LOG"
 
 # Give priority to built-in binaries #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -2429,13 +2439,30 @@ _UpdateDatabaseFileSizeInfo_()
 }
 
 ##-------------------------------------##
-## Added by Martinski W. [2025-Feb-28] ##
+## Added by Martinski W. [2025-Jun-04] ##
 ##-------------------------------------##
+_SQLCheckDBLogFileSize_()
+{
+   if [ "$(_GetFileSize_ "$sqlDBLogFilePath")" -gt "$sqlDBLogFileSize" ]
+   then
+       cp -fp "$sqlDBLogFilePath" "${sqlDBLogFilePath}.BAK"
+       echo -n > "$sqlDBLogFilePath"
+   fi
+}
+
+_SQLGetDBLogTimeStamp_()
+{ printf "[$(date +"$sqlDBLogDateTime")]" ; }
+
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-04] ##
+##----------------------------------------##
 _ApplyDatabaseSQLCmds_()
 {
     local errorCount=0  maxErrorCount=5  callFlag
-    local triesCount=0  maxTriesCount=25  sqlErrorMsg
-    local tempLogFilePath="/tmp/spdMerlinStats_TMP_$$.LOG"
+    local triesCount=0  maxTriesCount=10  sqlErrorMsg
+    local tempLogFilePath="/tmp/${SCRIPT_NAME}Stats_TMP_$$.LOG"
+    local debgLogFilePath="/tmp/${SCRIPT_NAME}Stats_DEBUG_$$.LOG"
+    local debgLogSQLcmds=false
 
     if [ $# -gt 1 ] && [ -n "$2" ]
     then callFlag="$2"
@@ -2444,7 +2471,7 @@ _ApplyDatabaseSQLCmds_()
 
     resultStr=""
     foundError=false ; foundLocked=false
-    rm -f "$tempLogFilePath"
+    rm -f "$tempLogFilePath" "$debgLogFilePath"
 
     while [ "$errorCount" -lt "$maxErrorCount" ] && \
           [ "$((triesCount++))" -lt "$maxTriesCount" ]
@@ -2453,24 +2480,48 @@ _ApplyDatabaseSQLCmds_()
         then foundError=false ; foundLocked=false ; break
         fi
         sqlErrorMsg="$(cat "$tempLogFilePath")"
+
         if echo "$sqlErrorMsg" | grep -qE "^(Parse error|Runtime error|Error:)"
         then
             if echo "$sqlErrorMsg" | grep -qE "^(Parse|Runtime) error .*: database is locked"
             then
+                foundLocked=true ; maxTriesCount=25
                 echo -n > "$tempLogFilePath"  ##Clear for next error found##
-                foundLocked=true ; sleep 2 ; continue
+                sleep 2 ; continue
             fi
             errorCount="$((errorCount + 1))"
             foundError=true ; foundLocked=false
             Print_Output true "SQLite3 failure[$callFlag]: $sqlErrorMsg" "$ERR"
-            echo -n > "$tempLogFilePath"  ##Clear for next error found##
         fi
+
+        if ! "$debgLogSQLcmds"
+        then
+           debgLogSQLcmds=true
+           {
+              echo "==========================================="
+              echo "$(_SQLGetDBLogTimeStamp_) BEGIN [$callFlag]"
+              echo "Database: $SPEEDSTATS_DB"
+           } > "$debgLogFilePath"
+        fi
+        cat "$tempLogFilePath" >> "$debgLogFilePath"
+        echo -n > "$tempLogFilePath"  ##Clear for next error found##
         [ "$triesCount" -ge "$maxTriesCount" ] && break
         [ "$errorCount" -ge "$maxErrorCount" ] && break
         sleep 1
     done
 
-    rm -f "$tempLogFilePath"
+    if "$debgLogSQLcmds"
+    then
+       {
+          echo "--------------------------------"
+          cat "$1"
+          echo "--------------------------------"
+          echo "$(_SQLGetDBLogTimeStamp_) END [$callFlag]"
+       } >> "$debgLogFilePath"
+       cat "$debgLogFilePath" >> "$sqlDBLogFilePath"
+    fi
+
+    rm -f "$tempLogFilePath" "$debgLogFilePath"
     if "$foundError"
     then resultStr="reported error(s)."
     elif "$foundLocked"
@@ -3571,7 +3622,7 @@ ScriptHeader()
 	printf "${BOLD}##                  %9s on %-18s           ##${CLEARFORMAT}\n" "$SCRIPT_VERSION" "$ROUTER_MODEL"
 	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
 	printf "${BOLD}##            https://github.com/AMTM-OSR/spdMerlin           ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##      Forked from: https://github.com/jackyaz/spdMerlin     ##${CLEARFORMAT}\\n"
+	printf "${BOLD}##      Forked from https://github.com/jackyaz/spdMerlin      ##${CLEARFORMAT}\\n"
 	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
 	printf "${BOLD}################################################################${CLEARFORMAT}\\n"
 	printf "\\n"
@@ -5436,10 +5487,13 @@ Entware_Ready()
 }
 
 ### function based on @dave14305's FlexQoS about function ###
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-04] ##
+##----------------------------------------##
 Show_About()
 {
 	cat <<EOF
-About
+About $SCRIPT_VERS_INFO
   $SCRIPT_NAME is an internet speedtest and monitoring tool for
   AsusWRT Merlin with charts for daily, weekly and monthly summaries.
   It tracks download/upload bandwidth as well as latency, jitter and
@@ -5459,9 +5513,13 @@ EOF
 }
 
 ### function based on @dave14305's FlexQoS show_help function ###
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-04] ##
+##----------------------------------------##
 Show_Help()
 {
 	cat <<EOF
+HELP $SCRIPT_VERS_INFO
 Available commands:
   $SCRIPT_NAME_LOWER about            explains functionality
   $SCRIPT_NAME_LOWER update           checks for updates
@@ -5486,6 +5544,12 @@ TMPDIR="$SHARE_TEMP_DIR"
 SQLITE_TMPDIR="$TMPDIR"
 export SQLITE_TMPDIR TMPDIR
 
+if [ -d "$TMPDIR" ]
+then sqlDBLogFilePath="${TMPDIR}/$sqlDBLogFileName"
+else sqlDBLogFilePath="/tmp/var/tmp/$sqlDBLogFileName"
+fi
+_SQLCheckDBLogFileSize_
+
 if [ -f "/opt/share/${SCRIPT_NAME_LOWER}.d/config" ]
 then SCRIPT_STORAGE_DIR="/opt/share/${SCRIPT_NAME_LOWER}.d"
 else SCRIPT_STORAGE_DIR="/jffs/addons/${SCRIPT_NAME_LOWER}.d"
@@ -5497,6 +5561,11 @@ CSV_OUTPUT_DIR="$SCRIPT_STORAGE_DIR/csv"
 SCRIPT_INTERFACES="$SCRIPT_STORAGE_DIR/.interfaces"
 SCRIPT_INTERFACES_USER="$SCRIPT_STORAGE_DIR/.interfaces_user"
 JFFS_LowFreeSpaceStatus="OK"
+
+if [ "$SCRIPT_BRANCH" != "develop" ]
+then SCRIPT_VERS_INFO=""
+else SCRIPT_VERS_INFO="$scriptVERINFO"
+fi
 
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Feb-28] ##
