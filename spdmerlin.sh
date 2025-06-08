@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-06
+# Last Modified: 2025-Jun-08
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -2669,7 +2669,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-06] ##
+## Modified by Martinski W. [2025-Jun-08] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2951,8 +2951,8 @@ Run_Speedtest()
 						datadownload="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 						dataupload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 
-						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7)-1)}')"
-						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7)-1)}')"
+						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
+						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
 
 						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $2}' | tr -d ')')"
@@ -2966,8 +2966,8 @@ Run_Speedtest()
 						datadownload="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 						dataupload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 
-						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7)-1)}')"
-						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7)-1)}')"
+						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
+						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
 
 						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
@@ -2989,12 +2989,20 @@ Run_Speedtest()
 					! Validate_Bandwidth "$datadownload" && datadownload=0;
 					! Validate_Bandwidth "$dataupload" && dataupload=0;
 
-					if [ "$datadownloadunit" = "GB" ]; then
+					if [ "$datadownloadunit" = "GB" ]
+					then
 						datadownload="$(echo "$datadownload" | awk '{printf ($1*1024)}')"
+					elif [ "$datadownloadunit" = "kB" ] || [ "$datadownloadunit" = "KB" ]
+					then
+						datadownload="$(printf "%.4f" "$(echo "$datadownload" | awk '{printf ($1/1024)}')")"
 					fi
 
-					if [ "$datauploadunit" = "GB" ]; then
+					if [ "$datauploadunit" = "GB" ]
+					then
 						dataupload="$(echo "$dataupload" | awk '{printf ($1*1024)}')"
+					elif [ "$datauploadunit" = "kB" ] || [ "$datauploadunit" = "KB" ]
+					then
+						dataupload="$(printf "%.4f" "$(echo "$dataupload" | awk '{printf ($1/1024)}')")"
 					fi
 
 					if [ "$(SpeedtestBinary check)" = "builtin" ]
