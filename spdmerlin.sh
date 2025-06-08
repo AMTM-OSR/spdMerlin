@@ -2975,15 +2975,6 @@ Run_Speedtest()
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
 					fi
 
-     					# convert to Mbps if necessary
-					if [ "$datadownloadunit" = "kB" ]; then
-						datadownload=$(awk "BEGIN { printf \"%.3f\", $datadownload/1000 }")
-					fi
-
-					if [ "$datauploadunit" = "kB" ]; then
-						dataupload=$(awk "BEGIN { printf \"%.3f\", $dataupload/1000 }")
-					fi
-
 					if [ -z "$download" ] || [ -z "$upload" ] || [ -z "$datadownload" ] || [ -z "$dataupload" ]
 					then
 						cp -fp "$tmpfile" "$spdTestDBGFile"
@@ -3006,6 +2997,15 @@ Run_Speedtest()
 
 					if [ "$datauploadunit" = "GB" ]; then
 						dataupload="$(echo "$dataupload" | awk '{printf ($1*1024)}')"
+					fi
+
+          					# convert to Mbps if necessary
+					if [ "$datadownloadunit" = "kB" ]; then
+						datadownload=$(awk "BEGIN { printf \"%.3f\", $datadownload/1000 }")
+					fi
+
+					if [ "$datauploadunit" = "kB" ]; then
+						dataupload=$(awk "BEGIN { printf \"%.3f\", $dataupload/1000 }")
 					fi
 
 					if [ "$(SpeedtestBinary check)" = "builtin" ]
