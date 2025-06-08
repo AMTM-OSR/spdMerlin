@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.10"
-readonly SCRIPT_VERSTAG="25060622"
+readonly SCRIPT_VERSTAG="25060820"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -2943,7 +2943,8 @@ Run_Speedtest()
 					then
 						# Parse human readable output when buffer bloat data is included.#
 						download="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
-						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
+						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"						
+      
 						latency="$(grep "Idle Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $3}')"
 						jitter="$(grep "Idle Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}' | tr -d 'ms,')"
 						pktloss="$(grep "Packet Loss:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $3}' | tr -d '%')"
@@ -2958,7 +2959,8 @@ Run_Speedtest()
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $2}' | tr -d ')')"
 					else
 						download="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
-						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
+						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"						
+      
 						latency="$(grep "Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						jitter="$(grep "Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $4}' | tr -d '(')"
 						pktloss="$(grep "Packet Loss:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $3}' | tr -d '%')"
@@ -3003,6 +3005,15 @@ Run_Speedtest()
 					elif [ "$datauploadunit" = "kB" ] || [ "$datauploadunit" = "KB" ]
 					then
 						dataupload="$(printf "%.4f" "$(echo "$dataupload" | awk '{printf ($1/1024)}')")"
+					fi
+
+          					# convert to Mbps if necessary
+					if [ "$datadownloadunit" = "kB" ]; then
+						datadownload=$(awk "BEGIN { printf \"%.3f\", $datadownload/1000 }")
+					fi
+
+					if [ "$datauploadunit" = "kB" ]; then
+						dataupload=$(awk "BEGIN { printf \"%.3f\", $dataupload/1000 }")
 					fi
 
 					if [ "$(SpeedtestBinary check)" = "builtin" ]
