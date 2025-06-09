@@ -11,9 +11,10 @@
 ##        |_|                                               ##
 ##                                                          ##
 ##         https://github.com/AMTM-OSR/spdMerlin            ##
+##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-03
+# Last Modified: 2025-Jun-08
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -37,7 +38,8 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.9"
+readonly SCRIPT_VERSION="v4.4.10"
+readonly SCRIPT_VERSTAG="25060820"
 SCRIPT_BRANCH="master"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -65,6 +67,7 @@ readonly webPageLineTabExp="\{url: \"$webPageFileRegExp\", tabName: "
 readonly webPageLineRegExp="${webPageLineTabExp}\"$SCRIPT_NAME\"\},"
 readonly BEGIN_MenuAddOnsTag="/\*\*BEGIN:_AddOns_\*\*/"
 readonly ENDIN_MenuAddOnsTag="/\*\*ENDIN:_AddOns_\*\*/"
+readonly scriptVERINFO="[${SCRIPT_VERSION}_${SCRIPT_VERSTAG}, Branch: $SCRIPT_BRANCH]"
 
 # For daily CRON job to trim database #
 readonly defTrimDB_Hour=3
@@ -81,6 +84,13 @@ readonly ni9MByte=9437184
 readonly tenMByte=10485760
 readonly oneGByte=1073741824
 readonly SHARE_TEMP_DIR="/opt/share/tmp"
+
+##-------------------------------------##
+## Added by Martinski W. [2025-Jun-04] ##
+##-------------------------------------##
+readonly sqlDBLogFileSize=102400
+readonly sqlDBLogDateTime="%Y-%m-%d %H:%M:%S"
+readonly sqlDBLogFileName="${SCRIPT_NAME}_DBSQL_DEBUG.LOG"
 
 # Give priority to built-in binaries #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
@@ -835,6 +845,35 @@ _GetDefaultSpeedTestBinary_()
    fi
 }
 
+##-------------------------------------##
+## Added by Martinski W. [2025-Jun-06] ##
+##-------------------------------------##
+_GetConfigParam_()
+{
+   if [ $# -eq 0 ] || [ -z "$1" ]
+   then echo '' ; return 1 ; fi
+
+   local keyValue  checkFile
+   local defValue="$([ $# -eq 2 ] && echo "$2" || echo '')"
+
+   if [ ! -s "$SCRIPT_CONF" ]
+   then echo "$defValue" ; return 0 ; fi
+
+   if [ "$(grep -c "^${1}=" "$SCRIPT_CONF")" -gt 1 ]
+   then  ## Remove duplicates. Keep ONLY the 1st key ##
+       checkFile="${SCRIPT_CONF}.DUPKEY.txt"
+       awk "!(/^${1}=/ && dup[/^${1}=/]++)" "$SCRIPT_CONF" > "$checkFile"
+       if diff -q "$checkFile" "$SCRIPT_CONF" >/dev/null 2>&1
+       then rm -f "$checkFile"
+       else mv -f "$checkFile" "$SCRIPT_CONF"
+       fi
+   fi
+
+   keyValue="$(grep "^${1}=" "$SCRIPT_CONF" | cut -d'=' -f2)"
+   echo "${keyValue:=$defValue}"
+   return 0
+}
+
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Mar-14] ##
 ##----------------------------------------##
@@ -1053,7 +1092,7 @@ Auto_Startup()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-19] ##
+## Modified by Martinski W. [2025-Jun-06] ##
 ##----------------------------------------##
 Auto_Cron()
 {
@@ -1065,8 +1104,8 @@ Auto_Cron()
 				cru d "${SCRIPT_NAME}"
 			fi
 			STARTUPLINECOUNTGEN="$(cru l | grep -c "${SCRIPT_NAME}_generate")"
-			CRU_SCHHOUR="$(grep "^SCHHOURS=" "$SCRIPT_CONF" | cut -f2 -d"=")"
-			CRU_SCHMINS="$(grep "^SCHMINS=" "$SCRIPT_CONF" | cut -f2 -d"=")"
+			CRU_SCHHOUR="$(_GetConfigParam_ SCHHOURS '*')"
+			CRU_SCHMINS="$(_GetConfigParam_ SCHMINS '12,42')"
 			STARTUPLINECOUNTEXGEN="$(cru l | grep "${SCRIPT_NAME}_generate" | grep -c "^$CRU_SCHMINS $CRU_SCHHOUR [*] [*]")"
 			if [ "$STARTUPLINECOUNTGEN" -gt 0 ] && [ "$STARTUPLINECOUNTEXGEN" -eq 0 ]
 			then
@@ -1075,7 +1114,7 @@ Auto_Cron()
 			fi
 			if [ "$STARTUPLINECOUNTGEN" -eq 0 ]
 			then
-				CRU_SCHDAYS="$(grep "^SCHDAYS=" "$SCRIPT_CONF" | cut -f2 -d"=" | sed 's/Sun/0/;s/Mon/1/;s/Tues/2/;s/Wed/3/;s/Thurs/4/;s/Fri/5/;s/Sat/6/;')"
+				CRU_SCHDAYS="$(_GetConfigParam_ SCHDAYS '*' | sed 's/Sun/0/;s/Mon/1/;s/Tues/2/;s/Wed/3/;s/Thurs/4/;s/Fri/5/;s/Sat/6/;')"
 				cru a "${SCRIPT_NAME}_generate" "$CRU_SCHMINS $CRU_SCHHOUR * * $CRU_SCHDAYS $theScriptFilePath generate"
 			fi
 
@@ -1450,7 +1489,7 @@ _CheckFor_WebGUI_Page_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-19] ##
+## Modified by Martinski W. [2025-Jun-06] ##
 ##----------------------------------------##
 AutomaticMode()
 {
@@ -1476,15 +1515,15 @@ AutomaticMode()
 			printf "Automatic speedtests are now ${REDct}DISABLED${CLRct}.\n\n"
 		;;
 		check)
-			AUTOMATICMODE="$(grep "^AUTOMATICMODE=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			if [ "${AUTOMATICMODE:=true}" = "true" ]
+			AUTOMATICMODE="$(_GetConfigParam_ AUTOMATICMODE 'true')"
+			if [ "$AUTOMATICMODE" = "true" ]
 			then return 0; else return 1; fi
 		;;
 	esac
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-04] ##
+## Modified by Martinski W. [2025-Jun-06] ##
 ##----------------------------------------##
 CronTestSchedule()
 {
@@ -1497,16 +1536,16 @@ CronTestSchedule()
 			AutomaticMode check && Auto_Cron create 2>/dev/null
 		;;
 		check)
-			SCHDAYS="$(grep "^SCHDAYS=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			SCHHOURS="$(grep "^SCHHOURS=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			SCHMINS="$(grep "^SCHMINS=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			echo "${SCHDAYS:=*}|${SCHHOURS:=*}|${SCHMINS:=12,42}"
+			SCHDAYS="$(_GetConfigParam_ SCHDAYS '*')"
+			SCHHOURS="$(_GetConfigParam_ SCHHOURS '*')"
+			SCHMINS="$(_GetConfigParam_ SCHMINS '12,42')"
+			echo "${SCHDAYS}|${SCHHOURS}|${SCHMINS}"
 		;;
 	esac
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-04] ##
+## Modified by Martinski W. [2025-Jun-06] ##
 ##----------------------------------------##
 ScriptStorageLocation()
 {
@@ -1554,8 +1593,8 @@ ScriptStorageLocation()
 			sleep 2
 		    ;;
 		check)
-			STORAGELOCATION="$(grep "^STORAGELOCATION=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			echo "${STORAGELOCATION:=jffs}"
+			STORAGELOCATION="$(_GetConfigParam_ STORAGELOCATION jffs)"
+			echo "$STORAGELOCATION"
 		    ;;
 		load)
 			STORAGELOCATION="$(ScriptStorageLocation check)"
@@ -1577,26 +1616,31 @@ ScriptStorageLocation()
 	esac
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-06] ##
+##----------------------------------------##
 OutputTimeMode()
 {
 	case "$1" in
 		unix)
 			sed -i 's/^OUTPUTTIMEMODE=.*$/OUTPUTTIMEMODE=unix/' "$SCRIPT_CONF"
+			printf "Please wait..."
 			Generate_CSVs
 		;;
 		non-unix)
 			sed -i 's/^OUTPUTTIMEMODE=.*$/OUTPUTTIMEMODE=non-unix/' "$SCRIPT_CONF"
+			printf "Please wait..."
 			Generate_CSVs
 		;;
 		check)
-			OUTPUTTIMEMODE="$(grep "^OUTPUTTIMEMODE=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			echo "${OUTPUTTIMEMODE:=unix}"
+			OUTPUTTIMEMODE="$(_GetConfigParam_ OUTPUTTIMEMODE unix)"
+			echo "$OUTPUTTIMEMODE"
 		;;
 	esac
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2024-Nov-15] ##
+## Modified by Martinski W. [2025-Jun-06] ##
 ##----------------------------------------##
 SpeedtestBinary()
 {
@@ -1608,7 +1652,7 @@ SpeedtestBinary()
 			sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=external/' "$SCRIPT_CONF"
 		;;
 		check)
-			SPEEDTESTBINARY="$(grep "^SPEEDTESTBINARY=" "$SCRIPT_CONF" | cut -f2 -d'=')"
+			SPEEDTESTBINARY="$(_GetConfigParam_ SPEEDTESTBINARY)"
 			[ -z "$SPEEDTESTBINARY" ] && SPEEDTESTBINARY="$(_GetDefaultSpeedTestBinary_)"
 			echo "$SPEEDTESTBINARY"
 		;;
@@ -1616,7 +1660,7 @@ SpeedtestBinary()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-06] ##
 ##----------------------------------------##
 DaysToKeep()
 {
@@ -1665,14 +1709,14 @@ DaysToKeep()
 			fi
 		;;
 		check)
-			DAYSTOKEEP="$(grep "^DAYSTOKEEP=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			echo "${DAYSTOKEEP:=30}"
+			DAYSTOKEEP="$(_GetConfigParam_ DAYSTOKEEP 30)"
+			echo "$DAYSTOKEEP"
 		;;
 	esac
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-06] ##
 ##----------------------------------------##
 LastXResults()
 {
@@ -1738,12 +1782,15 @@ LastXResults()
 			fi
 		;;
 		check)
-			LASTXRESULTS="$(grep "^LASTXRESULTS=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			echo "${LASTXRESULTS:=10}"
+			LASTXRESULTS="$(_GetConfigParam_ LASTXRESULTS 10)"
+			echo "$LASTXRESULTS"
 		;;
 	esac
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-06] ##
+##----------------------------------------##
 StoreResultURL()
 {
 	case "$1" in
@@ -1754,12 +1801,15 @@ StoreResultURL()
 		sed -i 's/^STORERESULTURL=.*$/STORERESULTURL=false/' "$SCRIPT_CONF"
 	;;
 	check)
-		STORERESULTURL="$(grep "^STORERESULTURL=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-		echo "${STORERESULTURL:=true}"
+		STORERESULTURL="$(_GetConfigParam_ STORERESULTURL 'true')"
+		echo "$STORERESULTURL"
 	;;
 	esac
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-06] ##
+##----------------------------------------##
 ExcludeFromQoS()
 {
 	case "$1" in
@@ -1770,12 +1820,15 @@ ExcludeFromQoS()
 		sed -i 's/^EXCLUDEFROMQOS=.*$/EXCLUDEFROMQOS=false/' "$SCRIPT_CONF"
 	;;
 	check)
-		EXCLUDEFROMQOS="$(grep "^EXCLUDEFROMQOS=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-		echo "${EXCLUDEFROMQOS:=true}"
+		EXCLUDEFROMQOS="$(_GetConfigParam_ EXCLUDEFROMQOS 'true')"
+		echo "$EXCLUDEFROMQOS"
 	;;
 	esac
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-06] ##
+##----------------------------------------##
 AutoBWEnable()
 {
 	case "$1" in
@@ -1786,12 +1839,15 @@ AutoBWEnable()
 		sed -i 's/^AUTOBW_ENABLED=.*$/AUTOBW_ENABLED=false/' "$SCRIPT_CONF"
 	;;
 	check)
-		AUTOBW_ENABLED="$(grep "^AUTOBW_ENABLED=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-		echo "${AUTOBW_ENABLED:=false}"
+		AUTOBW_ENABLED="$(_GetConfigParam_ AUTOBW_ENABLED 'false')"
+		echo "$AUTOBW_ENABLED"
 	;;
 	esac
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-06] ##
+##----------------------------------------##
 AutoBWConf()
 {
 	case "$1" in
@@ -1799,7 +1855,8 @@ AutoBWConf()
 			sed -i 's/^AUTOBW_'"$2"'_'"$3"'=.*$/AUTOBW_'"$2"'_'"$3"'='"$4"'/' "$SCRIPT_CONF"
 		;;
 		check)
-			grep "^AUTOBW_${2}_${3}=" "$SCRIPT_CONF" | cut -f2 -d"="
+			AUTOBW_PARAM="$(_GetConfigParam_ "AUTOBW_${2}_${3}")"
+			echo "$AUTOBW_PARAM"
 		;;
 	esac
 }
@@ -2057,14 +2114,15 @@ GenerateServerList_WebUI()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-04] ##
+## Modified by Martinski W. [2025-Jun-06] ##
 ##----------------------------------------##
 PreferredServer()
 {
 	case "$1" in
 		update)
 			GenerateServerList "$2"
-			if [ "$serverno" != "exit" ]; then
+			if [ "$serverno" != "exit" ]
+			then
 				sed -i 's/^PREFERREDSERVER_'"$2"'=.*$/PREFERREDSERVER_'"$2"'='"$serverno|$servername"'/' "$SCRIPT_CONF"
 			else
 				return 1
@@ -2077,8 +2135,9 @@ PreferredServer()
 			sed -i 's/^USEPREFERRED_'"$2"'=.*$/USEPREFERRED_'"$2"'=false/' "$SCRIPT_CONF"
 		;;
 		check)
-			USEPREFERRED="$(grep "^USEPREFERRED_${2}=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-			if [ "$USEPREFERRED" = "true" ]; then return 0; else return 1; fi
+			USEPREFERRED="$(_GetConfigParam_ "USEPREFERRED_${2}" 'false')"
+			if [ "$USEPREFERRED" = "true" ]
+			then return 0; else return 1; fi
 		;;
 		list)
 			PREFERREDSERVER="$(grep "^PREFERREDSERVER_${2}=" "$SCRIPT_CONF" | cut -f2 -d'=')"
@@ -2322,9 +2381,9 @@ _DelVarDefFromJSFile_()
    fi
 }
 
-##-------------------------------------##
-## Added by Martinski W. [2025-Feb-28] ##
-##-------------------------------------##
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-06] ##
+##----------------------------------------##
 JFFS_WarningLogTime()
 {
    case "$1" in
@@ -2332,8 +2391,11 @@ JFFS_WarningLogTime()
            sed -i 's/^JFFS_MSGLOGTIME=.*$/JFFS_MSGLOGTIME='"$2"'/' "$SCRIPT_CONF"
            ;;
        check)
-           JFFS_MSGLOGTIME="$(grep "^JFFS_MSGLOGTIME=" "$SCRIPT_CONF" | cut -f2 -d'=')"
-           echo "${JFFS_MSGLOGTIME:=0}"
+           JFFS_MSGLOGTIME="$(_GetConfigParam_ JFFS_MSGLOGTIME 0)"
+           if ! echo "$JFFS_MSGLOGTIME" | grep -qE "^[0-9]+$"
+           then JFFS_MSGLOGTIME=0
+           fi
+           echo "$JFFS_MSGLOGTIME"
            ;;
    esac
 }
@@ -2429,13 +2491,30 @@ _UpdateDatabaseFileSizeInfo_()
 }
 
 ##-------------------------------------##
-## Added by Martinski W. [2025-Feb-28] ##
+## Added by Martinski W. [2025-Jun-04] ##
 ##-------------------------------------##
+_SQLCheckDBLogFileSize_()
+{
+   if [ "$(_GetFileSize_ "$sqlDBLogFilePath")" -gt "$sqlDBLogFileSize" ]
+   then
+       cp -fp "$sqlDBLogFilePath" "${sqlDBLogFilePath}.BAK"
+       echo -n > "$sqlDBLogFilePath"
+   fi
+}
+
+_SQLGetDBLogTimeStamp_()
+{ printf "[$(date +"$sqlDBLogDateTime")]" ; }
+
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-05] ##
+##----------------------------------------##
 _ApplyDatabaseSQLCmds_()
 {
-    local errorCount=0  maxErrorCount=5  callFlag
-    local triesCount=0  maxTriesCount=25  sqlErrorMsg
-    local tempLogFilePath="/tmp/spdMerlinStats_TMP_$$.LOG"
+    local errorCount=0  maxErrorCount=3  callFlag
+    local triesCount=0  maxTriesCount=10  sqlErrorMsg
+    local tempLogFilePath="/tmp/${SCRIPT_NAME}Stats_TMP_$$.LOG"
+    local debgLogFilePath="/tmp/${SCRIPT_NAME}Stats_DEBUG_$$.LOG"
+    local debgLogSQLcmds=false
 
     if [ $# -gt 1 ] && [ -n "$2" ]
     then callFlag="$2"
@@ -2444,7 +2523,7 @@ _ApplyDatabaseSQLCmds_()
 
     resultStr=""
     foundError=false ; foundLocked=false
-    rm -f "$tempLogFilePath"
+    rm -f "$tempLogFilePath" "$debgLogFilePath"
 
     while [ "$errorCount" -lt "$maxErrorCount" ] && \
           [ "$((triesCount++))" -lt "$maxTriesCount" ]
@@ -2453,24 +2532,48 @@ _ApplyDatabaseSQLCmds_()
         then foundError=false ; foundLocked=false ; break
         fi
         sqlErrorMsg="$(cat "$tempLogFilePath")"
-        if echo "$sqlErrorMsg" | grep -qE "^(Parse error|Runtime error|Error:)"
+
+        if echo "$sqlErrorMsg" | grep -qE "^(Parse error|Runtime error|Error:|Illegal instruction)"
         then
             if echo "$sqlErrorMsg" | grep -qE "^(Parse|Runtime) error .*: database is locked"
             then
+                foundLocked=true ; maxTriesCount=25
                 echo -n > "$tempLogFilePath"  ##Clear for next error found##
-                foundLocked=true ; sleep 2 ; continue
+                sleep 2 ; continue
             fi
             errorCount="$((errorCount + 1))"
             foundError=true ; foundLocked=false
             Print_Output true "SQLite3 failure[$callFlag]: $sqlErrorMsg" "$ERR"
-            echo -n > "$tempLogFilePath"  ##Clear for next error found##
         fi
+
+        if ! "$debgLogSQLcmds"
+        then
+           debgLogSQLcmds=true
+           {
+              echo "==========================================="
+              echo "$(_SQLGetDBLogTimeStamp_) BEGIN [$callFlag]"
+              echo "Database: $SPEEDSTATS_DB"
+           } > "$debgLogFilePath"
+        fi
+        cat "$tempLogFilePath" >> "$debgLogFilePath"
+        echo -n > "$tempLogFilePath"  ##Clear for next error found##
         [ "$triesCount" -ge "$maxTriesCount" ] && break
         [ "$errorCount" -ge "$maxErrorCount" ] && break
         sleep 1
     done
 
-    rm -f "$tempLogFilePath"
+    if "$debgLogSQLcmds"
+    then
+       {
+          echo "--------------------------------"
+          cat "$1"
+          echo "--------------------------------"
+          echo "$(_SQLGetDBLogTimeStamp_) END [$callFlag]"
+       } >> "$debgLogFilePath"
+       cat "$debgLogFilePath" >> "$sqlDBLogFilePath"
+    fi
+
+    rm -f "$tempLogFilePath" "$debgLogFilePath"
     if "$foundError"
     then resultStr="reported error(s)."
     elif "$foundLocked"
@@ -2566,7 +2669,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-14] ##
+## Modified by Martinski W. [2025-Jun-08] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2609,8 +2712,10 @@ Run_Speedtest()
 	speedtestServerName=""
 	MAXwaitTestSecs=120  #2 minutes#
 	local spdIndx  spdTestOK  verboseNUM  verboseARG
-	verboseNUM="$(grep -E '^VERBOSE_TEST=[0-3]$' "$SCRIPT_CONF" | awk -F '=' '{print $2}')"
-	[ -z "$verboseNUM" ] && verboseNUM=0
+	verboseNUM="$(_GetConfigParam_ VERBOSE_TEST 0)"
+	if ! echo "$verboseNUM" | grep -qE "^[0-3]$"
+	then verboseNUM=0
+	fi
 
 	CONFIG_STRING=""
 	LICENSE_STRING="--accept-license --accept-gdpr"
@@ -2839,6 +2944,7 @@ Run_Speedtest()
 						# Parse human readable output when buffer bloat data is included.#
 						download="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
+
 						latency="$(grep "Idle Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $3}')"
 						jitter="$(grep "Idle Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}' | tr -d 'ms,')"
 						pktloss="$(grep "Packet Loss:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $3}' | tr -d '%')"
@@ -2846,14 +2952,15 @@ Run_Speedtest()
 						datadownload="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 						dataupload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 
-						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7)-1)}')"
-						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7)-1)}')"
+						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
+						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
 
 						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $2}' | tr -d ')')"
 					else
 						download="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
+
 						latency="$(grep "Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						jitter="$(grep "Latency:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $4}' | tr -d '(')"
 						pktloss="$(grep "Packet Loss:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $3}' | tr -d '%')"
@@ -2861,8 +2968,8 @@ Run_Speedtest()
 						datadownload="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 						dataupload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 
-						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7)-1)}')"
-						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7)-1)}')"
+						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
+						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
 
 						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
@@ -2884,12 +2991,20 @@ Run_Speedtest()
 					! Validate_Bandwidth "$datadownload" && datadownload=0;
 					! Validate_Bandwidth "$dataupload" && dataupload=0;
 
-					if [ "$datadownloadunit" = "GB" ]; then
+					if [ "$datadownloadunit" = "GB" ]
+					then
 						datadownload="$(echo "$datadownload" | awk '{printf ($1*1024)}')"
+					elif [ "$datadownloadunit" = "kB" ] || [ "$datadownloadunit" = "KB" ]
+					then
+						datadownload="$(printf "%.4f" "$(echo "$datadownload" | awk '{printf ($1/1024)}')")"
 					fi
 
-					if [ "$datauploadunit" = "GB" ]; then
+					if [ "$datauploadunit" = "GB" ]
+					then
 						dataupload="$(echo "$dataupload" | awk '{printf ($1*1024)}')"
+					elif [ "$datauploadunit" = "kB" ] || [ "$datauploadunit" = "KB" ]
+					then
+						dataupload="$(printf "%.4f" "$(echo "$dataupload" | awk '{printf ($1/1024)}')")"
 					fi
 
 					if [ "$(SpeedtestBinary check)" = "builtin" ]
@@ -3571,7 +3686,7 @@ ScriptHeader()
 	printf "${BOLD}##                  %9s on %-18s           ##${CLEARFORMAT}\n" "$SCRIPT_VERSION" "$ROUTER_MODEL"
 	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
 	printf "${BOLD}##            https://github.com/AMTM-OSR/spdMerlin           ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##      Forked from: https://github.com/jackyaz/spdMerlin     ##${CLEARFORMAT}\\n"
+	printf "${BOLD}##      Forked from https://github.com/jackyaz/spdMerlin      ##${CLEARFORMAT}\\n"
 	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
 	printf "${BOLD}################################################################${CLEARFORMAT}\\n"
 	printf "\\n"
@@ -4803,30 +4918,43 @@ Menu_ResetDB()
 	esac
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-06] ##
+##----------------------------------------##
 Menu_AutoBW()
 {
+	local AUTOBW_MenuStatus
+
 	while true
 	do
 		ScriptHeader
-		
-		AUTOBW_MENU=""
-		
-		if [ "$(AutoBWEnable check)" = "true" ]; then
-			AUTOBW_MENU="Enabled"
-		elif [ "$(AutoBWEnable check)" = "false" ]; then
-			AUTOBW_MENU="Disabled"
+
+		AUTOBW_MenuStatus="UNKNOWN"
+
+		if [ "$(AutoBWEnable check)" = "true" ]
+		then
+			AUTOBW_MenuStatus="${PassBGRNct} ENABLED ${CLRct}"
+		elif [ "$(AutoBWEnable check)" = "false" ]
+		then
+			AUTOBW_MenuStatus="${CritIREDct} DISABLED ${CLRct}"
 		fi
-		
-		printf "1.    Update QoS bandwidth values now\\n\\n"
-		printf "2.    Configure number of speedtests used to calculate average bandwidth\\n      Currently bandwidth is calculated using the average of the last ${SETTING}%s${CLEARFORMAT} speedtest(s)\\n\\n" "$(AutoBWConf check AVERAGE CALC)"
-		printf "3.    Configure scale factor\\n      Download: ${SETTING}%s%%${CLEARFORMAT}  -  Upload: ${SETTING}%s%%${CLEARFORMAT}\\n\\n" "$(AutoBWConf check SF DOWN)" "$(AutoBWConf check SF UP)"
-		printf "4.    Configure bandwidth limits\\n      Upper Limit    Download: ${SETTING}%s Mbps${CLEARFORMAT}  -  Upload: ${SETTING}%s Mbps${CLEARFORMAT}\\n      Lower Limit    Download: ${SETTING}%s Mbps${CLEARFORMAT}  -  Upload: ${SETTING}%s Mbps${CLEARFORMAT}\\n\\n" "$(AutoBWConf check ULIMIT DOWN)" "$(AutoBWConf check ULIMIT UP)" "$(AutoBWConf check LLIMIT DOWN)" "$(AutoBWConf check LLIMIT UP)"
-		printf "5.    Configure threshold for updating QoS bandwidth values\\n      Download: ${SETTING}%s%%${CLEARFORMAT} - Upload: ${SETTING}%s%%${CLEARFORMAT}\\n\\n" "$(AutoBWConf check THRESHOLD DOWN)" "$(AutoBWConf check THRESHOLD UP)"
-		printf "6.    Toggle AutoBW on/off\\n      Currently: ${SETTING}%s${CLEARFORMAT}\\n\\n" "$AUTOBW_MENU"
-		printf "e.    Go back\\n\\n"
-		printf "${BOLD}####################################################################${CLEARFORMAT}\\n"
-		printf "\\n"
-		
+
+		printf "1.    Update QoS bandwidth values now\n\n"
+		printf "2.    Configure number of speedtests used to calculate average bandwidth\n"
+		printf "      Currently bandwidth is calculated using the average of the last ${SETTING}%s${CLEARFORMAT} speedtest(s)\n\n" "$(AutoBWConf check AVERAGE CALC)"
+		printf "3.    Configure scale factor\n"
+		printf "      Download: ${SETTING}%s%%${CLEARFORMAT}  -  Upload: ${SETTING}%s%%${CLEARFORMAT}\n\n" "$(AutoBWConf check SF DOWN)" "$(AutoBWConf check SF UP)"
+		printf "4.    Configure bandwidth limits\n"
+		printf "      Upper Limit    Download: ${SETTING}%s Mbps${CLEARFORMAT}  -  Upload: ${SETTING}%s Mbps${CLEARFORMAT}\n" "$(AutoBWConf check ULIMIT DOWN)" "$(AutoBWConf check ULIMIT UP)"
+		printf "      Lower Limit    Download: ${SETTING}%s Mbps${CLEARFORMAT}  -  Upload: ${SETTING}%s Mbps${CLEARFORMAT}\n\n" "$(AutoBWConf check LLIMIT DOWN)" "$(AutoBWConf check LLIMIT UP)"
+		printf "5.    Configure threshold for updating QoS bandwidth values\n"
+		printf "      Download: ${SETTING}%s%%${CLEARFORMAT} - Upload: ${SETTING}%s%%${CLEARFORMAT}\n\n" "$(AutoBWConf check THRESHOLD DOWN)" "$(AutoBWConf check THRESHOLD UP)"
+		printf "6.    Toggle AutoBW on/off\n"
+		printf "      Currently: ${AUTOBW_MenuStatus}${CLEARFORMAT}\n\n"
+		printf "e.    Go back\n\n"
+		printf "${BOLD}####################################################################${CLEARFORMAT}\n"
+		printf "\n"
+
 		printf "Choose an option:  "
 		read -r autobwmenu
 		case "$autobwmenu" in
@@ -5107,12 +5235,15 @@ Menu_AutoBW()
 				PressEnter
 			;;
 			6)
-				printf "\\n"
-				if [ "$(AutoBWEnable check)" = "true" ]; then
+				printf "\n"
+				if [ "$(AutoBWEnable check)" = "true" ]
+				then
 					AutoBWEnable disable
-				elif [ "$(AutoBWEnable check)" = "false" ]; then
+				elif [ "$(AutoBWEnable check)" = "false" ]
+				then
 					AutoBWEnable enable
-					if [ "$(ExcludeFromQoS check)" = "false" ]; then
+					if [ "$(ExcludeFromQoS check)" = "false" ]
+					then
 						Print_Output false "Enabling Exclude from QoS (required for AutoBW)"
 						ExcludeFromQoS enable
 						PressEnter
@@ -5131,7 +5262,8 @@ Menu_AutoBW()
 ##----------------------------------------##
 Menu_AutoBW_Update()
 {
-	if [ "$(nvram get qos_enable)" -eq 0 ]; then
+	if [ "$(nvram get qos_enable)" -eq 0 ]
+	then
 		Print_Output true "QoS is not enabled, please enable this in the Asus WebUI." "$ERR"
 		return 1
 	fi
@@ -5436,10 +5568,13 @@ Entware_Ready()
 }
 
 ### function based on @dave14305's FlexQoS about function ###
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-04] ##
+##----------------------------------------##
 Show_About()
 {
 	cat <<EOF
-About
+About $SCRIPT_VERS_INFO
   $SCRIPT_NAME is an internet speedtest and monitoring tool for
   AsusWRT Merlin with charts for daily, weekly and monthly summaries.
   It tracks download/upload bandwidth as well as latency, jitter and
@@ -5459,9 +5594,13 @@ EOF
 }
 
 ### function based on @dave14305's FlexQoS show_help function ###
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-04] ##
+##----------------------------------------##
 Show_Help()
 {
 	cat <<EOF
+HELP $SCRIPT_VERS_INFO
 Available commands:
   $SCRIPT_NAME_LOWER about            explains functionality
   $SCRIPT_NAME_LOWER update           checks for updates
@@ -5486,6 +5625,12 @@ TMPDIR="$SHARE_TEMP_DIR"
 SQLITE_TMPDIR="$TMPDIR"
 export SQLITE_TMPDIR TMPDIR
 
+if [ -d "$TMPDIR" ]
+then sqlDBLogFilePath="${TMPDIR}/$sqlDBLogFileName"
+else sqlDBLogFilePath="/tmp/var/tmp/$sqlDBLogFileName"
+fi
+_SQLCheckDBLogFileSize_
+
 if [ -f "/opt/share/${SCRIPT_NAME_LOWER}.d/config" ]
 then SCRIPT_STORAGE_DIR="/opt/share/${SCRIPT_NAME_LOWER}.d"
 else SCRIPT_STORAGE_DIR="/jffs/addons/${SCRIPT_NAME_LOWER}.d"
@@ -5497,6 +5642,11 @@ CSV_OUTPUT_DIR="$SCRIPT_STORAGE_DIR/csv"
 SCRIPT_INTERFACES="$SCRIPT_STORAGE_DIR/.interfaces"
 SCRIPT_INTERFACES_USER="$SCRIPT_STORAGE_DIR/.interfaces_user"
 JFFS_LowFreeSpaceStatus="OK"
+
+if [ "$SCRIPT_BRANCH" != "develop" ]
+then SCRIPT_VERS_INFO=""
+else SCRIPT_VERS_INFO="$scriptVERINFO"
+fi
 
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Feb-28] ##
