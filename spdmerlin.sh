@@ -3007,15 +3007,6 @@ Run_Speedtest()
 						dataupload="$(printf "%.4f" "$(echo "$dataupload" | awk '{printf ($1/1024)}')")"
 					fi
 
-          				# convert to Mbps if necessary
-					if [ "$datadownloadunit" = "kB" ]; then
-						datadownload=$(awk "BEGIN { printf \"%.3f\", $datadownload/1024 }")
-					fi
-
-					if [ "$datauploadunit" = "kB" ]; then
-						dataupload=$(awk "BEGIN { printf \"%.3f\", $dataupload/1024 }")
-					fi
-
 					if [ "$(SpeedtestBinary check)" = "builtin" ]
 					then
 						curllatency="$latency"
