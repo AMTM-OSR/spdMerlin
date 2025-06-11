@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-08
+# Last Modified: 2025-Jun-11
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,8 +38,8 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.10"
-readonly SCRIPT_VERSTAG="25060820"
+readonly SCRIPT_VERSION="v4.4.11"
+readonly SCRIPT_VERSTAG="25061108"
 SCRIPT_BRANCH="master"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -365,8 +365,24 @@ Update_Version()
 	fi
 }
 
+##-------------------------------------##
+## Added by Martinski W. [2025-Jun-11] ##
+##-------------------------------------##
+_GetSpeedtestBinaryVersion_()
+{
+   if [ ! -x "$OOKLA_DIR/speedtest" ] ; then echo "[N/A]" ; return 1 ; fi
+   local verLine  verStr="[N/A]"
+
+   verLine="$("$OOKLA_DIR"/speedtest -V | grep -E '^Speedtest by Ookla [1-9]+[.].*')"
+   if [ -n "$verLine" ]
+   then
+       verStr="$(echo "$verLine" | awk -F ' ' '{print $4}')"
+   fi
+   echo "$verStr"
+}
+
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-15] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 Update_File()
 {
@@ -385,7 +401,8 @@ Update_File()
 			tar -xzf "$OOKLA_DIR/$1" -C "$OOKLA_DIR"
 			rm -f "$OOKLA_DIR/$1"
 			chmod 0755 "$OOKLA_DIR/speedtest"
-			Print_Output true "New version of Speedtest CLI downloaded to $OOKLA_DIR/speedtest" "$PASS"
+			spdTestVer="$(_GetSpeedtestBinaryVersion_)"
+			Print_Output true "New version $spdTestVer of Speedtest CLI downloaded to $OOKLA_DIR/speedtest" "$PASS"
 		fi
 		rm -f /tmp/speedtest*
 	elif [ "$1" = "spdstats_www.asp" ]
@@ -2669,7 +2686,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-08] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2952,8 +2969,8 @@ Run_Speedtest()
 						datadownload="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 						dataupload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 
-						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
-						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
+						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
+						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 
 						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $2}' | tr -d ')')"
@@ -2968,8 +2985,8 @@ Run_Speedtest()
 						datadownload="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 						dataupload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 
-						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
-						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
+						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
+						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 
 						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
