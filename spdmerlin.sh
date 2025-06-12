@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-11
+# Last Modified: 2025-Jun-12
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.11"
-readonly SCRIPT_VERSTAG="25061123"
+readonly SCRIPT_VERSTAG="25061206"
 SCRIPT_BRANCH="master"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -5314,7 +5314,7 @@ Menu_AutoBW()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-12] ##
 ##----------------------------------------##
 Menu_AutoBW_Update()
 {
@@ -5355,7 +5355,7 @@ Menu_AutoBW_Update()
 	TZ="$(cat /etc/TZ)"
 	export TZ
 
-	printf "AutoBW report - %s\\n\\n" "$(date +'%c')" > "$autobwoutfile"
+	printf "AutoBW report - %s\n\n" "$(date +'%c')" > "$autobwoutfile"
 
 	dspdkbps="$(echo "$(awk '{printf (1024*$1)}' /tmp/spdbwDownload)" "$dsf" | awk '{printf int($1*$2)}')"
 	uspdkbps="$(echo "$(awk '{printf (1024*$1)}' /tmp/spdbwUpload)" "$usf" | awk '{printf int($1*$2)}')"
@@ -5421,7 +5421,7 @@ Menu_AutoBW_Update()
 		printf "No changes made to QoS by AutoBW" >> "$autobwoutfile"
 	fi
 
-	sed -i 's/[^a-zA-Z0-9():%<>-]/ /g;s/  1m//g;s/  33m//g;s/  0m//g' "$autobwoutfile"
+	sed -i 's/[^a-zA-Z0-9():%<>-]/ /g;s/  [0-1]m//g;s/  3[0-9]m//g' "$autobwoutfile"
 
 	Clear_Lock
 }
