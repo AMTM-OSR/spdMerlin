@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-08
+# Last Modified: 2025-Jun-12
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,8 +38,8 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.10"
-readonly SCRIPT_VERSTAG="25060820"
+readonly SCRIPT_VERSION="v4.4.11"
+readonly SCRIPT_VERSTAG="25061206"
 SCRIPT_BRANCH="master"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -68,6 +68,7 @@ readonly webPageLineRegExp="${webPageLineTabExp}\"$SCRIPT_NAME\"\},"
 readonly BEGIN_MenuAddOnsTag="/\*\*BEGIN:_AddOns_\*\*/"
 readonly ENDIN_MenuAddOnsTag="/\*\*ENDIN:_AddOns_\*\*/"
 readonly scriptVERINFO="[${SCRIPT_VERSION}_${SCRIPT_VERSTAG}, Branch: $SCRIPT_BRANCH]"
+readonly theUserName="$(nvram get http_username)"
 
 # For daily CRON job to trim database #
 readonly defTrimDB_Hour=3
@@ -365,8 +366,24 @@ Update_Version()
 	fi
 }
 
+##-------------------------------------##
+## Added by Martinski W. [2025-Jun-11] ##
+##-------------------------------------##
+_GetSpeedtestBinaryVersion_()
+{
+   if [ ! -x "$OOKLA_DIR/speedtest" ] ; then echo "[N/A]" ; return 1 ; fi
+   local verLine  verStr="[N/A]"
+
+   verLine="$("$OOKLA_DIR"/speedtest -V | grep -E '^Speedtest by Ookla [1-9]+[.].*')"
+   if [ -n "$verLine" ]
+   then
+       verStr="$(echo "$verLine" | awk -F ' ' '{print $4}')"
+   fi
+   echo "$verStr"
+}
+
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-15] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 Update_File()
 {
@@ -385,7 +402,9 @@ Update_File()
 			tar -xzf "$OOKLA_DIR/$1" -C "$OOKLA_DIR"
 			rm -f "$OOKLA_DIR/$1"
 			chmod 0755 "$OOKLA_DIR/speedtest"
-			Print_Output true "New version of Speedtest CLI downloaded to $OOKLA_DIR/speedtest" "$PASS"
+			chown "${theUserName}:root" "$OOKLA_DIR"/*
+			spdTestVer="$(_GetSpeedtestBinaryVersion_)"
+			Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 		fi
 		rm -f /tmp/speedtest*
 	elif [ "$1" = "spdstats_www.asp" ]
@@ -663,7 +682,7 @@ Create_Symlinks()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-19] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 Conf_FromSettings()
 {
@@ -678,10 +697,16 @@ Conf_FromSettings()
 			cp -a "$SCRIPT_CONF" "${SCRIPT_CONF}.bak"
 			grep "^spdmerlin_" "$SETTINGSFILE" | grep -v "version" > "$TMPFILE"
 			sed -i "s/^spdmerlin_//g;s/ /=/g" "$TMPFILE"
+
 			while IFS='' read -r line || [ -n "$line" ]
 			do
 				SETTINGNAME="$(echo "$line" | cut -f1 -d'=' | awk '{print toupper($1)}')"
 				SETTINGVALUE="$(echo "$line" | cut -f2- -d'=' | sed "s/=/ /g")"
+				if [ "$SETTINGNAME" = "SPEEDTESTBINARY" ]
+				then
+				    SpeedtestBinary "$SETTINGVALUE"
+				    continue
+				fi
 				sed -i "s~$SETTINGNAME=.*~$SETTINGNAME=$SETTINGVALUE~" "$SCRIPT_CONF"
 			done < "$TMPFILE"
 
@@ -715,8 +740,9 @@ Conf_FromSettings()
 			fi
 			if [ "$(AutoBWEnable check)" = "true" ]
 			then
-				if [ "$(ExcludeFromQoS check)" = "false" ]; then
-					Print_Output true "Enabling Exclude from QoS (required for AutoBW)"
+				if [ "$(ExcludeFromQoS check)" = "false" ]
+				then
+					Print_Output true "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
 					ExcludeFromQoS enable
 				fi
 			fi
@@ -1640,16 +1666,30 @@ OutputTimeMode()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-06] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 SpeedtestBinary()
 {
+	local retCode=0
+
 	case "$1" in
 		builtin)
-			sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=builtin/' "$SCRIPT_CONF"
+			if [ -f /usr/sbin/ookla ]
+			then
+			    sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=builtin/' "$SCRIPT_CONF"
+			else
+			    retCode=1
+			    Print_Output true "The built-in Speedtest binary is NOT found." "$ERR"
+			fi
 		;;
 		external)
-			sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=external/' "$SCRIPT_CONF"
+			if [ -f "$OOKLA_DIR/speedtest" ]
+			then
+			    sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=external/' "$SCRIPT_CONF"
+			else
+			    retCode=1
+			    Print_Output true "The external Speedtest binary is NOT found." "$ERR"
+			fi
 		;;
 		check)
 			SPEEDTESTBINARY="$(_GetConfigParam_ SPEEDTESTBINARY)"
@@ -1657,6 +1697,7 @@ SpeedtestBinary()
 			echo "$SPEEDTESTBINARY"
 		;;
 	esac
+    return "$retCode"
 }
 
 ##----------------------------------------##
@@ -1940,12 +1981,13 @@ GenerateServerList()
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY=/usr/sbin/ookla
+		SPEEDTEST_BINARY="/usr/sbin/ookla"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
 		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
 	fi
-	if [ "$SPEEDTEST_BINARY" = /usr/sbin/ookla ]; then
+	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
+	then
 		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
 		LICENSE_STRING=""
 	fi
@@ -2053,14 +2095,14 @@ GenerateServerList_WebUI()
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY=/usr/sbin/ookla
+		SPEEDTEST_BINARY="/usr/sbin/ookla"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
 		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
 	fi
 	CONFIG_STRING=""
 	LICENSE_STRING="--accept-license --accept-gdpr"
-	if [ "$SPEEDTEST_BINARY" = /usr/sbin/ookla ]
+	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
 	then
 		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
 		LICENSE_STRING=""
@@ -2669,13 +2711,13 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-08] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
 	if [ ! -f /opt/bin/xargs ] && [ -x /opt/bin/opkg ]
 	then
-		Print_Output true "Installing findutils from Entware"
+		Print_Output true "Installing findutils from Entware" "$PASS"
 		opkg update
 		opkg install findutils
 	fi
@@ -2723,7 +2765,7 @@ Run_Speedtest()
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY=/usr/sbin/ookla
+		SPEEDTEST_BINARY="/usr/sbin/ookla"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
 		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
@@ -2952,8 +2994,8 @@ Run_Speedtest()
 						datadownload="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 						dataupload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 
-						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
-						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
+						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
+						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 
 						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $2}' | tr -d ')')"
@@ -2968,8 +3010,8 @@ Run_Speedtest()
 						datadownload="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 						dataupload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $6}')"
 
-						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
-						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,length($7))}')"
+						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
+						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 
 						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
@@ -3215,7 +3257,7 @@ _FindTableColumnTextInDatabase_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-02] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 Process_Upgrade()
 {
@@ -3223,10 +3265,14 @@ Process_Upgrade()
 
 	if [ ! -f "$OOKLA_DIR/speedtest" ]
 	then
+		rm -f "$OOKLA_DIR"/*
 		Download_File "$SCRIPT_REPO/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
 		tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
 		rm -f "$OOKLA_DIR/$ARCH.tar.gz"
 		chmod 0755 "$OOKLA_DIR/speedtest"
+        chown "${theUserName}:root" "$OOKLA_DIR"/*
+		spdTestVer="$(_GetSpeedtestBinaryVersion_)"
+		Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 	fi
 	rm -f "$SCRIPT_STORAGE_DIR/spdjs.js"
 	rm -f "$SCRIPT_STORAGE_DIR/.tableupgraded"*
@@ -3241,7 +3287,7 @@ Process_Upgrade()
 	then
 		if [ "$(ExcludeFromQoS check)" = "false" ]
 		then
-			Print_Output false "Enabling Exclude from QoS (required for AutoBW)"
+			Print_Output false "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
 			ExcludeFromQoS enable
 		fi
 	fi
@@ -3596,10 +3642,10 @@ Reset_DB()
 		return 1
 	else
 		Print_Output true "Sufficient free space to back up database, proceeding..." "$PASS"
-		if ! cp -a "$SPEEDSTATS_DB" "${SPEEDSTATS_DB}.bak"; then
+		if ! cp -a "$SPEEDSTATS_DB" "${SPEEDSTATS_DB}.bak"
+		then
 			Print_Output true "Database backup failed, please check storage device" "$WARN"
 		fi
-
 		Print_Output false "Please wait..." "$PASS"
 
 		local rstIndx=0
@@ -3794,7 +3840,7 @@ _CronScheduleHourMinsInfo_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 MainMenu()
 {
@@ -3936,10 +3982,12 @@ MainMenu()
 			;;
 			9)
 				printf "\n"
-				if [ "$(SpeedtestBinary check)" = "builtin" ]; then
-					SpeedtestBinary external
-				elif [ "$(SpeedtestBinary check)" = "external" ]; then
-					SpeedtestBinary builtin
+				if [ "$(SpeedtestBinary check)" = "builtin" ]
+				then
+					! SpeedtestBinary external && PressEnter
+				elif [ "$(SpeedtestBinary check)" = "external" ]
+				then
+					! SpeedtestBinary builtin && PressEnter
 				fi
 				break
 			;;
@@ -4108,7 +4156,7 @@ Check_Requirements()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-04] ##
+## Modified by Martinski W. [2025-Jun-11] ##
 ##----------------------------------------##
 Menu_Install()
 {
@@ -4145,9 +4193,11 @@ Menu_Install()
 
 	Create_Dirs
 	Conf_Exists
-	if [ "$(SpeedtestBinary check)" = "builtin" ]; then
+	if [ "$(SpeedtestBinary check)" = "builtin" ]
+	then
 		printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
-	elif [ "$(SpeedtestBinary check)" = "external" ]; then
+	elif [ "$(SpeedtestBinary check)" = "external" ]
+	then
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	Set_Version_Custom_Settings local "$SCRIPT_VERSION"
@@ -4155,10 +4205,14 @@ Menu_Install()
 	ScriptStorageLocation load
 	Create_Symlinks
 
+	rm -f "$OOKLA_DIR"/*
 	Download_File "$SCRIPT_REPO/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
 	tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
 	rm -f "$OOKLA_DIR/$ARCH.tar.gz"
 	chmod 0755 "$OOKLA_DIR/speedtest"
+	chown "${theUserName}:root" "$OOKLA_DIR"/*
+	spdTestVer="$(_GetSpeedtestBinaryVersion_)"
+	Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 
 	Update_File README.md
 	Update_File spdstats_www.asp
@@ -4204,16 +4258,18 @@ Menu_Startup()
 
 	NTP_Ready
 	Check_Lock
-	
+
 	if [ "$1" != "force" ]; then
 		sleep 8
 	fi
-	
+
 	Create_Dirs
 	Conf_Exists
-	if [ "$(SpeedtestBinary check)" = "builtin" ]; then
+	if [ "$(SpeedtestBinary check)" = "builtin" ]
+	then
 		printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
-	elif [ "$(SpeedtestBinary check)" = "external" ]; then
+	elif [ "$(SpeedtestBinary check)" = "external" ]
+	then
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load
@@ -5244,7 +5300,7 @@ Menu_AutoBW()
 					AutoBWEnable enable
 					if [ "$(ExcludeFromQoS check)" = "false" ]
 					then
-						Print_Output false "Enabling Exclude from QoS (required for AutoBW)"
+						Print_Output false "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
 						ExcludeFromQoS enable
 						PressEnter
 					fi
@@ -5258,7 +5314,7 @@ Menu_AutoBW()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-12] ##
 ##----------------------------------------##
 Menu_AutoBW_Update()
 {
@@ -5299,7 +5355,7 @@ Menu_AutoBW_Update()
 	TZ="$(cat /etc/TZ)"
 	export TZ
 
-	printf "AutoBW report - %s\\n\\n" "$(date +'%c')" > "$autobwoutfile"
+	printf "AutoBW report - %s\n\n" "$(date +'%c')" > "$autobwoutfile"
 
 	dspdkbps="$(echo "$(awk '{printf (1024*$1)}' /tmp/spdbwDownload)" "$dsf" | awk '{printf int($1*$2)}')"
 	uspdkbps="$(echo "$(awk '{printf (1024*$1)}' /tmp/spdbwUpload)" "$usf" | awk '{printf int($1*$2)}')"
@@ -5365,7 +5421,7 @@ Menu_AutoBW_Update()
 		printf "No changes made to QoS by AutoBW" >> "$autobwoutfile"
 	fi
 
-	sed -i 's/[^a-zA-Z0-9():%<>-]/ /g;s/  1m//g;s/  33m//g;s/  0m//g' "$autobwoutfile"
+	sed -i 's/[^a-zA-Z0-9():%<>-]/ /g;s/  [0-1]m//g;s/  3[0-9]m//g' "$autobwoutfile"
 
 	Clear_Lock
 }
@@ -5436,13 +5492,14 @@ Menu_Uninstall()
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY=/usr/sbin/ookla
+		SPEEDTEST_BINARY="/usr/sbin/ookla"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
 		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
 	fi
 	PROC_NAME="speedtest"
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]; then
+	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
+	then
 		PROC_NAME="ookla"
 	fi
 	if [ -n "$(pidof "$PROC_NAME")" ]; then
@@ -5780,9 +5837,11 @@ case "$1" in
 	postupdate)
 		Create_Dirs
 		Conf_Exists
-		if [ "$(SpeedtestBinary check)" = "builtin" ]; then
+		if [ "$(SpeedtestBinary check)" = "builtin" ]
+		then
 			printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
-		elif [ "$(SpeedtestBinary check)" = "external" ]; then
+		elif [ "$(SpeedtestBinary check)" = "external" ]
+		then
 			printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 		fi
 		ScriptStorageLocation load
