@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-12
+# Last Modified: 2025-Jun-21
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,9 +38,9 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.11"
-readonly SCRIPT_VERSTAG="25061206"
-SCRIPT_BRANCH="master"
+readonly SCRIPT_VERSION="v4.4.12"
+readonly SCRIPT_VERSTAG="25062121"
+SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
 readonly SCRIPT_WEBPAGE_DIR="$(readlink -f /www/user)"
@@ -1362,10 +1362,13 @@ _Check_WebGUI_Page_Exists_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-19] ##
 ##----------------------------------------##
 Get_WebUI_Page()
 {
+	if [ $# -eq 0 ] || [ -z "$1" ] || [ ! -s "$1" ]
+	then MyWebPage="NONE" ; return 1 ; fi
+
 	local webPageFile  webPagePath
 
 	MyWebPage="$(_Check_WebGUI_Page_Exists_)"
@@ -1456,11 +1459,12 @@ ${ENDIN_MenuAddOnsTag}" "$TEMP_MENU_TREE"
 
 ### locking mechanism code credit to Martineau (@MartineauUK) ###
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
 Mount_WebUI()
 {
 	Print_Output true "Mounting WebUI tab for $SCRIPT_NAME" "$PASS"
+
 	LOCKFILE=/tmp/addonwebui.lock
 	FD=386
 	eval exec "$FD>$LOCKFILE"
@@ -1468,7 +1472,7 @@ Mount_WebUI()
 	Get_WebUI_Page "$SCRIPT_DIR/spdstats_www.asp"
 	if [ "$MyWebPage" = "NONE" ]
 	then
-		Print_Output true "**ERROR** Unable to mount $SCRIPT_NAME WebUI page, exiting" "$CRIT"
+		Print_Output true "**ERROR** Unable to mount $SCRIPT_NAME WebUI page." "$CRIT"
 		flock -u "$FD"
 		return 1
 	fi
@@ -1502,6 +1506,7 @@ Mount_WebUI()
 		mount -o bind "$TEMP_MENU_TREE" /www/require/modules/menuTree.js
 	fi
 	flock -u "$FD"
+
 	Print_Output true "Mounted $SCRIPT_NAME WebUI page as $MyWebPage" "$PASS"
 }
 
@@ -2133,21 +2138,21 @@ GenerateServerList_WebUI()
 			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$IFACE_NAME")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
 			serverCount="$(echo "$serverList" | jq '.servers | length')"
 			COUNTER=1
-			until [ $COUNTER -gt "$serverCount" ]
+			until [ "$COUNTER" -gt "$serverCount" ]
 			do
 				printf "%s|%s\\n" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"  >> "/tmp/$serverlistfile.tmp"
-				COUNTER=$((COUNTER + 1))
+				COUNTER="$((COUNTER + 1))"
 			done
-			printf "-----\\n" >> "/tmp/$serverlistfile.tmp"
+			printf "-----\n" >> "/tmp/$serverlistfile.tmp"
 		done
 	else
 		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$spdifacename")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
 		serverCount="$(echo "$serverList" | jq '.servers | length')"
 		COUNTER=1
-		until [ $COUNTER -gt "$serverCount" ]
+		until [ "$COUNTER" -gt "$serverCount" ]
 		do
 			printf "%s|%s\\n" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"  >> "/tmp/$serverlistfile.tmp"
-			COUNTER=$((COUNTER + 1))
+			COUNTER="$((COUNTER + 1))"
 		done
 	fi
 	sleep 1
@@ -2380,6 +2385,12 @@ _Check_JFFS_SpaceAvailable_()
 }
 
 ##-------------------------------------##
+## Added by Martinski W. [2025-Jun-19] ##
+##-------------------------------------##
+_EscapeChars_()
+{ printf "%s" "$1" | sed 's/[][\/$.*^&-]/\\&/g' ; }
+
+##-------------------------------------##
 ## Added by Martinski W. [2025-Feb-28] ##
 ##-------------------------------------##
 _WriteVarDefToJSFile_()
@@ -2387,10 +2398,13 @@ _WriteVarDefToJSFile_()
    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ]
    then return 1; fi
 
-   local varValue
+   local varValue  sedValue
    if [ $# -eq 3 ] && [ "$3" = "true" ]
-   then varValue="$2"
-   else varValue="'${2}'"
+   then
+       varValue="$2"
+   else
+       varValue="'${2}'"
+       sedValue="$(_EscapeChars_ "$varValue")"
    fi
 
    local targetJSfile="$SCRIPT_STORAGE_DIR/spdtitletext.js"
@@ -2402,9 +2416,9 @@ _WriteVarDefToJSFile_()
    then
        sed -i "1 i var $1 = ${varValue};" "$targetJSfile"
    elif
-      ! grep -q "^var $1 = ${varValue};" "$targetJSfile"
+      ! grep -q "^var $1 = ${sedValue};" "$targetJSfile"
    then
-       sed -i "s/^var $1 =.*/var $1 = ${varValue};/" "$targetJSfile"
+       sed -i "s/^var $1 =.*/var $1 = ${sedValue};/" "$targetJSfile"
    fi
 }
 
@@ -2548,8 +2562,14 @@ _SQLGetDBLogTimeStamp_()
 { printf "[$(date +"$sqlDBLogDateTime")]" ; }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-05] ##
+## Modified by Martinski W. [2025-Jun-21] ##
 ##----------------------------------------##
+readonly errorMsgsRegExp="Parse error|Runtime error|Error:"
+readonly corruptedBinExp="Illegal instruction|SQLite header and source version mismatch"
+readonly sqlErrorsRegExp="($errorMsgsRegExp|$corruptedBinExp)"
+readonly sqlLockedRegExp="(Parse|Runtime) error .*: database is locked"
+readonly sqlCorruptedMsg="SQLite3 binary is likely corrupted. Remove and reinstall the Entware package."
+##-----------------------------------------------------------------------
 _ApplyDatabaseSQLCmds_()
 {
     local errorCount=0  maxErrorCount=3  callFlag
@@ -2575,17 +2595,23 @@ _ApplyDatabaseSQLCmds_()
         fi
         sqlErrorMsg="$(cat "$tempLogFilePath")"
 
-        if echo "$sqlErrorMsg" | grep -qE "^(Parse error|Runtime error|Error:|Illegal instruction)"
+        if echo "$sqlErrorMsg" | grep -qE "^$sqlErrorsRegExp"
         then
-            if echo "$sqlErrorMsg" | grep -qE "^(Parse|Runtime) error .*: database is locked"
+            if echo "$sqlErrorMsg" | grep -qE "^$sqlLockedRegExp"
             then
                 foundLocked=true ; maxTriesCount=25
                 echo -n > "$tempLogFilePath"  ##Clear for next error found##
                 sleep 2 ; continue
             fi
+            if echo "$sqlErrorMsg" | grep -qE "^($corruptedBinExp)"
+            then  ## Corrupted SQLite3 Binary?? ##
+                errorCount="$maxErrorCount"
+                echo "$sqlCorruptedMsg" >> "$tempLogFilePath"
+                Print_Output true "SQLite3 Fatal Error[$callFlag]: $sqlCorruptedMsg" "$CRIT"
+            fi
             errorCount="$((errorCount + 1))"
             foundError=true ; foundLocked=false
-            Print_Output true "SQLite3 failure[$callFlag]: $sqlErrorMsg" "$ERR"
+            Print_Output true "SQLite3 Failure[$callFlag]: $sqlErrorMsg" "$ERR"
         fi
 
         if ! "$debgLogSQLcmds"
@@ -2642,6 +2668,7 @@ _Optimize_Database_()
    local optIndx=0
    for dbtable in $FULL_IFACELIST
    do
+       optIndx="$((optIndx + 1))"
        SQLTable="spdstats_$dbtable"
        {
           echo "PRAGMA temp_store=1;"
@@ -2651,10 +2678,9 @@ _Optimize_Database_()
           echo "ANALYZE $SQLTable;"
           echo "VACUUM;"
        } > /tmp/spdMerlin-trim.sql
-       optIndx="$((optIndx + 1))"
        _ApplyDatabaseSQLCmds_ /tmp/spdMerlin-trim.sql "opt$optIndx"
-
        rm -f /tmp/spdMerlin-trim.sql
+
        if "$foundError" || "$foundLocked"
        then
            sqlProcSuccess=false
@@ -2686,6 +2712,7 @@ _Trim_Database_()
    local trmIndx=0
    for dbtable in $FULL_IFACELIST
    do
+       trmIndx="$((trmIndx + 1))"
        SQLTable="spdstats_$dbtable"
        {
           echo "PRAGMA temp_store=1;"
@@ -2693,10 +2720,9 @@ _Trim_Database_()
           echo "PRAGMA cache_size=-20000;"
           echo "DELETE FROM [$SQLTable] WHERE [Timestamp] < strftime('%s',datetime($timeNow,'unixepoch','-$(DaysToKeep check) day'));"
        } > /tmp/spdMerlin-trim.sql
-       trmIndx="$((trmIndx + 1))"
        _ApplyDatabaseSQLCmds_ /tmp/spdMerlin-trim.sql "trm$trmIndx"
-
        rm -f /tmp/spdMerlin-trim.sql
+
        if "$foundError" || "$foundLocked"
        then
            sqlProcSuccess=false
@@ -3233,7 +3259,10 @@ _FindTableColumnTextInDatabase_()
    local IFACE_ID="$1"
    local tableInfoFileSQL="/tmp/spdstats-tableinfo.sql"
    local tableInfoFileLST="/tmp/spdstats-tableinfo.lst"
+   local foundError  foundLocked  resultStr  sqlProcSuccess
 
+   rm -f "$tableInfoFileLST"
+   sqlProcSuccess=true
    {
       echo ".mode list"
       echo ".headers off"
@@ -3245,7 +3274,10 @@ _FindTableColumnTextInDatabase_()
    } > "$tableInfoFileSQL"
    _ApplyDatabaseSQLCmds_ "$tableInfoFileSQL" "ftc$3"
 
-   if grep -q "|${2}|TEXT|" "$tableInfoFileLST"
+   if "$foundError" || "$foundLocked" || [ ! -s "$tableInfoFileLST" ]
+   then sqlProcSuccess=false ; fi
+
+   if "$sqlProcSuccess" && grep -q "|${2}|TEXT|" "$tableInfoFileLST"
    then
        retCode=0
    else
@@ -3295,12 +3327,12 @@ Process_Upgrade()
 	local prcIndx=0
 	for IFACE_NAME in $FULL_IFACELIST
 	do
+		prcIndx="$((prcIndx + 1))"
 		{
 		   echo "PRAGMA temp_store=1;"
 		   echo "PRAGMA journal_mode=TRUNCATE;"
 		   echo "CREATE TABLE IF NOT EXISTS [spdstats_$IFACE_NAME] ([StatID] INTEGER PRIMARY KEY NOT NULL,[Timestamp] NUMERIC NOT NULL,[Download] REAL NOT NULL,[Upload] REAL NOT NULL,[Latency] REAL,[Jitter] REAL,[PktLoss] REAL,[ResultURL] TEXT,[DataDownload] REAL NOT NULL,[DataUpload] REAL NOT NULL,[ServerID] TEXT,[ServerName] TEXT);"
 		} > /tmp/spdstats-upgrade.sql
-		prcIndx="$((prcIndx + 1))"
 		_ApplyDatabaseSQLCmds_ /tmp/spdstats-upgrade.sql "prc01$prcIndx"
 		if ! "$foundError" && ! "$foundLocked" ; then doUpdateDB=true ; fi
 	done
@@ -3426,16 +3458,20 @@ Process_Upgrade()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
 #$1 IFACE Name
 Generate_LastXResults()
 {
+	local foundError  foundLocked  resultStr  sqlProcSuccess
+
 	for IFACE_NAME in $FULL_IFACELIST;
     do
 		rm -f "$SCRIPT_STORAGE_DIR/lastx_${IFACE_NAME}.htm"
 	done
 
+	rm -f /tmp/spdMerlin-lastx.csv
+	sqlProcSuccess=true
 	local glxIndx=0
 	if [ $# -gt 1 ] && [ -n "$2" ] ; then glxIndx="$2" ; fi
 
@@ -3446,10 +3482,19 @@ Generate_LastXResults()
 	   echo "SELECT [Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[DataDownload],[DataUpload],[ResultURL],[ServerID],[ServerName] FROM spdstats_$1 ORDER BY [Timestamp] DESC LIMIT $(LastXResults check);" 
     } > /tmp/spdMerlin-lastx.sql
 	_ApplyDatabaseSQLCmds_ /tmp/spdMerlin-lastx.sql "glx$glxIndx"
-
 	rm -f /tmp/spdMerlin-lastx.sql
-	sed -i 's/,,/,null,/g;s/"//g;' /tmp/spdMerlin-lastx.csv
-	mv -f /tmp/spdMerlin-lastx.csv "$SCRIPT_STORAGE_DIR/lastx_${1}.csv"
+
+	if "$foundError" || "$foundLocked" || [ ! -f /tmp/spdMerlin-lastx.csv ]
+	then
+		sqlProcSuccess=false
+		Print_Output true "**ERROR**: Generate Last X Results Failed" "$ERR"
+	fi
+
+	if "$sqlProcSuccess"
+	then
+		sed -i 's/,,/,null,/g;s/"//g;' /tmp/spdMerlin-lastx.csv
+		mv -f /tmp/spdMerlin-lastx.csv "$SCRIPT_STORAGE_DIR/lastx_${1}.csv"
+	fi
 }
 
 ##----------------------------------------##
@@ -3486,10 +3531,10 @@ Generate_CSVs()
 			timenow="$(date +'%s')"
 			timenowfriendly="$(date +'%c')"
 
-			metriclist="Download Upload Latency Jitter PktLoss" # DataDownload DataUpload"
+			metricList="Download Upload Latency Jitter PktLoss" # DataDownload DataUpload"
 			gnrIndx2=0
 
-			for metric in $metriclist
+			for metric in $metricList
 			do
 				gnrIndx2="$((gnrIndx2 + 1))"
 				{
@@ -3598,21 +3643,21 @@ Generate_CSVs()
 
 		dos2unix "$CSV_OUTPUT_DIR/"*.htm
 
-		tmpoutputdir="/tmp/${SCRIPT_NAME_LOWER}results"
-		mkdir -p "$tmpoutputdir"
-		mv -f "$CSV_OUTPUT_DIR/CompleteResults"*.htm "$tmpoutputdir/."
+		tmpOutputDir="/tmp/${SCRIPT_NAME_LOWER}results"
+		mkdir -p "$tmpOutputDir"
+		mv -f "$CSV_OUTPUT_DIR/CompleteResults"*.htm "$tmpOutputDir/."
 
 		if [ "$OUTPUTTIMEMODE" = "unix" ]
 		then
-			find "$tmpoutputdir/" -name '*.htm' -exec sh -c 'i="$1"; mv -- "$i" "${i%.htm}.csv"' _ {} \;
+			find "$tmpOutputDir/" -name '*.htm' -exec sh -c 'i="$1"; mv -- "$i" "${i%.htm}.csv"' _ {} \;
 		elif [ "$OUTPUTTIMEMODE" = "non-unix" ]
 		then
-			for i in "$tmpoutputdir/"*".htm"; do
+			for i in "$tmpOutputDir/"*".htm"; do
 				awk -F"," 'NR==1 {OFS=","; print} NR>1 {OFS=","; $1=strftime("%Y-%m-%d %H:%M:%S", $1); print }' "$i" > "$i.out"
 			done
 
-			find "$tmpoutputdir/" -name '*.htm.out' -exec sh -c 'i="$1"; mv -- "$i" "${i%.htm.out}.csv"' _ {} \;
-			rm -f "$tmpoutputdir/"*.htm
+			find "$tmpOutputDir/" -name '*.htm.out' -exec sh -c 'i="$1"; mv -- "$i" "${i%.htm.out}.csv"' _ {} \;
+			rm -f "$tmpOutputDir/"*.htm
 		fi
 
 		if [ ! -f /opt/bin/7za ] && [ -x /opt/bin/opkg ]
@@ -3620,9 +3665,9 @@ Generate_CSVs()
 			opkg update
 			opkg install p7zip
 		fi
-		/opt/bin/7za a -y -bsp0 -bso0 -tzip "/tmp/${SCRIPT_NAME_LOWER}data.zip" "$tmpoutputdir/*"
+		/opt/bin/7za a -y -bsp0 -bso0 -tzip "/tmp/${SCRIPT_NAME_LOWER}data.zip" "$tmpOutputDir/*"
 		mv -f "/tmp/${SCRIPT_NAME_LOWER}data.zip" "$CSV_OUTPUT_DIR"
-		rm -rf "$tmpoutputdir"
+		rm -rf "$tmpOutputDir"
 	fi
 	renice 0 $$
 }
@@ -3840,7 +3885,7 @@ _CronScheduleHourMinsInfo_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-11] ##
+## Modified by Martinski W. [2025-Jun-19] ##
 ##----------------------------------------##
 MainMenu()
 {
@@ -3874,6 +3919,7 @@ MainMenu()
 
 	storageLocStr="$(ScriptStorageLocation check | tr 'a-z' 'A-Z')"
 
+	_UpdateJFFS_FreeSpaceInfo_
 	jffsFreeSpace="$(_Get_JFFS_Space_ FREE HRx | sed 's/%/%%/')"
 	if ! echo "$JFFS_LowFreeSpaceStatus" | grep -E "^WARNING[0-9]$"
 	then
@@ -3909,7 +3955,7 @@ MainMenu()
 	printf "r.    Reset list of interfaces for automatic speedtests to default\n\n"
 	printf "s.    Toggle storage location for stats and config\n"
 	printf "      Current location: ${SETTING}%s${CLEARFORMAT}\n" "$storageLocStr"
-    printf "      JFFS Available: ${jffsFreeSpaceStr}${CLEARFORMAT}\n\n"
+	printf "      JFFS Available: ${jffsFreeSpaceStr}${CLEARFORMAT}\n\n"
 	printf "q.    Toggle exclusion of %s speedtests from QoS\n" "$SCRIPT_NAME"
 	printf "      Currently: %s speedtests are ${SETTING}%s${CLEARFORMAT} QoS\n\n" "$SCRIPT_NAME" "$EXCLUDEFROMQOS_MENU"
 	printf "a.    AutoBW\n\n"
@@ -4237,7 +4283,7 @@ Menu_Install()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-04] ##
+## Modified by Martinski W. [2025-Jun-19] ##
 ##----------------------------------------##
 Menu_Startup()
 {
@@ -4252,7 +4298,7 @@ Menu_Startup()
 			Print_Output true "$1 does NOT contain Entware, not starting $SCRIPT_NAME" "$CRIT"
 			exit 1
 		else
-			Print_Output true "$1 contains Entware, starting $SCRIPT_NAME" "$PASS"
+			Print_Output true "$1 contains Entware, $SCRIPT_NAME $SCRIPT_VERSION starting up" "$PASS"
 		fi
 	fi
 
@@ -4272,7 +4318,7 @@ Menu_Startup()
 	then
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
-	ScriptStorageLocation load
+	ScriptStorageLocation load true
 	Create_Symlinks
 	Auto_Startup create 2>/dev/null
 	if AutomaticMode check
@@ -5015,7 +5061,7 @@ Menu_AutoBW()
 		read -r autobwmenu
 		case "$autobwmenu" in
 			1)
-				printf "\\n"
+				printf "\n"
 				Menu_AutoBW_Update
 				PressEnter
 			;;
@@ -5027,7 +5073,7 @@ Menu_AutoBW()
 					avgnum=""
 					while true
 					do
-						printf "\\n"
+						printf "\n"
 						printf "Enter number of speedtests to use to calculate avg bandwidth (1-30):  "
 						read -r avgnumvalue
 							if [ "$avgnumvalue" = "e" ]; then
@@ -5314,7 +5360,7 @@ Menu_AutoBW()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-12] ##
+## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
 Menu_AutoBW_Update()
 {
@@ -5324,63 +5370,78 @@ Menu_AutoBW_Update()
 		return 1
 	fi
 
-	dsf="$(AutoBWConf check SF DOWN | awk '{printf ($1/100)}')"
-	usf="$(AutoBWConf check SF UP | awk '{printf ($1/100)}')"
+	local foundError  foundLocked  resultStr
+	local dwnSpdKbps  uplSpdKbps  sqlProcSuccess
 
+	TZ="$(cat /etc/TZ)"
+	export TZ
+
+	dwnSF="$(AutoBWConf check SF DOWN | awk '{printf ($1/100)}')"
+	uplSF="$(AutoBWConf check SF UP | awk '{printf ($1/100)}')"
+
+	dwnSpdKbps=0
 	dlimitlow="$(($(AutoBWConf check LLIMIT DOWN)*1024))"
 	dlimithigh="$(($(AutoBWConf check ULIMIT DOWN)*1024))"
+
+	uplSpdKbps=0
 	ulimitlow="$(($(AutoBWConf check LLIMIT UP)*1024))"
 	ulimithigh="$(($(AutoBWConf check ULIMIT UP)*1024))"
-	avgcalc="$(AutoBWConf check AVERAGE CALC)"
+	avrgCalc="$(AutoBWConf check AVERAGE CALC)"
 
-	metriclist="Download Upload"
 	local abwIndx=0
-	for metric in $metriclist
+	sqlProcSuccess=true
+	rm -f /tmp/spdbwDownload /tmp/spdbwUpload
+
+	metricList="Download Upload"
+	for metric in $metricList
 	do
-	{
+		abwIndx="$((abwIndx + 1))"
 		{
 		   echo ".mode list"
 		   echo ".headers off"
 		   echo ".output /tmp/spdbw$metric"
 		   echo "PRAGMA temp_store=1;"
-		   echo "SELECT avg($metric) FROM (SELECT $metric FROM spdstats_WAN ORDER BY [Timestamp] DESC LIMIT $avgcalc);"
+		   echo "SELECT avg($metric) FROM (SELECT $metric FROM spdstats_WAN ORDER BY [Timestamp] DESC LIMIT $avrgCalc);"
 		} > /tmp/spdTest-autobw.sql
-		abwIndx="$((abwIndx + 1))"
 		_ApplyDatabaseSQLCmds_ /tmp/spdTest-autobw.sql "abw${abwIndx}"
 		rm -f /tmp/spdTest-autobw.sql
-	}
+
+		if "$foundError" || "$foundLocked"
+		then
+		    sqlProcSuccess=false
+		    Print_Output true "AutoBW $metric Update ${resultStr}" "$ERR"
+		fi
 	done
 
-	autobwoutfile="$SCRIPT_STORAGE_DIR/.autobwoutfile"
-	TZ="$(cat /etc/TZ)"
-	export TZ
+	autobwOutFile="$SCRIPT_STORAGE_DIR/.autobwoutfile"
+	printf "AutoBW report - %s\n\n" "$(date +'%c')" > "$autobwOutFile"
 
-	printf "AutoBW report - %s\n\n" "$(date +'%c')" > "$autobwoutfile"
+	[ -s /tmp/spdbwDownload ] && \
+	dwnSpdKbps="$(echo "$(awk '{printf (1024*$1)}' /tmp/spdbwDownload)" "$dwnSF" | awk '{printf int($1*$2)}')"
 
-	dspdkbps="$(echo "$(awk '{printf (1024*$1)}' /tmp/spdbwDownload)" "$dsf" | awk '{printf int($1*$2)}')"
-	uspdkbps="$(echo "$(awk '{printf (1024*$1)}' /tmp/spdbwUpload)" "$usf" | awk '{printf int($1*$2)}')"
+	[ -s /tmp/spdbwUpload ] && \
+	uplSpdKbps="$(echo "$(awk '{printf (1024*$1)}' /tmp/spdbwUpload)" "$uplSF" | awk '{printf int($1*$2)}')"
 
-	rm -f /tmp/spdbwDownload
-	rm -f /tmp/spdbwUpload
+	rm -f /tmp/spdbwDownload /tmp/spdbwUpload
 
-	if [ "$dspdkbps" -lt "$dlimitlow" ]
+	if [ "$dwnSpdKbps" -lt "$dlimitlow" ]
 	then
-		Print_Output true "Download speed ($dspdkbps Kbps) < lower limit ($dlimitlow Kbps)" "$WARN" | tee -a "$autobwoutfile"
-		dspdkbps="$dlimitlow"
-	elif [ "$dspdkbps" -gt "$dlimithigh" ] && [ "$dlimithigh" -gt 0 ]
+		Print_Output true "Download speed ($dwnSpdKbps Kbps) < lower limit ($dlimitlow Kbps)" "$WARN" | tee -a "$autobwOutFile"
+		dwnSpdKbps="$dlimitlow"
+	elif [ "$dwnSpdKbps" -gt "$dlimithigh" ] && [ "$dlimithigh" -gt 0 ]
 	then
-		Print_Output true "Download speed ($dspdkbps Kbps) > upper limit ($dlimithigh Kbps)" "$WARN" | tee -a "$autobwoutfile"
-		dspdkbps="$dlimithigh"
+		Print_Output true "Download speed ($dwnSpdKbps Kbps) > upper limit ($dlimithigh Kbps)" "$WARN" | tee -a "$autobwOutFile"
+		dwnSpdKbps="$dlimithigh"
 	fi
 
-	if [ "$uspdkbps" -lt "$ulimitlow" ]
+	if [ "$uplSpdKbps" -lt "$ulimitlow" ]
 	then
-		Print_Output true "Upload speed ($uspdkbps Kbps) < lower limit ($ulimitlow Kbps)" "$WARN" | tee -a "$autobwoutfile"
-		uspdkbps="$ulimitlow"
-	elif [ "$uspdkbps" -gt "$ulimithigh" ] && [ "$ulimithigh" -gt 0 ]
+		Print_Output true "Upload speed ($uplSpdKbps Kbps) < lower limit ($ulimitlow Kbps)" "$WARN" | tee -a "$autobwOutFile"
+		uplSpdKbps="$ulimitlow"
+	elif [ "$uplSpdKbps" -gt "$ulimithigh" ] && [ "$ulimithigh" -gt 0 ]
 	then
-		Print_Output true "Upload speed ($uspdkbps Kbps) > upper limit ($ulimithigh Kbps)" "$WARN" | tee -a "$autobwoutfile"
-		uspdkbps="$ulimithigh"
+		Print_Output true "Upload speed ($uplSpdKbps Kbps) > upper limit ($ulimithigh Kbps)" "$WARN" | tee -a "$autobwOutFile"
+		uplSpdKbps="$ulimithigh"
 	fi
 
 	old_uspdkbps="$(nvram get qos_obw)"
@@ -5390,38 +5451,38 @@ Menu_AutoBW_Update()
 
 	dbw_threshold="$(AutoBWConf check THRESHOLD DOWN | awk '{printf ($1/100)}')"
 
-	if [ "$dspdkbps" -gt "$(echo "$old_dspdkbps" "$dbw_threshold" | awk '{printf int($1+$1*$2)}')" ] || \
-	   [ "$dspdkbps" -lt "$(echo "$old_dspdkbps" "$dbw_threshold" | awk '{printf int($1-$1*$2)}')" ]
+	if [ "$dwnSpdKbps" -gt "$(echo "$old_dspdkbps" "$dbw_threshold" | awk '{printf int($1+$1*$2)}')" ] || \
+	   [ "$dwnSpdKbps" -lt "$(echo "$old_dspdkbps" "$dbw_threshold" | awk '{printf int($1-$1*$2)}')" ]
 	then
 		bw_changed="true"
-		nvram set qos_ibw="$(echo $dspdkbps | cut -d'.' -f1)"
-		Print_Output true "Setting QoS Download Speed to $dspdkbps Kbps (was $old_dspdkbps Kbps)" "$PASS" | tee -a "$autobwoutfile"
+		nvram set qos_ibw="$(echo "$dwnSpdKbps" | cut -d'.' -f1)"
+		Print_Output true "Setting QoS Download Speed to $dwnSpdKbps Kbps (was $old_dspdkbps Kbps)" "$PASS" | tee -a "$autobwOutFile"
 	else
-		Print_Output true "Calculated Download speed ($dspdkbps Kbps) does not exceed $(AutoBWConf check THRESHOLD DOWN)% threshold of existing value ($old_dspdkbps Kbps)" "$WARN" | tee -a "$autobwoutfile"
+		Print_Output true "Calculated Download speed ($dwnSpdKbps Kbps) does not exceed $(AutoBWConf check THRESHOLD DOWN)% threshold of existing value ($old_dspdkbps Kbps)" "$WARN" | tee -a "$autobwOutFile"
 	fi
 
 	ubw_threshold="$(AutoBWConf check THRESHOLD UP | awk '{printf ($1/100)}')"
 
-	if [ "$uspdkbps" -gt "$(echo "$old_uspdkbps" "$ubw_threshold" | awk '{printf int($1+$1*$2)}')" ] || \
-	   [ "$uspdkbps" -lt "$(echo "$old_uspdkbps" "$ubw_threshold" | awk '{printf int($1-$1*$2)}')" ]
+	if [ "$uplSpdKbps" -gt "$(echo "$old_uspdkbps" "$ubw_threshold" | awk '{printf int($1+$1*$2)}')" ] || \
+	   [ "$uplSpdKbps" -lt "$(echo "$old_uspdkbps" "$ubw_threshold" | awk '{printf int($1-$1*$2)}')" ]
 	then
 		bw_changed="true"
-		nvram set qos_obw="$(echo $uspdkbps | cut -d'.' -f1)"
-		Print_Output true "Setting QoS Upload Speed to $uspdkbps Kbps (was $old_uspdkbps Kbps)" "$PASS" | tee -a "$autobwoutfile"
+		nvram set qos_obw="$(echo "$uplSpdKbps" | cut -d'.' -f1)"
+		Print_Output true "Setting QoS Upload Speed to $uplSpdKbps Kbps (was $old_uspdkbps Kbps)" "$PASS" | tee -a "$autobwOutFile"
 	else
-		Print_Output true "Calculated Upload speed ($uspdkbps Kbps) does not exceed $(AutoBWConf check THRESHOLD UP)% threshold of existing value ($old_uspdkbps Kbps)" "$WARN" | tee -a "$autobwoutfile"
+		Print_Output true "Calculated Upload speed ($uplSpdKbps Kbps) does not exceed $(AutoBWConf check THRESHOLD UP)% threshold of existing value ($old_uspdkbps Kbps)" "$WARN" | tee -a "$autobwOutFile"
 	fi
 
 	if [ "$bw_changed" = "true" ]
 	then
 		nvram commit
 		service "restart_qos;restart_firewall" >/dev/null 2>&1
-		printf "AutoBW made changes to QoS bandwidth, QoS will be restarted" >> "$autobwoutfile"
+		printf "AutoBW made changes to QoS bandwidth, QoS will be restarted" >> "$autobwOutFile"
 	else
-		printf "No changes made to QoS by AutoBW" >> "$autobwoutfile"
+		printf "No changes made to QoS by AutoBW" >> "$autobwOutFile"
 	fi
 
-	sed -i 's/[^a-zA-Z0-9():%<>-]/ /g;s/  [0-1]m//g;s/  3[0-9]m//g' "$autobwoutfile"
+	sed -i 's/[^a-zA-Z0-9():%<>-]/ /g;s/  [0-1]m//g;s/  3[0-9]m//g' "$autobwOutFile"
 
 	Clear_Lock
 }
@@ -5699,6 +5760,7 @@ CSV_OUTPUT_DIR="$SCRIPT_STORAGE_DIR/csv"
 SCRIPT_INTERFACES="$SCRIPT_STORAGE_DIR/.interfaces"
 SCRIPT_INTERFACES_USER="$SCRIPT_STORAGE_DIR/.interfaces_user"
 JFFS_LowFreeSpaceStatus="OK"
+updateJFFS_SpaceInfo=false
 
 if [ "$SCRIPT_BRANCH" != "develop" ]
 then SCRIPT_VERS_INFO=""
@@ -5730,7 +5792,6 @@ then
 	fi
 	ScriptStorageLocation load
 	Create_Symlinks
-
 	Process_Upgrade
 
 	Auto_Startup create 2>/dev/null
@@ -5747,7 +5808,7 @@ then
 fi
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-19] ##
+## Modified by Martinski W. [2025-Jun-19] ##
 ##----------------------------------------##
 case "$1" in
 	install)
@@ -5778,6 +5839,7 @@ case "$1" in
 		exit 0
 	;;
 	service_event)
+		updateJFFS_SpaceInfo=true
 		if [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}spdtest"
 		then
 			rm -f /tmp/detect_spdtest.js
@@ -5786,6 +5848,7 @@ case "$1" in
 			Check_Lock webui
 			sleep 3
 			Run_Speedtest_WebUI "$3"
+			updateJFFS_SpaceInfo=false
 			Clear_Lock
 		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlistmanual"
 		then
@@ -5806,6 +5869,7 @@ case "$1" in
 		then
 			Update_Version force unattended
 		fi
+		"$updateJFFS_SpaceInfo" && _UpdateJFFS_FreeSpaceInfo_
 		exit 0
 	;;
 	outputcsv)
@@ -5844,7 +5908,7 @@ case "$1" in
 		then
 			printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 		fi
-		ScriptStorageLocation load
+		ScriptStorageLocation load true
 		Create_Symlinks
 		Process_Upgrade
 		Auto_Startup create 2>/dev/null
