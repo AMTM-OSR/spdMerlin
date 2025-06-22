@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-20
+# Last Modified: 2025-Jun-21
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.12"
-readonly SCRIPT_VERSTAG="25062001"
+readonly SCRIPT_VERSTAG="25062121"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -1459,11 +1459,12 @@ ${ENDIN_MenuAddOnsTag}" "$TEMP_MENU_TREE"
 
 ### locking mechanism code credit to Martineau (@MartineauUK) ###
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
 Mount_WebUI()
 {
 	Print_Output true "Mounting WebUI tab for $SCRIPT_NAME" "$PASS"
+
 	LOCKFILE=/tmp/addonwebui.lock
 	FD=386
 	eval exec "$FD>$LOCKFILE"
@@ -1505,6 +1506,7 @@ Mount_WebUI()
 		mount -o bind "$TEMP_MENU_TREE" /www/require/modules/menuTree.js
 	fi
 	flock -u "$FD"
+
 	Print_Output true "Mounted $SCRIPT_NAME WebUI page as $MyWebPage" "$PASS"
 }
 
@@ -2560,8 +2562,14 @@ _SQLGetDBLogTimeStamp_()
 { printf "[$(date +"$sqlDBLogDateTime")]" ; }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-05] ##
+## Modified by Martinski W. [2025-Jun-21] ##
 ##----------------------------------------##
+readonly errorMsgsRegExp="Parse error|Runtime error|Error:"
+readonly corruptedBinExp="Illegal instruction|SQLite header and source version mismatch"
+readonly sqlErrorsRegExp="($errorMsgsRegExp|$corruptedBinExp)"
+readonly sqlLockedRegExp="(Parse|Runtime) error .*: database is locked"
+readonly sqlCorruptedMsg="SQLite3 binary is likely corrupted. Remove and reinstall the Entware package."
+##-----------------------------------------------------------------------
 _ApplyDatabaseSQLCmds_()
 {
     local errorCount=0  maxErrorCount=3  callFlag
@@ -2587,17 +2595,23 @@ _ApplyDatabaseSQLCmds_()
         fi
         sqlErrorMsg="$(cat "$tempLogFilePath")"
 
-        if echo "$sqlErrorMsg" | grep -qE "^(Parse error|Runtime error|Error:|Illegal instruction)"
+        if echo "$sqlErrorMsg" | grep -qE "^$sqlErrorsRegExp"
         then
-            if echo "$sqlErrorMsg" | grep -qE "^(Parse|Runtime) error .*: database is locked"
+            if echo "$sqlErrorMsg" | grep -qE "^$sqlLockedRegExp"
             then
                 foundLocked=true ; maxTriesCount=25
                 echo -n > "$tempLogFilePath"  ##Clear for next error found##
                 sleep 2 ; continue
             fi
+            if echo "$sqlErrorMsg" | grep -qE "^($corruptedBinExp)"
+            then  ## Corrupted SQLite3 Binary?? ##
+                errorCount="$maxErrorCount"
+                echo "$sqlCorruptedMsg" >> "$tempLogFilePath"
+                Print_Output true "SQLite3 Fatal Error[$callFlag]: $sqlCorruptedMsg" "$CRIT"
+            fi
             errorCount="$((errorCount + 1))"
             foundError=true ; foundLocked=false
-            Print_Output true "SQLite3 failure[$callFlag]: $sqlErrorMsg" "$ERR"
+            Print_Output true "SQLite3 Failure[$callFlag]: $sqlErrorMsg" "$ERR"
         fi
 
         if ! "$debgLogSQLcmds"
@@ -3247,6 +3261,7 @@ _FindTableColumnTextInDatabase_()
    local tableInfoFileLST="/tmp/spdstats-tableinfo.lst"
    local foundError  foundLocked  resultStr  sqlProcSuccess
 
+   rm -f "$tableInfoFileLST"
    sqlProcSuccess=true
    {
       echo ".mode list"
@@ -3443,7 +3458,7 @@ Process_Upgrade()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-19] ##
+## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
 #$1 IFACE Name
 Generate_LastXResults()
@@ -3455,6 +3470,7 @@ Generate_LastXResults()
 		rm -f "$SCRIPT_STORAGE_DIR/lastx_${IFACE_NAME}.htm"
 	done
 
+	rm -f /tmp/spdMerlin-lastx.csv
 	sqlProcSuccess=true
 	local glxIndx=0
 	if [ $# -gt 1 ] && [ -n "$2" ] ; then glxIndx="$2" ; fi
@@ -3515,10 +3531,10 @@ Generate_CSVs()
 			timenow="$(date +'%s')"
 			timenowfriendly="$(date +'%c')"
 
-			metriclist="Download Upload Latency Jitter PktLoss" # DataDownload DataUpload"
+			metricList="Download Upload Latency Jitter PktLoss" # DataDownload DataUpload"
 			gnrIndx2=0
 
-			for metric in $metriclist
+			for metric in $metricList
 			do
 				gnrIndx2="$((gnrIndx2 + 1))"
 				{
@@ -5344,7 +5360,7 @@ Menu_AutoBW()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-19] ##
+## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
 Menu_AutoBW_Update()
 {
@@ -5374,9 +5390,10 @@ Menu_AutoBW_Update()
 
 	local abwIndx=0
 	sqlProcSuccess=true
-	metriclist="Download Upload"
+	rm -f /tmp/spdbwDownload /tmp/spdbwUpload
 
-	for metric in $metriclist
+	metricList="Download Upload"
+	for metric in $metricList
 	do
 		abwIndx="$((abwIndx + 1))"
 		{
