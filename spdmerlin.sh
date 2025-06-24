@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-23
+# Last Modified: 2025-Jun-24
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.13"
-readonly SCRIPT_VERSTAG="25062322"
+readonly SCRIPT_VERSTAG="25062412"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -188,7 +188,8 @@ Check_Lock()
 			then
 				exit 1
 			else
-				if [ "$1" = "webui" ]; then
+				if [ "$1" = "webui" ]
+				then
 					echo 'var spdteststatus = "LOCKED";' > /tmp/detect_spdtest.js
 					exit 1
 				fi
@@ -263,7 +264,7 @@ Update_Check()
 	localver="$(grep "SCRIPT_VERSION=" "/jffs/scripts/$SCRIPT_NAME_LOWER" | grep -m1 -oE "$scriptVersRegExp")"
 	[ -n "$localver" ] && Set_Version_Custom_Settings local "$localver"
 	curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" | grep -qF "jackyaz" || \
-    { Print_Output true "404 error detected - stopping update" "$ERR"; return 1; }
+	{ Print_Output true "404 error detected - stopping update" "$ERR"; return 1; }
 	serverver="$(curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" | grep "SCRIPT_VERSION=" | grep -m1 -oE "$scriptVersRegExp")"
 	if [ "$localver" != "$serverver" ]
 	then
@@ -559,13 +560,13 @@ _CheckNetClientInterfaceUP_()
 ##############################################################
 _Check_WG_ClientInterfaceUP_()
 {
-    if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
-    local IFACE_NAME  threshold  handshakeLine
+	if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
+	local IFACE_NAME  threshold  handshakeLine
 
-    if echo "$1" | grep -qE "^wgc[1-5]$"
-    then IFACE_NAME="$1"
-    else IFACE_NAME="wgc$1"
-    fi
+	if echo "$1" | grep -qE "^wgc[1-5]$"
+	then IFACE_NAME="$1"
+	else IFACE_NAME="wgc$1"
+	fi
 
 	threshold=180  # 180-second cutoff for "connected" #
 
@@ -629,8 +630,8 @@ _Check_All_Interface_States_()
 
 	printf "WAN\n" > "$SCRIPT_INTERFACES"
 
-    local ifaceTagStr
-    local excludedNotUPstr=" #excluded - interface not up#"
+	local ifaceTagStr
+	local excludedNotUPstr=" #excluded - interface not up#"
 
 	for index in 1 2 3 4 5
 	do
@@ -4363,6 +4364,26 @@ Menu_Startup()
 	Clear_Lock
 }
 
+##---------------------------------=---##
+## Added by Martinski W. [2025-Jun-24] ##
+##-------------------------------------##
+_Reset_Interface_States_()
+{
+    if [ $# -gt 0 ] && [ "$1" != "force" ]
+    then
+        Print_Output false "UNKNOWN argument for resetting interfaces. Exiting" "$CRIT"
+        return 1
+    fi
+    Print_Output true "Resetting interfaces for ${SCRIPT_NAME}..." "$PASS"
+    NTP_Ready
+    Check_Lock
+    Create_Dirs
+    Conf_Exists
+    ScriptStorageLocation load true
+    Create_Symlinks "$@"
+    Print_Output true "Interfaces have been reset for ${SCRIPT_NAME}." "$PASS"
+}
+
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Mar-03] ##
 ##----------------------------------------##
@@ -5840,7 +5861,7 @@ then
 fi
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-23] ##
+## Modified by Martinski W. [2025-Jun-24] ##
 ##----------------------------------------##
 case "$1" in
 	install)
@@ -5849,7 +5870,14 @@ case "$1" in
 		exit 0
 	;;
 	startup)
-		Menu_Startup "$([ $# -lt 2 ] && echo "" || echo "$2")"
+		shift
+		Menu_Startup "$@"
+		exit 0
+	;;
+	reset_interfaces)
+		shift
+		_Reset_Interface_States_ "$@"
+		Clear_Lock
 		exit 0
 	;;
 	generate)
@@ -5884,12 +5912,16 @@ case "$1" in
 			Clear_Lock
 		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlistmanual"
 		then
+			Check_Lock webui
 			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlistmanual_//" | cut -f1 -d'_' | tr "a-z" "A-Z")";
 			GenerateServerList_WebUI "$spdifacename" "spdmerlin_manual_serverlist"
+			Clear_Lock
 		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlist"
 		then
+			Check_Lock webui
 			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlist_//" | cut -f1 -d'_' | tr "a-z" "A-Z")";
 			GenerateServerList_WebUI "$spdifacename" "spdmerlin_serverlist_$spdifacename"
+			Clear_Lock
 		elif [ "$2" = "start" ] && [ "$3" = "${SCRIPT_NAME_LOWER}config" ]
 		then
 			Interfaces_FromSettings
