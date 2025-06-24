@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-21
+# Last Modified: 2025-Jun-23
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,8 +38,8 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.12"
-readonly SCRIPT_VERSTAG="25062121"
+readonly SCRIPT_VERSION="v4.4.13"
+readonly SCRIPT_VERSTAG="25062322"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -603,11 +603,30 @@ _Check_WG_ClientInterfaceUP_()
 	return 1
 }
 
-##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
-##----------------------------------------##
-Create_Symlinks()
+##---------------------------------=---##
+## Added by Martinski W. [2025-Jun-23] ##
+##-------------------------------------##
+_Set_All_Interface_States_()
 {
+	local interfaceCount  COUNTER
+
+	interfaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
+	COUNTER=1
+	until [ "$COUNTER" -gt "$interfaceCount" ]
+	do
+		Set_Interface_State "$COUNTER"
+		COUNTER="$((COUNTER + 1))"
+	done
+}
+
+##---------------------------------=---##
+## Added by Martinski W. [2025-Jun-23] ##
+##-------------------------------------##
+_Check_All_Interface_States_()
+{
+	[ -f "$SCRIPT_INTERFACES" ] && \
+	cp -a "$SCRIPT_INTERFACES" "${SCRIPT_INTERFACES}.bak"
+
 	printf "WAN\n" > "$SCRIPT_INTERFACES"
 
     local ifaceTagStr
@@ -618,7 +637,7 @@ Create_Symlinks()
         ifaceTagStr="$excludedNotUPstr"
 		if _CheckNetClientInterfaceUP_ "$index"
 		then
-			ifaceTagStr=""  #Interface is included#
+			ifaceTagStr=""  #Assumes interface is included#
 		fi
 		printf "VPNC%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 	done
@@ -628,18 +647,18 @@ Create_Symlinks()
 		ifaceTagStr="$excludedNotUPstr"
 		if _Check_WG_ClientInterfaceUP_ "$index"
 		then
-			ifaceTagStr=""  #Interface is included#
+			ifaceTagStr=""  #Assumes interface is included#
 		fi
 		printf "WGVPN%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 	done
+}
 
-	if [ $# -gt 0 ] && [ "$1" = "force" ]; then
-		rm -f "$SCRIPT_INTERFACES_USER"
-	fi
-
-	if [ ! -f "$SCRIPT_INTERFACES_USER" ]; then
-		touch "$SCRIPT_INTERFACES_USER"
-	fi
+##---------------------------------=---##
+## Added by Martinski W. [2025-Jun-23] ##
+##-------------------------------------##
+_Startup_All_Interface_States_()
+{
+	_Check_All_Interface_States_
 
 	while IFS='' read -r line || [ -n "$line" ]
 	do
@@ -649,13 +668,32 @@ Create_Symlinks()
 		fi
 	done < "$SCRIPT_INTERFACES"
 
-	interfaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
-	COUNTER=1
-	until [ "$COUNTER" -gt "$interfaceCount" ]
-	do
-		Set_Interface_State "$COUNTER"
-		COUNTER="$((COUNTER + 1))"
-	done
+	_Set_All_Interface_States_
+}
+
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-23] ##
+##----------------------------------------##
+Create_Symlinks()
+{
+	if [ $# -gt 0 ] && [ "$1" = "force" ]
+	then rm -f "$SCRIPT_INTERFACES_USER"
+	fi
+
+	if [ ! -f "$SCRIPT_INTERFACES_USER" ]
+	then touch "$SCRIPT_INTERFACES_USER"
+	fi
+
+	if [ $# -gt 1 ] && [ "$1" = "startup" ] && [ "$2" != "force" ]
+	then
+		Print_Output true "Waiting for interfaces to be initialized for ${SCRIPT_NAME}..." "$PASS"
+		{
+		    sleep 90 ; _Startup_All_Interface_States_
+		    Print_Output true "Interfaces have been set for ${SCRIPT_NAME}." "$PASS"
+		} &
+	else
+		_Startup_All_Interface_States_
+	fi
 
 	rm -rf "${SCRIPT_WEB_DIR:?}/"* 2>/dev/null
 
@@ -758,7 +796,7 @@ Conf_FromSettings()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
+## Modified by Martinski W. [2025-Jun-23] ##
 ##----------------------------------------##
 Interfaces_FromSettings()
 {
@@ -772,6 +810,7 @@ Interfaces_FromSettings()
 		if grep -q "spdmerlin_ifaces_enabled" "$SETTINGSFILE"
 		then
 			Print_Output true "Updated interfaces from WebUI found, merging into $SCRIPT_INTERFACES_USER" "$PASS"
+			cp -a "$SCRIPT_INTERFACES" "${SCRIPT_INTERFACES}.bak"
 			cp -a "$SCRIPT_INTERFACES_USER" "${SCRIPT_INTERFACES_USER}.bak"
 			SETTINGVALUE="$(grep "spdmerlin_ifaces_enabled" "$SETTINGSFILE" | cut -f2 -d' ')"
 			sed -i "\\~spdmerlin_ifaces_enabled~d" "$SETTINGSFILE"
@@ -799,7 +838,6 @@ Interfaces_FromSettings()
 			done
 
 			echo "" > "$SCRIPT_INTERFACES_USER"
-
 			while IFS='' read -r line || [ -n "$line" ]
 			do
 				if [ "$(grep -c "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')" "$SCRIPT_INTERFACES_USER")" -eq 0 ]
@@ -808,13 +846,7 @@ Interfaces_FromSettings()
 				fi
 			done < "$SCRIPT_INTERFACES"
 
-			interfaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
-			COUNTER=1
-			until [ "$COUNTER" -gt "$interfaceCount" ]
-			do
-				Set_Interface_State "$COUNTER"
-				COUNTER="$((COUNTER + 1))"
-			done
+			_Set_All_Interface_States_
 
 			for IFACEname in $(echo "$SETTINGVALUE" | sed "s/,/ /g")
 			do
@@ -4283,7 +4315,7 @@ Menu_Install()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-19] ##
+## Modified by Martinski W. [2025-Jun-23] ##
 ##----------------------------------------##
 Menu_Startup()
 {
@@ -4319,7 +4351,7 @@ Menu_Startup()
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load true
-	Create_Symlinks
+	Create_Symlinks startup "$1"
 	Auto_Startup create 2>/dev/null
 	if AutomaticMode check
 	then Auto_Cron create 2>/dev/null
@@ -5808,7 +5840,7 @@ then
 fi
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-19] ##
+## Modified by Martinski W. [2025-Jun-23] ##
 ##----------------------------------------##
 case "$1" in
 	install)
@@ -5817,7 +5849,7 @@ case "$1" in
 		exit 0
 	;;
 	startup)
-		Menu_Startup "$2"
+		Menu_Startup "$([ $# -lt 2 ] && echo "" || echo "$2")"
 		exit 0
 	;;
 	generate)
