@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-24
+# Last Modified: 2025-Jun-25
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.13"
-readonly SCRIPT_VERSTAG="25062412"
+readonly SCRIPT_VERSTAG="25062520"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -673,10 +673,12 @@ _Startup_All_Interface_States_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-23] ##
+## Modified by Martinski W. [2025-Jun-25] ##
 ##----------------------------------------##
 Create_Symlinks()
 {
+	local sleepDelaySecs
+
 	if [ $# -gt 0 ] && [ "$1" = "force" ]
 	then rm -f "$SCRIPT_INTERFACES_USER"
 	fi
@@ -687,9 +689,13 @@ Create_Symlinks()
 
 	if [ $# -gt 1 ] && [ "$1" = "startup" ] && [ "$2" != "force" ]
 	then
+		if grep -q '/jffs/scripts/vpnmon-r3.sh' /jffs/scripts/post-mount
+		then sleepDelaySecs=90  ##Extra delay for VPNMON##
+		else sleepDelaySecs=60
+		fi
 		Print_Output true "Waiting for interfaces to be initialized for ${SCRIPT_NAME}..." "$PASS"
 		{
-		    sleep 90 ; _Startup_All_Interface_States_
+		    sleep "$sleepDelaySecs" ; _Startup_All_Interface_States_
 		    Print_Output true "Interfaces have been set for ${SCRIPT_NAME}." "$PASS"
 		} &
 	else
@@ -4352,8 +4358,8 @@ Menu_Startup()
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load true
-	Create_Symlinks startup "$1"
 	Auto_Startup create 2>/dev/null
+	Create_Symlinks startup "$1"
 	if AutomaticMode check
 	then Auto_Cron create 2>/dev/null
 	else Auto_Cron delete 2>/dev/null
