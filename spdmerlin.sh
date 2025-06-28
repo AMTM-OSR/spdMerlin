@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-25
+# Last Modified: 2025-Jun-27
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.13"
-readonly SCRIPT_VERSTAG="25062520"
+readonly SCRIPT_VERSTAG="25062721"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -787,7 +787,7 @@ Conf_FromSettings()
 			then
 				if [ "$(ExcludeFromQoS check)" = "false" ]
 				then
-					Print_Output true "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
+					Print_Output true "Enabling \"Exclude from QoS\" since it's required to enable AutoBW." "$WARN"
 					ExcludeFromQoS enable
 				fi
 			fi
@@ -1212,23 +1212,25 @@ Auto_Cron()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
+## Modified by Martinski W. [2025-Jun-27] ##
 ##----------------------------------------##
 Get_Interface_From_Name()
 {
-	local IFACEname=""
+	local wanPrefix="wan0"  wanProto  IFACEname=""
+	wanProto="$(nvram get "${wanPrefix}_proto")"
+
 	case "$1" in
 		WAN)
 			if [ "$(nvram get sw_mode)" -ne 1 ]
 			then
 				IFACEname="br0"
-			elif [ "$(nvram get wan0_proto)" = "pppoe" ] || \
-			     [ "$(nvram get wan0_proto)" = "pptp" ] || \
-			     [ "$(nvram get wan0_proto)" = "l2tp" ]
+			elif [ "$wanProto" = "l2tp" ] || \
+			     [ "$wanProto" = "pptp" ] || \
+			     [ "$wanProto" = "pppoe" ]
 			then
-				IFACEname="ppp0"
+				IFACEname="$(nvram get "${wanPrefix}_pppoe_ifname")"
 			else
-				IFACEname="$(nvram get wan0_ifname)"
+				IFACEname="$(nvram get "${wanPrefix}_ifname")"
 			fi
 		;;
 		VPNC1) IFACEname="tun11" ;;
@@ -2776,7 +2778,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-11] ##
+## Modified by Martinski W. [2025-Jun-27] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2818,6 +2820,8 @@ Run_Speedtest()
 	speedtestServerIDx=""
 	speedtestServerName=""
 	MAXwaitTestSecs=120  #2 minutes#
+
+	local stoppedQoS  nvramQoSenable  nvramQoStype
 	local spdIndx  spdTestOK  verboseNUM  verboseARG
 	verboseNUM="$(_GetConfigParam_ VERBOSE_TEST 0)"
 	if ! echo "$verboseNUM" | grep -qE "^[0-3]$"
@@ -2881,11 +2885,14 @@ Run_Speedtest()
 
 		if [ "$IFACELIST" != "" ]
 		then
-			stoppedqos="false"
+			stoppedQoS=false
 			if [ "$(ExcludeFromQoS check)" = "true" ]
 			then
-				if [ "$(nvram get qos_enable)" -eq 1 ] && [ "$(nvram get qos_type)" -eq 1 ]
+				nvramQoStype="$(nvram get qos_type)"
+				nvramQoSenable="$(nvram get qos_enable)"
+				if [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -eq 1 ]
 				then
+					Print_Output true "Stopping QoS [Type: $nvramQoStype] for Speedtests..." "$WARN"
 					for ACTION in -D -A
 					do
 						for proto in tcp udp
@@ -2895,22 +2902,29 @@ Run_Speedtest()
 							iptables -t mangle "$ACTION" OUTPUT -p "$proto" -o "$(Get_Interface_From_Name WAN)" -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 							iptables -t mangle "$ACTION" OUTPUT -p "$proto" -o tun1+ -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 						done
-						stoppedqos="true"
 					done
-				elif [ "$(nvram get qos_enable)" -eq 1 ] && [ "$(nvram get qos_type)" -ne 1 ] && [ -f /tmp/qos ]
+					sleep 2 ; stoppedQoS=true
+					Print_Output true "QoS [Type: $nvramQoStype] was stopped." "$WARN"
+				##
+				elif [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -ne 1 ] && [ -f /tmp/qos ]
 				then
+					Print_Output true "Stopping QoS [Type: $nvramQoStype] for Speedtests..." "$WARN"
 					/tmp/qos stop >/dev/null 2>&1
-					stoppedqos="true"
-				elif [ "$(nvram get qos_enable)" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
+					sleep 3 ; stoppedQoS=true
+					Print_Output true "QoS [Type: $nvramQoStype] was stopped." "$WARN"
+				##
+				elif [ "$nvramQoSenable" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
 				then
+					Print_Output true "Stopping CAKE QoS for Speedtests..." "$WARN"
 					/jffs/addons/cake-qos/cake-qos stop >/dev/null 2>&1
-					stoppedqos="true"
+					sleep 3 ; stoppedQoS=true
+					Print_Output true "CAKE QoS was stopped." "$WARN"
 				fi
 			fi
 
-			applyautobw="false"
+			applyAutoBW=false
 			if [ "$mode" = "schedule" ] && [ "$(AutoBWEnable check)" = "true" ]; then
-				applyautobw="true"
+				applyAutoBW=true
 			fi
 
 			if [ "$verboseNUM" -eq 0 ]
@@ -3190,10 +3204,13 @@ Run_Speedtest()
 				fi
 			done
 
-			if [ "$stoppedqos" = "true" ]
+			if [ "$stoppedQoS" = "true" ]
 			then
-				if [ "$(nvram get qos_enable)" -eq 1 ] && [ "$(nvram get qos_type)" -eq 1 ]
+				nvramQoStype="$(nvram get qos_type)"
+				nvramQoSenable="$(nvram get qos_enable)"
+				if [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -eq 1 ]
 				then
+					Print_Output true "Restarting QoS [Type: $nvramQoStype]..." "$WARN"
 					for proto in tcp udp
 					do
 						iptables -D OUTPUT -p "$proto" -o "$(Get_Interface_From_Name WAN)" -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
@@ -3201,12 +3218,22 @@ Run_Speedtest()
 						iptables -t mangle -D OUTPUT -p "$proto" -o "$(Get_Interface_From_Name WAN)" -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 						iptables -t mangle -D OUTPUT -p "$proto" -o tun1+ -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 					done
-				elif [ "$(nvram get qos_enable)" -eq 1 ] && [ "$(nvram get qos_type)" -ne 1 ] && [ -f /tmp/qos ]
+					sleep 2 ; stoppedQoS=false
+					Print_Output true "QoS [Type: $nvramQoStype] was restarted." "$WARN"
+				##
+				elif [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -ne 1 ] && [ -f /tmp/qos ]
 				then
+					Print_Output true "Restarting QoS [Type: $nvramQoStype]..." "$WARN"
 					/tmp/qos start >/dev/null 2>&1
-				elif [ "$(nvram get qos_enable)" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
+					sleep 3 ; stoppedQoS=false
+					Print_Output true "QoS [Type: $nvramQoStype] was restarted." "$WARN"
+				##
+				elif [ "$nvramQoSenable" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
 				then
+					Print_Output true "Restarting CAKE QoS..." "$WARN"
 					/jffs/addons/cake-qos/cake-qos start >/dev/null 2>&1
+					sleep 3 ; stoppedQoS=false
+					Print_Output true "CAKE QoS was restarted." "$WARN"
 				fi
 			fi
 
@@ -3221,7 +3248,7 @@ Run_Speedtest()
 			fi
 			_UpdateDatabaseFileSizeInfo_
 
-			if [ "$applyautobw" = "true" ]; then
+			if [ "$applyAutoBW" = "true" ]; then
 				Menu_AutoBW_Update
 			fi
 
@@ -3358,7 +3385,7 @@ Process_Upgrade()
 	then
 		if [ "$(ExcludeFromQoS check)" = "false" ]
 		then
-			Print_Output false "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
+			Print_Output false "Enabling \"Exclude from QoS\" since it's required to enable AutoBW." "$WARN"
 			ExcludeFromQoS enable
 		fi
 	fi
@@ -4117,7 +4144,7 @@ MainMenu()
 				then
 					if [ "$(AutoBWEnable check)" = "true" ]
 					then
-						Print_Output false "Cannot disable Exclude from QoS when AutoBW is enabled" "$WARN"
+						Print_Output false "Cannot disable \"Exclude from QoS\" when AutoBW is enabled." "$WARN"
 						PressEnter
 					elif [ "$(AutoBWEnable check)" = "false" ]
 					then
@@ -5405,7 +5432,7 @@ Menu_AutoBW()
 					AutoBWEnable enable
 					if [ "$(ExcludeFromQoS check)" = "false" ]
 					then
-						Print_Output false "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
+						Print_Output false "Enabling \"Exclude from QoS\" since it's required to enable AutoBW." "$WARN"
 						ExcludeFromQoS enable
 						PressEnter
 					fi
