@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-27
+# Last Modified: 2025-Jun-30
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.13"
-readonly SCRIPT_VERSTAG="25062721"
+readonly SCRIPT_VERSTAG="25063023"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -673,7 +673,7 @@ _Startup_All_Interface_States_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-25] ##
+## Modified by Martinski W. [2025-Jun-30] ##
 ##----------------------------------------##
 Create_Symlinks()
 {
@@ -690,7 +690,7 @@ Create_Symlinks()
 	if [ $# -gt 1 ] && [ "$1" = "startup" ] && [ "$2" != "force" ]
 	then
 		if grep -q '/jffs/scripts/vpnmon-r3.sh' /jffs/scripts/post-mount
-		then sleepDelaySecs=90  ##Extra delay for VPNMON##
+		then sleepDelaySecs=150  ##Extra delay for VPNMON##
 		else sleepDelaySecs=60
 		fi
 		Print_Output true "Waiting for interfaces to be initialized for ${SCRIPT_NAME}..." "$PASS"
@@ -2778,7 +2778,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-27] ##
+## Modified by Martinski W. [2025-Jun-30] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2903,21 +2903,21 @@ Run_Speedtest()
 							iptables -t mangle "$ACTION" OUTPUT -p "$proto" -o tun1+ -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 						done
 					done
-					sleep 2 ; stoppedQoS=true
+					sleep 3 ; stoppedQoS=true
 					Print_Output true "QoS [Type: $nvramQoStype] was stopped." "$WARN"
 				##
 				elif [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -ne 1 ] && [ -f /tmp/qos ]
 				then
 					Print_Output true "Stopping QoS [Type: $nvramQoStype] for Speedtests..." "$WARN"
 					/tmp/qos stop >/dev/null 2>&1
-					sleep 3 ; stoppedQoS=true
+					sleep 4 ; stoppedQoS=true
 					Print_Output true "QoS [Type: $nvramQoStype] was stopped." "$WARN"
 				##
 				elif [ "$nvramQoSenable" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
 				then
 					Print_Output true "Stopping CAKE QoS for Speedtests..." "$WARN"
 					/jffs/addons/cake-qos/cake-qos stop >/dev/null 2>&1
-					sleep 3 ; stoppedQoS=true
+					sleep 4 ; stoppedQoS=true
 					Print_Output true "CAKE QoS was stopped." "$WARN"
 				fi
 			fi
