@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-21
+# Last Modified: 2025-Jun-30
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,8 +38,8 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.12"
-readonly SCRIPT_VERSTAG="25062121"
+readonly SCRIPT_VERSION="v4.4.13"
+readonly SCRIPT_VERSTAG="25063023"
 SCRIPT_BRANCH="master"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -188,7 +188,8 @@ Check_Lock()
 			then
 				exit 1
 			else
-				if [ "$1" = "webui" ]; then
+				if [ "$1" = "webui" ]
+				then
 					echo 'var spdteststatus = "LOCKED";' > /tmp/detect_spdtest.js
 					exit 1
 				fi
@@ -263,7 +264,7 @@ Update_Check()
 	localver="$(grep "SCRIPT_VERSION=" "/jffs/scripts/$SCRIPT_NAME_LOWER" | grep -m1 -oE "$scriptVersRegExp")"
 	[ -n "$localver" ] && Set_Version_Custom_Settings local "$localver"
 	curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" | grep -qF "jackyaz" || \
-    { Print_Output true "404 error detected - stopping update" "$ERR"; return 1; }
+	{ Print_Output true "404 error detected - stopping update" "$ERR"; return 1; }
 	serverver="$(curl -fsL --retry 4 --retry-delay 5 "$SCRIPT_REPO/$SCRIPT_NAME_LOWER.sh" | grep "SCRIPT_VERSION=" | grep -m1 -oE "$scriptVersRegExp")"
 	if [ "$localver" != "$serverver" ]
 	then
@@ -559,13 +560,13 @@ _CheckNetClientInterfaceUP_()
 ##############################################################
 _Check_WG_ClientInterfaceUP_()
 {
-    if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
-    local IFACE_NAME  threshold  handshakeLine
+	if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
+	local IFACE_NAME  threshold  handshakeLine
 
-    if echo "$1" | grep -qE "^wgc[1-5]$"
-    then IFACE_NAME="$1"
-    else IFACE_NAME="wgc$1"
-    fi
+	if echo "$1" | grep -qE "^wgc[1-5]$"
+	then IFACE_NAME="$1"
+	else IFACE_NAME="wgc$1"
+	fi
 
 	threshold=180  # 180-second cutoff for "connected" #
 
@@ -603,22 +604,41 @@ _Check_WG_ClientInterfaceUP_()
 	return 1
 }
 
-##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
-##----------------------------------------##
-Create_Symlinks()
+##---------------------------------=---##
+## Added by Martinski W. [2025-Jun-23] ##
+##-------------------------------------##
+_Set_All_Interface_States_()
 {
+	local interfaceCount  COUNTER
+
+	interfaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
+	COUNTER=1
+	until [ "$COUNTER" -gt "$interfaceCount" ]
+	do
+		Set_Interface_State "$COUNTER"
+		COUNTER="$((COUNTER + 1))"
+	done
+}
+
+##---------------------------------=---##
+## Added by Martinski W. [2025-Jun-23] ##
+##-------------------------------------##
+_Check_All_Interface_States_()
+{
+	[ -f "$SCRIPT_INTERFACES" ] && \
+	cp -a "$SCRIPT_INTERFACES" "${SCRIPT_INTERFACES}.bak"
+
 	printf "WAN\n" > "$SCRIPT_INTERFACES"
 
-    local ifaceTagStr
-    local excludedNotUPstr=" #excluded - interface not up#"
+	local ifaceTagStr
+	local excludedNotUPstr=" #excluded - interface not up#"
 
 	for index in 1 2 3 4 5
 	do
         ifaceTagStr="$excludedNotUPstr"
 		if _CheckNetClientInterfaceUP_ "$index"
 		then
-			ifaceTagStr=""  #Interface is included#
+			ifaceTagStr=""  #Assumes interface is included#
 		fi
 		printf "VPNC%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 	done
@@ -628,18 +648,18 @@ Create_Symlinks()
 		ifaceTagStr="$excludedNotUPstr"
 		if _Check_WG_ClientInterfaceUP_ "$index"
 		then
-			ifaceTagStr=""  #Interface is included#
+			ifaceTagStr=""  #Assumes interface is included#
 		fi
 		printf "WGVPN%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 	done
+}
 
-	if [ $# -gt 0 ] && [ "$1" = "force" ]; then
-		rm -f "$SCRIPT_INTERFACES_USER"
-	fi
-
-	if [ ! -f "$SCRIPT_INTERFACES_USER" ]; then
-		touch "$SCRIPT_INTERFACES_USER"
-	fi
+##---------------------------------=---##
+## Added by Martinski W. [2025-Jun-23] ##
+##-------------------------------------##
+_Startup_All_Interface_States_()
+{
+	_Check_All_Interface_States_
 
 	while IFS='' read -r line || [ -n "$line" ]
 	do
@@ -649,13 +669,38 @@ Create_Symlinks()
 		fi
 	done < "$SCRIPT_INTERFACES"
 
-	interfaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
-	COUNTER=1
-	until [ "$COUNTER" -gt "$interfaceCount" ]
-	do
-		Set_Interface_State "$COUNTER"
-		COUNTER="$((COUNTER + 1))"
-	done
+	_Set_All_Interface_States_
+}
+
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jun-30] ##
+##----------------------------------------##
+Create_Symlinks()
+{
+	local sleepDelaySecs
+
+	if [ $# -gt 0 ] && [ "$1" = "force" ]
+	then rm -f "$SCRIPT_INTERFACES_USER"
+	fi
+
+	if [ ! -f "$SCRIPT_INTERFACES_USER" ]
+	then touch "$SCRIPT_INTERFACES_USER"
+	fi
+
+	if [ $# -gt 1 ] && [ "$1" = "startup" ] && [ "$2" != "force" ]
+	then
+		if grep -q '/jffs/scripts/vpnmon-r3.sh' /jffs/scripts/post-mount
+		then sleepDelaySecs=150  ##Extra delay for VPNMON##
+		else sleepDelaySecs=60
+		fi
+		Print_Output true "Waiting for interfaces to be initialized for ${SCRIPT_NAME}..." "$PASS"
+		{
+		    sleep "$sleepDelaySecs" ; _Startup_All_Interface_States_
+		    Print_Output true "Interfaces have been set for ${SCRIPT_NAME}." "$PASS"
+		} &
+	else
+		_Startup_All_Interface_States_
+	fi
 
 	rm -rf "${SCRIPT_WEB_DIR:?}/"* 2>/dev/null
 
@@ -742,7 +787,7 @@ Conf_FromSettings()
 			then
 				if [ "$(ExcludeFromQoS check)" = "false" ]
 				then
-					Print_Output true "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
+					Print_Output true "Enabling \"Exclude from QoS\" since it's required to enable AutoBW." "$WARN"
 					ExcludeFromQoS enable
 				fi
 			fi
@@ -758,7 +803,7 @@ Conf_FromSettings()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
+## Modified by Martinski W. [2025-Jun-23] ##
 ##----------------------------------------##
 Interfaces_FromSettings()
 {
@@ -772,6 +817,7 @@ Interfaces_FromSettings()
 		if grep -q "spdmerlin_ifaces_enabled" "$SETTINGSFILE"
 		then
 			Print_Output true "Updated interfaces from WebUI found, merging into $SCRIPT_INTERFACES_USER" "$PASS"
+			cp -a "$SCRIPT_INTERFACES" "${SCRIPT_INTERFACES}.bak"
 			cp -a "$SCRIPT_INTERFACES_USER" "${SCRIPT_INTERFACES_USER}.bak"
 			SETTINGVALUE="$(grep "spdmerlin_ifaces_enabled" "$SETTINGSFILE" | cut -f2 -d' ')"
 			sed -i "\\~spdmerlin_ifaces_enabled~d" "$SETTINGSFILE"
@@ -799,7 +845,6 @@ Interfaces_FromSettings()
 			done
 
 			echo "" > "$SCRIPT_INTERFACES_USER"
-
 			while IFS='' read -r line || [ -n "$line" ]
 			do
 				if [ "$(grep -c "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')" "$SCRIPT_INTERFACES_USER")" -eq 0 ]
@@ -808,13 +853,7 @@ Interfaces_FromSettings()
 				fi
 			done < "$SCRIPT_INTERFACES"
 
-			interfaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
-			COUNTER=1
-			until [ "$COUNTER" -gt "$interfaceCount" ]
-			do
-				Set_Interface_State "$COUNTER"
-				COUNTER="$((COUNTER + 1))"
-			done
+			_Set_All_Interface_States_
 
 			for IFACEname in $(echo "$SETTINGVALUE" | sed "s/,/ /g")
 			do
@@ -1173,23 +1212,25 @@ Auto_Cron()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
+## Modified by Martinski W. [2025-Jun-27] ##
 ##----------------------------------------##
 Get_Interface_From_Name()
 {
-	local IFACEname=""
+	local wanPrefix="wan0"  wanProto  IFACEname=""
+	wanProto="$(nvram get "${wanPrefix}_proto")"
+
 	case "$1" in
 		WAN)
 			if [ "$(nvram get sw_mode)" -ne 1 ]
 			then
 				IFACEname="br0"
-			elif [ "$(nvram get wan0_proto)" = "pppoe" ] || \
-			     [ "$(nvram get wan0_proto)" = "pptp" ] || \
-			     [ "$(nvram get wan0_proto)" = "l2tp" ]
+			elif [ "$wanProto" = "l2tp" ] || \
+			     [ "$wanProto" = "pptp" ] || \
+			     [ "$wanProto" = "pppoe" ]
 			then
-				IFACEname="ppp0"
+				IFACEname="$(nvram get "${wanPrefix}_pppoe_ifname")"
 			else
-				IFACEname="$(nvram get wan0_ifname)"
+				IFACEname="$(nvram get "${wanPrefix}_ifname")"
 			fi
 		;;
 		VPNC1) IFACEname="tun11" ;;
@@ -2737,7 +2778,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-11] ##
+## Modified by Martinski W. [2025-Jun-30] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -2779,6 +2820,8 @@ Run_Speedtest()
 	speedtestServerIDx=""
 	speedtestServerName=""
 	MAXwaitTestSecs=120  #2 minutes#
+
+	local stoppedQoS  nvramQoSenable  nvramQoStype
 	local spdIndx  spdTestOK  verboseNUM  verboseARG
 	verboseNUM="$(_GetConfigParam_ VERBOSE_TEST 0)"
 	if ! echo "$verboseNUM" | grep -qE "^[0-3]$"
@@ -2842,11 +2885,14 @@ Run_Speedtest()
 
 		if [ "$IFACELIST" != "" ]
 		then
-			stoppedqos="false"
+			stoppedQoS=false
 			if [ "$(ExcludeFromQoS check)" = "true" ]
 			then
-				if [ "$(nvram get qos_enable)" -eq 1 ] && [ "$(nvram get qos_type)" -eq 1 ]
+				nvramQoStype="$(nvram get qos_type)"
+				nvramQoSenable="$(nvram get qos_enable)"
+				if [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -eq 1 ]
 				then
+					Print_Output true "Stopping QoS [Type: $nvramQoStype] for Speedtests..." "$WARN"
 					for ACTION in -D -A
 					do
 						for proto in tcp udp
@@ -2856,22 +2902,29 @@ Run_Speedtest()
 							iptables -t mangle "$ACTION" OUTPUT -p "$proto" -o "$(Get_Interface_From_Name WAN)" -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 							iptables -t mangle "$ACTION" OUTPUT -p "$proto" -o tun1+ -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 						done
-						stoppedqos="true"
 					done
-				elif [ "$(nvram get qos_enable)" -eq 1 ] && [ "$(nvram get qos_type)" -ne 1 ] && [ -f /tmp/qos ]
+					sleep 3 ; stoppedQoS=true
+					Print_Output true "QoS [Type: $nvramQoStype] was stopped." "$WARN"
+				##
+				elif [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -ne 1 ] && [ -f /tmp/qos ]
 				then
+					Print_Output true "Stopping QoS [Type: $nvramQoStype] for Speedtests..." "$WARN"
 					/tmp/qos stop >/dev/null 2>&1
-					stoppedqos="true"
-				elif [ "$(nvram get qos_enable)" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
+					sleep 4 ; stoppedQoS=true
+					Print_Output true "QoS [Type: $nvramQoStype] was stopped." "$WARN"
+				##
+				elif [ "$nvramQoSenable" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
 				then
+					Print_Output true "Stopping CAKE QoS for Speedtests..." "$WARN"
 					/jffs/addons/cake-qos/cake-qos stop >/dev/null 2>&1
-					stoppedqos="true"
+					sleep 4 ; stoppedQoS=true
+					Print_Output true "CAKE QoS was stopped." "$WARN"
 				fi
 			fi
 
-			applyautobw="false"
+			applyAutoBW=false
 			if [ "$mode" = "schedule" ] && [ "$(AutoBWEnable check)" = "true" ]; then
-				applyautobw="true"
+				applyAutoBW=true
 			fi
 
 			if [ "$verboseNUM" -eq 0 ]
@@ -3151,10 +3204,13 @@ Run_Speedtest()
 				fi
 			done
 
-			if [ "$stoppedqos" = "true" ]
+			if [ "$stoppedQoS" = "true" ]
 			then
-				if [ "$(nvram get qos_enable)" -eq 1 ] && [ "$(nvram get qos_type)" -eq 1 ]
+				nvramQoStype="$(nvram get qos_type)"
+				nvramQoSenable="$(nvram get qos_enable)"
+				if [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -eq 1 ]
 				then
+					Print_Output true "Restarting QoS [Type: $nvramQoStype]..." "$WARN"
 					for proto in tcp udp
 					do
 						iptables -D OUTPUT -p "$proto" -o "$(Get_Interface_From_Name WAN)" -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
@@ -3162,12 +3218,22 @@ Run_Speedtest()
 						iptables -t mangle -D OUTPUT -p "$proto" -o "$(Get_Interface_From_Name WAN)" -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 						iptables -t mangle -D OUTPUT -p "$proto" -o tun1+ -j MARK --set-xmark 0x80000000/0xC0000000 2>/dev/null
 					done
-				elif [ "$(nvram get qos_enable)" -eq 1 ] && [ "$(nvram get qos_type)" -ne 1 ] && [ -f /tmp/qos ]
+					sleep 2 ; stoppedQoS=false
+					Print_Output true "QoS [Type: $nvramQoStype] was restarted." "$WARN"
+				##
+				elif [ "$nvramQoSenable" -eq 1 ] && [ "$nvramQoStype" -ne 1 ] && [ -f /tmp/qos ]
 				then
+					Print_Output true "Restarting QoS [Type: $nvramQoStype]..." "$WARN"
 					/tmp/qos start >/dev/null 2>&1
-				elif [ "$(nvram get qos_enable)" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
+					sleep 3 ; stoppedQoS=false
+					Print_Output true "QoS [Type: $nvramQoStype] was restarted." "$WARN"
+				##
+				elif [ "$nvramQoSenable" -eq 0 ] && [ -f /jffs/addons/cake-qos/cake-qos ]
 				then
+					Print_Output true "Restarting CAKE QoS..." "$WARN"
 					/jffs/addons/cake-qos/cake-qos start >/dev/null 2>&1
+					sleep 3 ; stoppedQoS=false
+					Print_Output true "CAKE QoS was restarted." "$WARN"
 				fi
 			fi
 
@@ -3182,7 +3248,7 @@ Run_Speedtest()
 			fi
 			_UpdateDatabaseFileSizeInfo_
 
-			if [ "$applyautobw" = "true" ]; then
+			if [ "$applyAutoBW" = "true" ]; then
 				Menu_AutoBW_Update
 			fi
 
@@ -3319,7 +3385,7 @@ Process_Upgrade()
 	then
 		if [ "$(ExcludeFromQoS check)" = "false" ]
 		then
-			Print_Output false "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
+			Print_Output false "Enabling \"Exclude from QoS\" since it's required to enable AutoBW." "$WARN"
 			ExcludeFromQoS enable
 		fi
 	fi
@@ -4078,7 +4144,7 @@ MainMenu()
 				then
 					if [ "$(AutoBWEnable check)" = "true" ]
 					then
-						Print_Output false "Cannot disable Exclude from QoS when AutoBW is enabled" "$WARN"
+						Print_Output false "Cannot disable \"Exclude from QoS\" when AutoBW is enabled." "$WARN"
 						PressEnter
 					elif [ "$(AutoBWEnable check)" = "false" ]
 					then
@@ -4283,7 +4349,7 @@ Menu_Install()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-19] ##
+## Modified by Martinski W. [2025-Jun-23] ##
 ##----------------------------------------##
 Menu_Startup()
 {
@@ -4319,8 +4385,8 @@ Menu_Startup()
 		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load true
-	Create_Symlinks
 	Auto_Startup create 2>/dev/null
+	Create_Symlinks startup "$1"
 	if AutomaticMode check
 	then Auto_Cron create 2>/dev/null
 	else Auto_Cron delete 2>/dev/null
@@ -4329,6 +4395,26 @@ Menu_Startup()
 	Shortcut_Script create
 	Mount_WebUI
 	Clear_Lock
+}
+
+##---------------------------------=---##
+## Added by Martinski W. [2025-Jun-24] ##
+##-------------------------------------##
+_Reset_Interface_States_()
+{
+    if [ $# -gt 0 ] && [ "$1" != "force" ]
+    then
+        Print_Output false "UNKNOWN argument for resetting interfaces. Exiting" "$CRIT"
+        return 1
+    fi
+    Print_Output true "Resetting interfaces for ${SCRIPT_NAME}..." "$PASS"
+    NTP_Ready
+    Check_Lock
+    Create_Dirs
+    Conf_Exists
+    ScriptStorageLocation load true
+    Create_Symlinks "$@"
+    Print_Output true "Interfaces have been reset for ${SCRIPT_NAME}." "$PASS"
 }
 
 ##----------------------------------------##
@@ -5346,7 +5432,7 @@ Menu_AutoBW()
 					AutoBWEnable enable
 					if [ "$(ExcludeFromQoS check)" = "false" ]
 					then
-						Print_Output false "Enabling Exclude from QoS (required for AutoBW)" "$WARN"
+						Print_Output false "Enabling \"Exclude from QoS\" since it's required to enable AutoBW." "$WARN"
 						ExcludeFromQoS enable
 						PressEnter
 					fi
@@ -5808,7 +5894,7 @@ then
 fi
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-19] ##
+## Modified by Martinski W. [2025-Jun-24] ##
 ##----------------------------------------##
 case "$1" in
 	install)
@@ -5817,7 +5903,14 @@ case "$1" in
 		exit 0
 	;;
 	startup)
-		Menu_Startup "$2"
+		shift
+		Menu_Startup "$@"
+		exit 0
+	;;
+	reset_interfaces)
+		shift
+		_Reset_Interface_States_ "$@"
+		Clear_Lock
 		exit 0
 	;;
 	generate)
@@ -5852,12 +5945,16 @@ case "$1" in
 			Clear_Lock
 		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlistmanual"
 		then
+			Check_Lock webui
 			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlistmanual_//" | cut -f1 -d'_' | tr "a-z" "A-Z")";
 			GenerateServerList_WebUI "$spdifacename" "spdmerlin_manual_serverlist"
+			Clear_Lock
 		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlist"
 		then
+			Check_Lock webui
 			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlist_//" | cut -f1 -d'_' | tr "a-z" "A-Z")";
 			GenerateServerList_WebUI "$spdifacename" "spdmerlin_serverlist_$spdifacename"
+			Clear_Lock
 		elif [ "$2" = "start" ] && [ "$3" = "${SCRIPT_NAME_LOWER}config" ]
 		then
 			Interfaces_FromSettings
