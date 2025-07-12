@@ -1,5 +1,5 @@
 /**----------------------------**/
-/** Last Modified: 2025-Jun-03 **/
+/** Last Modified: 2025-Jul-10 **/
 /**----------------------------**/
 
 var daysofweek = ['Mon','Tues','Wed','Thurs','Fri','Sat','Sun'];
@@ -1320,7 +1320,7 @@ function PostSpeedTest()
 }
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Mar-02] **/
+/** Modified by Martinski W. [2025-Jul-10] **/
 /**----------------------------------------**/
 function RunSpeedtest()
 {
@@ -1334,7 +1334,7 @@ function RunSpeedtest()
 		if (document.form.spdtest_enabled.value == 'All')
 		{
 			$.each($('select[name^=spdtest_serverprefselect]'),function(){
-				spdtestservers += this.value.substring(0,this.value.indexOf('|'))+'+';
+				spdtestservers += this.value.substring(0,this.value.indexOf('|'))+'-';
 			});
 			spdtestservers = spdtestservers.slice(0,-1);
 		}
@@ -1343,7 +1343,11 @@ function RunSpeedtest()
 			spdtestservers = document.form.spdtest_serverprefselect.value.substring(0,document.form.spdtest_serverprefselect.value.indexOf('|'));
 		}
 	}
-	document.formScriptActions.action_script.value='start_spdmerlinspdtest_'+document.form.spdtest_serverpref.value+'_'+document.form.spdtest_enabled.value+'_'+spdtestservers.replace(/ /g,'%');
+
+	let actionScriptVal;
+	actionScriptVal='start_spdmerlinspdtest_'+document.form.spdtest_serverpref.value+'_'+document.form.spdtest_enabled.value+'_'+spdtestservers.replace(/ /g,'%');
+
+	document.formScriptActions.action_script.value = actionScriptVal;
 	document.formScriptActions.submit();
 	showhide('imgSpdTest',true);
 	showhide('spdtest_text',false);
@@ -2315,7 +2319,8 @@ function Toggle_SpdTestServerPref(forminput)
 	{
 		document.formScriptActions.action_script.value='start_spdmerlinserverlistmanual_'+document.form.spdtest_enabled.value;
 		document.formScriptActions.submit();
-		for(var i = 0; i < interfacescomplete.length; i++){
+		for (var i = 0; i < interfacescomplete.length; i++)
+		{
 			$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
 			$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
 		}
@@ -2326,12 +2331,14 @@ function Toggle_SpdTestServerPref(forminput)
 		showhide('rowmanualserverprefselect',true);
 		showhide('imgManualServerList',true);
 		
-		if(document.form.spdtest_enabled.value == 'All'){
+		if (document.form.spdtest_enabled.value == 'All')
+		{
 			$.each($('select[name^=spdtest_serverprefselect]'),function(){
 				$(this).empty();
 			});
 		}
-		else{
+		else
+		{
 			$('select[name=spdtest_serverprefselect]').empty();
 		}
 		setTimeout(get_manualspdtestservers_file,2000);
@@ -2339,7 +2346,8 @@ function Toggle_SpdTestServerPref(forminput)
 	else
 	{
 		showhide('rowmanualserverprefselect',false);
-		if(document.form.spdtest_enabled.value == 'All'){
+		if (document.form.spdtest_enabled.value == 'All')
+		{
 			$.each($('select[name^=spdtest_serverprefselect]'),function(){
 				showhide(this.id,false);
 			});
@@ -2347,7 +2355,8 @@ function Toggle_SpdTestServerPref(forminput)
 				showhide(this.id,false);
 			});
 		}
-		else{
+		else
+		{
 			showhide('spdtest_serverprefselect',false);
 		}
 		showhide('imgManualServerList',false);
@@ -2362,8 +2371,10 @@ function GenerateManualSpdTestServerPrefSelect()
 	
 	if (document.form.spdtest_enabled.value == 'All')
 	{
-		for(var i = 0; i < interfacescomplete.length; i++){
-			if(interfacesdisabled.includes(interfacescomplete[i]) == false){
+		for (var i = 0; i < interfacescomplete.length; i++)
+		{
+			if (interfacesdisabled.includes(interfacescomplete[i]) == false)
+			{
 				var interfacename = interfacescomplete[i].toLowerCase();
 				serverprefhtml += '<span style="width:50px;display:none;" id="spdtest_serverprefselectspan_'+interfacename+'">'+interfacescomplete[i]+':</span><select name="spdtest_serverprefselect_'+interfacename+'" id="spdtest_serverprefselect_'+interfacename+'" style="display:none;max-width:415px;"></select><br />';
 			}
