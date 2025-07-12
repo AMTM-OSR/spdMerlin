@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jun-30
+# Last Modified: 2025-Jul-11
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,9 +38,9 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.13"
-readonly SCRIPT_VERSTAG="25063023"
-SCRIPT_BRANCH="master"
+readonly SCRIPT_VERSION="v4.4.14"
+readonly SCRIPT_VERSTAG="25071123"
+SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
 readonly SCRIPT_WEBPAGE_DIR="$(readlink -f /www/user)"
@@ -74,7 +74,6 @@ readonly theUserName="$(nvram get http_username)"
 readonly defTrimDB_Hour=3
 readonly defTrimDB_Mins=5
 
-readonly oneHrSec=3600
 readonly _12Hours=43200
 readonly _24Hours=86400
 readonly _36Hours=129600
@@ -121,6 +120,7 @@ readonly CLEARFORMAT="\\e[0m"
 readonly CLRct="\e[0m"
 readonly REDct="\e[1;31m"
 readonly GRNct="\e[1;32m"
+readonly MGNTct="\e[1;35m"
 readonly CritIREDct="\e[41m"
 readonly CritBREDct="\e[30;101m"
 readonly PassBGRNct="\e[30;102m"
@@ -131,8 +131,8 @@ readonly WarnBMGNct="\e[30;105m"
 ### End of output format variables ###
 
 ### Start of Speedtest Server Variables ###
-serverno=""
-servername=""
+serverNum=""
+serverName=""
 ### End of Speedtest Server Variables ###
 
 ##----------------------------------------##
@@ -382,6 +382,12 @@ _GetSpeedtestBinaryVersion_()
    fi
    echo "$verStr"
 }
+
+##-------------------------------------##
+## Added by Martinski W. [2025-Jun-19] ##
+##-------------------------------------##
+_EscapeChars_()
+{ printf "%s" "$1" | sed 's/[][\/$.*^&-]/\\&/g' ; }
 
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Jun-11] ##
@@ -727,7 +733,7 @@ Create_Symlinks()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-11] ##
+## Modified by Martinski W. [2025-Jul-11] ##
 ##----------------------------------------##
 Conf_FromSettings()
 {
@@ -749,10 +755,15 @@ Conf_FromSettings()
 				SETTINGVALUE="$(echo "$line" | cut -f2- -d'=' | sed "s/=/ /g")"
 				if [ "$SETTINGNAME" = "SPEEDTESTBINARY" ]
 				then
-				    SpeedtestBinary "$SETTINGVALUE"
-				    continue
+					SpeedtestBinary "$SETTINGVALUE"
+					continue
 				fi
-				sed -i "s~$SETTINGNAME=.*~$SETTINGNAME=$SETTINGVALUE~" "$SCRIPT_CONF"
+				if echo "$SETTINGNAME" | grep -Eq "^PREFERREDSERVER_.+"
+				then
+					PreferredServer setserver "$SETTINGNAME" "$SETTINGVALUE"
+					continue
+				fi
+				sed -i "s~^${SETTINGNAME}=.*~${SETTINGNAME}=${SETTINGVALUE}~" "$SCRIPT_CONF"
 			done < "$TMPFILE"
 
 			grep '^spdmerlin_version' "$SETTINGSFILE" > "$TMPFILE"
@@ -1097,6 +1108,50 @@ Auto_ServiceEvent()
 	esac
 }
 
+##-------------------------------------##
+## Added by Martinski W. [2025-Jul-11] ##
+##-------------------------------------##
+Auto_OpenVpnEvent()
+{
+	local theScriptFilePath="/jffs/scripts/$SCRIPT_NAME_LOWER"
+	case $1 in
+		create)
+			if [ -f /jffs/scripts/openvpn-event ]
+			then
+				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/openvpn-event)"
+                STARTUPLINECOUNTEX="$(grep -cx '\[ -x '"$theScriptFilePath"' \] && '"$theScriptFilePath"' openvpn_event "$1" "$script_type" & # '"$SCRIPT_NAME" /jffs/scripts/openvpn-event)"
+
+				if [ "$STARTUPLINECOUNT" -gt 1 ] || { [ "$STARTUPLINECOUNTEX" -eq 0 ] && [ "$STARTUPLINECOUNT" -gt 0 ]; }
+				then
+					sed -i -e '/# '"$SCRIPT_NAME"'/d' /jffs/scripts/openvpn-event
+				fi
+				if [ "$STARTUPLINECOUNTEX" -eq 0 ]
+				then
+					{
+					  echo '[ -x '"$theScriptFilePath"' ] && '"$theScriptFilePath"' openvpn_event "$1" "$script_type" & # '"$SCRIPT_NAME"
+					} >> /jffs/scripts/openvpn-event
+				fi
+			else
+				{
+				  echo "#!/bin/sh" ; echo
+				  echo '[ -x '"$theScriptFilePath"' ] && '"$theScriptFilePath"' openvpn_event "$1" "$script_type" & # '"$SCRIPT_NAME"
+                  echo
+				} > /jffs/scripts/openvpn-event
+				chmod 0755 /jffs/scripts/openvpn-event
+			fi
+		;;
+		delete)
+			if [ -f /jffs/scripts/openvpn-event ]
+			then
+				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/openvpn-event)"
+				if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+					sed -i -e '/# '"$SCRIPT_NAME"'/d' /jffs/scripts/openvpn-event
+				fi
+			fi
+		;;
+	esac
+}
+
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Jan-19] ##
 ##----------------------------------------##
@@ -1283,7 +1338,7 @@ Set_Interface_State()
                 # The interface is 'down' so ensure we have "#excluded - interface not up#" #
                 if echo "$interfaceLine" | grep -q "#excluded#$"
                 then
-                    sed -i "$1 s/#excluded$/#excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
+                    sed -i "$1 s/#excluded#/#excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
                 fi
             fi
         else
@@ -2008,10 +2063,12 @@ WriteStats_ToJS()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-03] ##
+## Modified by Martinski W. [2025-Jul-11] ##
 ##----------------------------------------##
 GenerateServerList()
 {
+	local serverMsgStr  maxServerCount  serverCount  serverIndx  COUNTER
+
 	if [ ! -f /opt/bin/jq ] && [ -x /opt/bin/opkg ]
 	then
 		opkg update
@@ -2021,7 +2078,8 @@ GenerateServerList()
 	then promptforservername=""
 	else promptforservername="$2"
 	fi
-	printf "Generating list of closest servers for %s...\n\n" "$1"
+
+	printf "Generating list of closest servers for ${GRNct}${1}${CLRct} interface. Please wait...\n\n"
 	CONFIG_STRING=""
 	LICENSE_STRING="--accept-license --accept-gdpr"
 	SPEEDTEST_BINARY=""
@@ -2040,34 +2098,44 @@ GenerateServerList()
 	serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$1")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
 	if [ -z "$serverList" ]
 	then
-		Print_Output true "Error retrieving server list for for $1" "$CRIT"
-		serverno="exit"
+		Print_Output true "Error retrieving server list for $1 interface" "$CRIT"
+		serverNum="ERROR"
 		return 1
 	fi
 	serverCount="$(echo "$serverList" | jq '.servers | length')"
 	COUNTER=1
-	until [ "$COUNTER" -gt "$serverCount" ]
+	until [ "$COUNTER" -gt "${serverCount:=0}" ]
 	do
-		serverdetails="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')|$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
+		serverIDnum="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')"
+		serverIDstr="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
 
-		printf "%2d)  %s\n" "$COUNTER" "$serverdetails"
+		printf "%2d) %6d|%s\n" "$COUNTER" "$serverIDnum" "$serverIDstr"
 		COUNTER="$((COUNTER + 1))"
 	done
 
+	if [ "$promptforservername" = "onetime" ]
+	then
+		serverMsgStr="server"
+		maxServerCount="$serverCount"
+	else
+		maxServerCount="$COUNTER"
+		serverMsgStr="preferred server"
+		printf "\n%2d)  Reset to ${GRNct}None configured${CLRct}" "$maxServerCount"
+	fi
 	printf "\n e)  Go back\n"
 
 	while true
 	do
-		printf "\n${BOLD}Please select a server from the list above [1-%s].${CLEARFORMAT}" "$serverCount"
-		printf "\n${BOLD}Or press ${GRNct}c${CLRct} to enter a known server ID.${CLEARFORMAT}"
+		printf "\n${BOLD}Please select a %s from the list above [1-%d].${CLEARFORMAT}" "$serverMsgStr" "$maxServerCount"
+		printf "\n${BOLD}Or press ${GRNct}C${CLRct} key to enter a known server ID.${CLEARFORMAT}"
 		printf "\n${BOLD}Enter answer:${CLEARFORMAT}  "
-		read -r server
+		read -r serverIndx
 
-		if [ "$server" = "e" ]
+		if [ "$serverIndx" = "e" ]
 		then
-			serverno="exit"
+			serverNum="exit"
 			break
-		elif [ "$server" = "c" ]
+		elif [ "$serverIndx" = "c" ] || [ "$serverIndx" = "C" ]
 		then
 				while true
 				do
@@ -2075,13 +2143,14 @@ GenerateServerList()
 					read -r customserver
 					if [ "$customserver" = "e" ]
 					then
+						serverNum="exit"
 						break
 					elif ! Validate_Number "$customserver"
 					then
 						printf "\n${ERR}Please enter a valid number.${CLEARFORMAT}\n"
 					else
-						serverno="$customserver"
-						if [ "$promptforservername" != "no" ]
+						serverNum="$customserver"
+						if [ "$promptforservername" != "onetime" ]
 						then
 							while true
 							do
@@ -2090,13 +2159,13 @@ GenerateServerList()
 								
 								if [ "$servername_select" = "n" ] || [ "$servername_select" = "N" ]
 								then
-									servername="Custom"
+									serverName="Custom"
 									break
 								elif [ "$servername_select" = "y" ] || [ "$servername_select" = "Y" ]
 								then
 									printf "\n${BOLD}Please enter the name for this server:${CLEARFORMAT}  "
-									read -r servername
-									printf "\n${BOLD}%s${CLEARFORMAT}\n" "$servername"
+									read -r serverName
+									printf "\n${BOLD}%s${CLEARFORMAT}\n" "$serverName"
 									printf "\n${BOLD}Is that correct (y/n)?${CLEARFORMAT}  "
 									read -r servername_confirm
 									if [ "$servername_confirm" = "y" ] || \
@@ -2111,33 +2180,44 @@ GenerateServerList()
 								fi
 							done
 						else
-							servername="Custom"
+							serverName="Custom"
 						fi
 						printf "\n"
 						return 0
 					fi
 				done
-		elif ! Validate_Number "$server"
+		elif ! Validate_Number "$serverIndx"
 		then
-			printf "\n${ERR}Please enter a valid number [1-%s]${CLEARFORMAT}\n" "$serverCount"
+			printf "\n${ERR}Please enter a valid number [1-%d]${CLEARFORMAT}\n" "$maxServerCount"
 		else
-			if [ "$server" -lt 1 ] || [ "$server" -gt "$serverCount" ]; then
-				printf "\n${ERR}Please enter a number between 1 and %s.${CLEARFORMAT}\n" "$serverCount"
+			if [ "$serverIndx" -lt 1 ] || [ "$serverIndx" -gt "$maxServerCount" ]
+			then
+				printf "\n${ERR}Please enter a number between 1 and %d.${CLEARFORMAT}\n" "$maxServerCount"
+			elif [ "$serverIndx" -eq "$COUNTER" ]
+			then
+				serverNum=0
+				serverName="None configured"
+				echo ; break
 			else
-				serverno="$(echo "$serverList" | jq -r --argjson index "$((server-1))" '.servers[$index] | .id')"
-				servername="$(echo "$serverList" | jq -r --argjson index "$((server-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
-				printf "\n"
-				break
+				serverNum="$(echo "$serverList" | jq -r --argjson index "$((serverIndx-1))" '.servers[$index] | .id')"
+				serverName="$(echo "$serverList" | jq -r --argjson index "$((serverIndx-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
+				echo ; break
 			fi
 		fi
 	done
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jul-11] ##
+##----------------------------------------##
 GenerateServerList_WebUI()
 {
+	spdifacename="$1"
 	serverlistfile="$2"
-	rm -f "/tmp/$serverlistfile.txt"
-	rm -f "$SCRIPT_WEB_DIR/$serverlistfile.htm"
+	rm -f "/tmp/${serverlistfile}.txt"
+	rm -f "/tmp/${serverlistfile}.tmp"
+	rm -f "$SCRIPT_WEB_DIR/${serverlistfile}.htm"
+
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
@@ -2153,8 +2233,6 @@ GenerateServerList_WebUI()
 		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
 		LICENSE_STRING=""
 	fi
-
-	spdifacename="$1"
 
 	if [ ! -f /opt/bin/jq ] && [ -x /opt/bin/opkg ]
 	then
@@ -2177,44 +2255,81 @@ GenerateServerList_WebUI()
 		for IFACE_NAME in $IFACELIST
 		do
 			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$IFACE_NAME")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+			if [ -z "$serverList" ]
+			then
+				Print_Output true "Error retrieving server list for $IFACE_NAME interface" "$CRIT"
+				{
+				   echo "0|**ERROR**: Unable to retrieve server list." ; echo "-----"
+				} >> "/tmp/${serverlistfile}.tmp"
+				continue
+			fi
 			serverCount="$(echo "$serverList" | jq '.servers | length')"
 			COUNTER=1
-			until [ "$COUNTER" -gt "$serverCount" ]
+			until [ "$COUNTER" -gt "${serverCount:=0}" ]
 			do
-				printf "%s|%s\\n" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"  >> "/tmp/$serverlistfile.tmp"
+				serverIDnum="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')"
+				serverIDstr="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
+				printf "%s|%s\n" "$serverIDnum" "$serverIDstr" >> "/tmp/${serverlistfile}.tmp"
 				COUNTER="$((COUNTER + 1))"
 			done
-			printf "-----\n" >> "/tmp/$serverlistfile.tmp"
+			[ -s "/tmp/${serverlistfile}.tmp" ] && \
+			echo "-----" >> "/tmp/${serverlistfile}.tmp"
 		done
 	else
 		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$spdifacename")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
-		serverCount="$(echo "$serverList" | jq '.servers | length')"
+		if [ -z "$serverList" ]
+		then
+			Print_Output true "Error retrieving server list for $spdifacename interface" "$CRIT"
+			serverCount=0
+		else
+			serverCount="$(echo "$serverList" | jq '.servers | length')"
+		fi
 		COUNTER=1
-		until [ "$COUNTER" -gt "$serverCount" ]
+		until [ "$COUNTER" -gt "${serverCount:=0}" ]
 		do
-			printf "%s|%s\\n" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')" "$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"  >> "/tmp/$serverlistfile.tmp"
+			serverIDnum="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')"
+			serverIDstr="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
+			printf "%s|%s\n" "$serverIDnum" "$serverIDstr" >> "/tmp/${serverlistfile}.tmp"
 			COUNTER="$((COUNTER + 1))"
 		done
 	fi
+
 	sleep 1
-	mv "/tmp/$serverlistfile.tmp" "/tmp/$serverlistfile.txt"
-	ln -s "/tmp/$serverlistfile.txt" "$SCRIPT_WEB_DIR/$serverlistfile.htm" 2>/dev/null
+	if [ -s "/tmp/${serverlistfile}.tmp" ]
+	then
+		mv -f "/tmp/${serverlistfile}.tmp" "/tmp/${serverlistfile}.txt"
+	else
+		echo "0|**ERROR**: Unable to retrieve server list." > "/tmp/${serverlistfile}.txt"
+		if [ "$spdifacename" = "ALL" ]
+		then echo "-----" >> "/tmp/${serverlistfile}.txt" ; fi
+	fi
+	ln -s "/tmp/${serverlistfile}.txt" "$SCRIPT_WEB_DIR/${serverlistfile}.htm" 2>/dev/null
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-06] ##
+## Modified by Martinski W. [2025-Jul-11] ##
 ##----------------------------------------##
 PreferredServer()
 {
+	local sedServerStr
 	case "$1" in
 		update)
-			GenerateServerList "$2"
-			if [ "$serverno" != "exit" ]
+			GenerateServerList "$2" update
+			if ! echo "$serverNum" | grep -qE "^(exit|ERROR)$"
 			then
-				sed -i 's/^PREFERREDSERVER_'"$2"'=.*$/PREFERREDSERVER_'"$2"'='"$serverno|$servername"'/' "$SCRIPT_CONF"
+				sedServerStr="$(_EscapeChars_ "$serverName")"
+				sed -i 's/^PREFERREDSERVER_'"$2"'=.*$/PREFERREDSERVER_'"$2"'='"$serverNum|$sedServerStr"'/' "$SCRIPT_CONF"
+				return 0
 			else
 				return 1
 			fi
+		;;
+		setserver)
+			if echo "$3" | grep -q "^0|\*\*ERROR\*\*:.*"
+			then sedServerStr="0|None configured"
+			else sedServerStr="$(_EscapeChars_ "$3")"
+			fi
+			sed -i "s/^${2}=.*$/${2}=${sedServerStr}/" "$SCRIPT_CONF"
 		;;
 		enable)
 			sed -i 's/^USEPREFERRED_'"$2"'=.*$/USEPREFERRED_'"$2"'=true/' "$SCRIPT_CONF"
@@ -2424,12 +2539,6 @@ _Check_JFFS_SpaceAvailable_()
    Print_Output true "${errorMsg1} ${errorMsg2}" "$CRIT"
    return 1
 }
-
-##-------------------------------------##
-## Added by Martinski W. [2025-Jun-19] ##
-##-------------------------------------##
-_EscapeChars_()
-{ printf "%s" "$1" | sed 's/[][\/$.*^&-]/\\&/g' ; }
 
 ##-------------------------------------##
 ## Added by Martinski W. [2025-Feb-28] ##
@@ -2797,10 +2906,10 @@ Run_Speedtest()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	Auto_Startup create 2>/dev/null
 	if AutomaticMode check
@@ -2808,6 +2917,7 @@ Run_Speedtest()
 	else Auto_Cron delete 2>/dev/null
 	fi
 	Auto_ServiceEvent create 2>/dev/null
+	Auto_OpenVpnEvent create 2>/dev/null
 	Shortcut_Script create
 	ScriptStorageLocation load
 	Create_Symlinks
@@ -2972,10 +3082,11 @@ Run_Speedtest()
 						fi
 					elif [ "$mode" = "onetime" ]
 					then
-						GenerateServerList "$IFACE_NAME" no
-						if [ "$serverno" != "exit" ]; then
-							speedtestServerIDx="$serverno"
-							speedtestServerName="$servername"
+						GenerateServerList "$IFACE_NAME" onetime
+						if ! echo "$serverNum" | grep -qE "^(exit|ERROR)$"
+						then
+							speedtestServerIDx="$serverNum"
+							speedtestServerName="$serverName"
 						else
 							Clear_Lock
 							return 1
@@ -2988,7 +3099,7 @@ Run_Speedtest()
 
 					echo 'var spdteststatus = "InProgress_'"$IFACE_NAME"'";' > /tmp/detect_spdtest.js
 					printf "" > "$tmpfile"
-					
+
 					if [ "$mode" = "auto" ]
 					then
 						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
@@ -3025,7 +3136,7 @@ Run_Speedtest()
 								continue
 							fi
 						else
-							Print_Output true "Starting speedtest using using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
+							Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
 							"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
 							sleep 2
 							speedTestSecs=0
@@ -3076,7 +3187,7 @@ Run_Speedtest()
 						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 
-						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
+						serverName="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $2}' | tr -d ')')"
 					else
 						download="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
@@ -3092,7 +3203,7 @@ Run_Speedtest()
 						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 
-						servername="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
+						serverName="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
 						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
 					fi
 
@@ -3170,13 +3281,13 @@ Run_Speedtest()
 					then
 						{
 						   echo "PRAGMA temp_store=1;"
-						   echo "INSERT INTO spdstats_$IFACE_NAME ([Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[ResultURL],[DataDownload],[DataUpload],[ServerID],[ServerName]) values($timenow,$download,$upload,$latency,$jitter,$pktloss,'$resulturl',$datadownload,$dataupload,$serverid,'$servername');"
+						   echo "INSERT INTO spdstats_$IFACE_NAME ([Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[ResultURL],[DataDownload],[DataUpload],[ServerID],[ServerName]) values($timenow,$download,$upload,$latency,$jitter,$pktloss,'$resulturl',$datadownload,$dataupload,$serverid,'$serverName');"
 						} > /tmp/spdTest-stats.sql
 					elif [ "$STORERESULTURL" = "false" ]
 					then
 						{
 						   echo "PRAGMA temp_store=1;"
-						   echo "INSERT INTO spdstats_$IFACE_NAME ([Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[ResultURL],[DataDownload],[DataUpload],[ServerID],[ServerName]) values($timenow,$download,$upload,$latency,$jitter,$pktloss,'',$datadownload,$dataupload,$serverid,'$servername');"
+						   echo "INSERT INTO spdstats_$IFACE_NAME ([Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[ResultURL],[DataDownload],[DataUpload],[ServerID],[ServerName]) values($timenow,$download,$upload,$latency,$jitter,$pktloss,'',$datadownload,$dataupload,$serverid,'$serverName');"
 						} > /tmp/spdTest-stats.sql
 					fi
 					_ApplyDatabaseSQLCmds_ /tmp/spdTest-stats.sql "spd2$spdIndx"
@@ -3245,18 +3356,19 @@ Run_Speedtest()
 
 				echo "Stats last updated: $timenowfriendly" > /tmp/spdstatstitle.txt
 				WriteStats_ToJS /tmp/spdstatstitle.txt "$SCRIPT_STORAGE_DIR/spdtitletext.js" SetSPDStatsTitle statstitle
+
+				if [ "$applyAutoBW" = "true" ]
+				then Menu_AutoBW_Update ; fi
+
+				echo 'var spdteststatus = "Done";' > /tmp/detect_spdtest.js
+			else
+				echo 'var spdteststatus = "Error";' > /tmp/detect_spdtest.js
+				Print_Output true "Speedtest failed." "$CRIT"
 			fi
+
 			_UpdateDatabaseFileSizeInfo_
 
-			if [ "$applyAutoBW" = "true" ]; then
-				Menu_AutoBW_Update
-			fi
-
-			rm -f "$tmpfile"
-			rm -f /tmp/spdstatstitle.txt
-
-			echo 'var spdteststatus = "Done";' > /tmp/detect_spdtest.js
-
+			rm -f "$tmpfile" /tmp/spdstatstitle.txt
 			Clear_Lock
 		else
 			echo 'var spdteststatus = "Error";' > /tmp/detect_spdtest.js
@@ -3273,17 +3385,22 @@ Run_Speedtest()
 	fi
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2025-Jul-11] ##
+##----------------------------------------##
 Run_Speedtest_WebUI()
 {
-	spdteststring="$(echo "$1" | sed "s/${SCRIPT_NAME_LOWER}spdtest_//;s/%/ /g")";
-	spdtestmode="webui_$(echo "$spdteststring" | cut -f1 -d'_')";
-	spdifacename="$(echo "$spdteststring" | cut -f2 -d'_')";
+	local spdTestStr  spdTestMode  spdTestServer  spdTestServerList
+
+	spdTestStr="$(echo "$1" | sed "s/${SCRIPT_NAME_LOWER}spdtest_//;s/%/ /g")";
+	spdTestMode="webui_$(echo "$spdTestStr" | cut -f1 -d'_')";
+	spdifacename="$(echo "$spdTestStr" | cut -f2 -d'_')";
 
 	cp -a "$SCRIPT_CONF" "${SCRIPT_CONF}.bak"
 
-	if [ "$spdtestmode" = "webui_onetime" ]
+	if [ "$spdTestMode" = "webui_onetime" ]
 	then
-		spdtestserverlist="$(echo "$spdteststring" | cut -f3 -d'_')";
+		spdTestServerList="$(echo "$spdTestStr" | cut -f3 -d'_')";
 		if [ "$spdifacename" = "All" ]
 		then
 			IFACELIST=""
@@ -3295,21 +3412,22 @@ Run_Speedtest_WebUI()
 				fi
 			done < "$SCRIPT_INTERFACES_USER"
 			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
-			
+
 			COUNT=1
 			for IFACE_NAME in $IFACELIST
 			do
-				spdtestserver="$(grep -m1 "$(echo "$spdtestserverlist" | cut -f"$COUNT" -d'+')" /tmp/spdmerlin_manual_serverlist.txt)"
-				sed -i 's/^PREFERREDSERVER_'"$IFACE_NAME"'=.*$/PREFERREDSERVER_'"$IFACE_NAME"'='"$spdtestserver"'/' "$SCRIPT_CONF"
-				COUNT="$((COUNT+1))"
+				spdTestServer="$(grep -m1 "^$(echo "$spdTestServerList" | cut -f"$COUNT" -d'-')|" /tmp/spdmerlin_manual_serverlist.txt)"
+				PreferredServer setserver "PREFERREDSERVER_$IFACE_NAME" "$spdTestServer"
+				COUNT="$((COUNT + 1))"
 			done
 		else
-			spdtestserver="$(grep -m1 "$spdtestserverlist" /tmp/spdmerlin_manual_serverlist.txt)"
-			sed -i 's/^PREFERREDSERVER_'"$spdifacename"'=.*$/PREFERREDSERVER_'"$spdifacename"'='"$spdtestserver"'/' "$SCRIPT_CONF"
+			spdTestServer="$(grep -m1 "^${spdTestServerList}|" /tmp/spdmerlin_manual_serverlist.txt)"
+			PreferredServer setserver "PREFERREDSERVER_$spdifacename" "$spdTestServer"
 		fi
 	fi
+
 	sleep 1
-	Run_Speedtest "$spdtestmode" "$spdifacename"
+	Run_Speedtest "$spdTestMode" "$spdifacename"
 	cp -a "${SCRIPT_CONF}.bak" "$SCRIPT_CONF"
 }
 
@@ -4307,10 +4425,10 @@ Menu_Install()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	Set_Version_Custom_Settings local "$SCRIPT_VERSION"
 	Set_Version_Custom_Settings server "$SCRIPT_VERSION"
@@ -4334,6 +4452,7 @@ Menu_Install()
 	Auto_Cron delete 2>/dev/null
 	AutomaticMode check && Auto_Cron create 2>/dev/null
 	Auto_ServiceEvent create 2>/dev/null
+	Auto_OpenVpnEvent create 2>/dev/null
 	Shortcut_Script create
 
 	Process_Upgrade
@@ -4379,10 +4498,10 @@ Menu_Startup()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load true
 	Auto_Startup create 2>/dev/null
@@ -4392,6 +4511,7 @@ Menu_Startup()
 	else Auto_Cron delete 2>/dev/null
 	fi
 	Auto_ServiceEvent create 2>/dev/null
+	Auto_OpenVpnEvent create 2>/dev/null
 	Shortcut_Script create
 	Mount_WebUI
 	Clear_Lock
@@ -4525,28 +4645,31 @@ Menu_RunSpeedtest()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-29] ##
+## Modified by Martinski W. [2025-Jul-11] ##
 ##----------------------------------------##
 Menu_ConfigurePreferred()
 {
-	exitmenu=""
-	prefiface=""
-	ScriptHeader
+	local exitmenu=""  pref_IFACE=""  pref_enabled  pref_server
+
 	while true
 	do
+		ScriptHeader
 		printf "Choose an interface to configure server preference for:\n\n"
-		printf "1.    All (on/off only)\n\n"
+		printf " 1.  ALL (${GRNct}ON${CLRct}/${GRNct}OFF${CLRct} only)\n\n"
 		COUNTER="2"
 		while IFS='' read -r line || [ -n "$line" ]
 		do
 			if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
 			then
-				pref_enabled=""
 				if PreferredServer check "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				then pref_enabled="On"; else pref_enabled="Off"; fi
-				printf "%s.    %s\n" "$COUNTER" "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				printf "      Preferred: %s - Server: %s\n\n" "$pref_enabled" "$(PreferredServer list "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')" | cut -f2 -d'|')"
-				COUNTER=$((COUNTER+1))
+				then pref_enabled="ON"
+				else pref_enabled="OFF"
+				fi
+				pref_server="$(PreferredServer list "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')" | cut -f2 -d'|')"
+
+				printf "%2d.  %s\n" "$COUNTER" "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
+				printf "     Preferred: ${GRNct}%s${CLRct} - Server: %s\n\n" "$pref_enabled" "$pref_server"
+				COUNTER="$((COUNTER+1))"
 			fi
 		done < "$SCRIPT_INTERFACES_USER"
 
@@ -4561,18 +4684,20 @@ Menu_ConfigurePreferred()
 				break
 			elif ! Validate_Number "$iface_choice"
 			then
-				printf "\n${ERR}Please enter a valid number [1-%s].${CLEARFORMAT}\n" "$((COUNTER-1))"
+				printf "\n${ERR}Please enter a valid number [1-%d].${CLEARFORMAT}\n" "$((COUNTER-1))"
+				PressEnter
 			else
 				if [ "$iface_choice" -lt 1 ] || [ "$iface_choice" -gt "$((COUNTER-1))" ]
 				then
-					printf "\n${ERR}Please enter a number between 1 and %s.${CLEARFORMAT}\n" "$((COUNTER-1))"
+					printf "\n${ERR}Please enter a number between 1 and %d.${CLEARFORMAT}\n" "$((COUNTER-1))"
+					PressEnter
 				else
 					if [ "$iface_choice" -gt "1" ]
 					then
-						prefiface="$(grep -v "interface not up" "$SCRIPT_INTERFACES_USER" | sed -n $((iface_choice-1))p | cut -f1 -d"#" | sed 's/ *$//')"
+						pref_IFACE="$(grep -v "interface not up" "$SCRIPT_INTERFACES_USER" | sed -n $((iface_choice-1))p | cut -f1 -d"#" | sed 's/ *$//')"
 						break
 					else
-						prefiface="All"
+						pref_IFACE="ALL"
 						break
 					fi
 				fi
@@ -4580,16 +4705,19 @@ Menu_ConfigurePreferred()
 		done
 
 		printf "\n"
+		if [ "$exitmenu" = "exit" ]
+		then break ; fi
 
 		if [ "$exitmenu" != "exit" ]
 		then
-			if [ "$prefiface" = "All" ]
+			if [ "$pref_IFACE" = "ALL" ]
 			then
 				while true
 				do
-					printf "What would you like to do?\n\n"
-					printf "1.    Turn on preferred servers\n"
-					printf "2.    Turn off preferred servers\n"
+					ScriptHeader
+					printf "What would you like to do for ${GRNct}ALL${CLRct} interfaces?\n\n"
+					printf " 1.  Turn ${GRNct}ON${CLRct} preferred servers\n"
+					printf " 2.  Turn ${GRNct}OFF${CLRct} preferred servers\n"
 					printf "\nChoose an option (e=Exit):  "
 					read -r usepref_choice
 
@@ -4599,10 +4727,12 @@ Menu_ConfigurePreferred()
 					elif ! Validate_Number "$usepref_choice"
 					then
 						printf "\n${ERR}Please enter a valid number [1-2].${CLEARFORMAT}\n"
+						PressEnter
 					else
 						if [ "$usepref_choice" -lt 1 ] || [ "$usepref_choice" -gt 2 ]
 						then
 							printf "\n${ERR}Please enter a number between 1 and 2.${CLEARFORMAT}\n\n"
+							PressEnter
 						else
 							prefenabledisable=""
 							if [ "$usepref_choice" -eq 1 ]
@@ -4626,13 +4756,16 @@ Menu_ConfigurePreferred()
 			else
 				while true
 				do
-					pref_enabled=""
-					if PreferredServer check "$prefiface"
-					then pref_enabled="On"; else pref_enabled="Off"
+					ScriptHeader
+					if PreferredServer check "$pref_IFACE"
+					then pref_enabled="ON"
+					else pref_enabled="OFF"
 					fi
-					printf "What would you like to do?\n\n"
-					printf "1.    Toggle preferred server on/off - currently: %s\n" "$pref_enabled"
-					printf "2.    Set preferred server - currently: %s\n" "$(PreferredServer list "$prefiface" | cut -f2 -d"|")"
+					pref_server="$(PreferredServer list "$pref_IFACE" | cut -f2 -d"|")"
+
+					printf "What would you like to do for the ${GRNct}${pref_IFACE}${CLRct} interface?\n\n"
+					printf " 1.  Toggle preferred server ${GRNct}ON${CLRct}/${GRNct}OFF${CLRct} - currently: ${GRNct}%s${CLRct}\n" "$pref_enabled"
+					printf " 2.  Set preferred server - currently: %s\n" "$pref_server"
 					printf "\nChoose an option (e=Exit):  "
 					read -r ifpref_choice
 
@@ -4642,25 +4775,28 @@ Menu_ConfigurePreferred()
 					elif ! Validate_Number "$ifpref_choice"
 					then
 						printf "\n${ERR}Please enter a valid number [1-2].${CLEARFORMAT}\n"
+						PressEnter
 					else
 						if [ "$ifpref_choice" -lt 1 ] || [ "$ifpref_choice" -gt 2 ]
 						then
 							printf "\n${ERR}Please enter a number between 1 and 2.${CLEARFORMAT}\n"
+							PressEnter
 						else
 							if [ "$ifpref_choice" -eq 1 ]
 							then
 								printf "\n"
-								if PreferredServer check "$prefiface"
+								if PreferredServer check "$pref_IFACE"
 								then
-									PreferredServer disable "$prefiface"
+									PreferredServer disable "$pref_IFACE"
 								else
-									PreferredServer enable "$prefiface"
+									PreferredServer enable "$pref_IFACE"
 								fi
 								break
 							elif [ "$ifpref_choice" -eq 2 ]
 							then
 								printf "\n"
-								PreferredServer "update" "$prefiface"
+								PreferredServer update "$pref_IFACE"
+								[ "$serverNum" = "ERROR" ] && PressEnter
 								break
 							fi
 						fi
@@ -4668,12 +4804,8 @@ Menu_ConfigurePreferred()
 				done
 			fi
 		fi
-		if [ "$exitmenu" = "exit" ]; then
-			break
-		fi
-		printf "\n"
-		PressEnter
-		ScriptHeader
+		if [ "$exitmenu" = "exit" ]
+		then break ; fi
 	done
 
 	if [ "$exitmenu" != "exit" ]
@@ -5656,6 +5788,7 @@ Menu_Uninstall()
 	Auto_Startup delete 2>/dev/null
 	Auto_Cron delete 2>/dev/null
 	Auto_ServiceEvent delete 2>/dev/null
+	Auto_OpenVpnEvent delete 2>/dev/null
 	Shortcut_Script delete
 
 	LOCKFILE=/tmp/addonwebui.lock
@@ -5773,12 +5906,12 @@ Entware_Ready()
 
 ### function based on @dave14305's FlexQoS about function ###
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-04] ##
+## Modified by Martinski W. [2025-Jul-11] ##
 ##----------------------------------------##
 Show_About()
 {
+	printf "About ${MGNTct}${SCRIPT_VERS_INFO}${CLRct}\n"
 	cat <<EOF
-About $SCRIPT_VERS_INFO
   $SCRIPT_NAME is an internet speedtest and monitoring tool for
   AsusWRT Merlin with charts for daily, weekly and monthly summaries.
   It tracks download/upload bandwidth as well as latency, jitter and
@@ -5799,12 +5932,12 @@ EOF
 
 ### function based on @dave14305's FlexQoS show_help function ###
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-04] ##
+## Modified by Martinski W. [2025-Jul-11] ##
 ##----------------------------------------##
 Show_Help()
 {
+	printf "HELP ${MGNTct}${SCRIPT_VERS_INFO}${CLRct}\n"
 	cat <<EOF
-HELP $SCRIPT_VERS_INFO
 Available commands:
   $SCRIPT_NAME_LOWER about            explains functionality
   $SCRIPT_NAME_LOWER update           checks for updates
@@ -5871,10 +6004,10 @@ then
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load
 	Create_Symlinks
@@ -5886,6 +6019,7 @@ then
 	else Auto_Cron delete 2>/dev/null
 	fi
 	Auto_ServiceEvent create 2>/dev/null
+	Auto_OpenVpnEvent create 2>/dev/null
 	Shortcut_Script create
 	_CheckFor_WebGUI_Page_
 	ScriptHeader
@@ -5894,7 +6028,7 @@ then
 fi
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-24] ##
+## Modified by Martinski W. [2025-Jul-11] ##
 ##----------------------------------------##
 case "$1" in
 	install)
@@ -5946,13 +6080,13 @@ case "$1" in
 		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlistmanual"
 		then
 			Check_Lock webui
-			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlistmanual_//" | cut -f1 -d'_' | tr "a-z" "A-Z")";
+			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlistmanual_//" | cut -f1 -d'_' | tr 'a-z' 'A-Z')";
 			GenerateServerList_WebUI "$spdifacename" "spdmerlin_manual_serverlist"
 			Clear_Lock
 		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlist"
 		then
 			Check_Lock webui
-			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlist_//" | cut -f1 -d'_' | tr "a-z" "A-Z")";
+			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlist_//" | cut -f1 -d'_' | tr 'a-z' 'A-Z')";
 			GenerateServerList_WebUI "$spdifacename" "spdmerlin_serverlist_$spdifacename"
 			Clear_Lock
 		elif [ "$2" = "start" ] && [ "$3" = "${SCRIPT_NAME_LOWER}config" ]
@@ -5967,6 +6101,24 @@ case "$1" in
 			Update_Version force unattended
 		fi
 		"$updateJFFS_SpaceInfo" && _UpdateJFFS_FreeSpaceInfo_
+		exit 0
+	;;
+	openvpn_event)
+		if echo "$2" | grep -qE "^tun1[1-5]" && \
+		   echo "$3" | grep -qE "^route-.*"
+		then
+			if [ "$3" = "route-pre-down" ]
+			then
+				Print_Output true "VPN Client tunnel is going down." "$PASS"
+				sleep 3
+			elif [ "$3" = "route-up" ]
+			then
+				Print_Output true "VPN Client tunnel is coming up." "$PASS"
+				sleep 2
+			fi
+			_Reset_Interface_States_ force "$2"
+			Clear_Lock
+		fi
 		exit 0
 	;;
 	outputcsv)
@@ -6000,10 +6152,10 @@ case "$1" in
 		Conf_Exists
 		if [ "$(SpeedtestBinary check)" = "builtin" ]
 		then
-			printf "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+			echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
 		elif [ "$(SpeedtestBinary check)" = "external" ]
 		then
-			printf "%s" "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+			echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
 		fi
 		ScriptStorageLocation load true
 		Create_Symlinks
@@ -6014,6 +6166,7 @@ case "$1" in
 		else Auto_Cron delete 2>/dev/null
 		fi
 		Auto_ServiceEvent create 2>/dev/null
+		Auto_OpenVpnEvent create 2>/dev/null
 		Shortcut_Script create
 		Set_Version_Custom_Settings local "$SCRIPT_VERSION"
 		Set_Version_Custom_Settings server "$SCRIPT_VERSION"
