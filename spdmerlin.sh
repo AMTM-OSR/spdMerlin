@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jul-11
+# Last Modified: 2025-Jul-14
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,8 +38,8 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.14"
-readonly SCRIPT_VERSTAG="25071123"
+readonly SCRIPT_VERSION="v4.4.15"
+readonly SCRIPT_VERSTAG="25071401"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -1109,13 +1109,42 @@ Auto_ServiceEvent()
 }
 
 ##-------------------------------------##
+## Added by Martinski W. [2025-Jul-13] ##
+##-------------------------------------##
+_CheckForOpenVPN_ClientsAvailable_()
+{
+   local retCode
+   local nvramTempFile="/tmp/${SCRIPT_NAME}_nvramShow_$$.txt"
+
+   nvram show 2>/dev/null | grep -E "^vpn_client[1-5]_.+" > "$nvramTempFile"
+   if [ ! -s "$nvramTempFile" ]
+   then
+       rm -f "$nvramTempFile"
+       return 1  #OpenVPN clients NOT found#
+   fi
+
+   if grep -qE "^vpn_client[1-5]_state=[1-3]$" "$nvramTempFile" || \
+      grep -qE "^vpn_client[1-5]_(username|password)=.+$" "$nvramTempFile" || \
+      grep -qE "^vpn_client[1-5]_addr=([0-9]{1,3}\.){3}[0-9]{1,3}$" "$nvramTempFile"
+   then retCode=0
+   else retCode=1
+   fi
+
+   rm -f "$nvramTempFile"
+   return "$retCode"
+}
+
+##-------------------------------------##
 ## Added by Martinski W. [2025-Jul-11] ##
 ##-------------------------------------##
-Auto_OpenVpnEvent()
+Auto_OpenVPN_Event()
 {
 	local theScriptFilePath="/jffs/scripts/$SCRIPT_NAME_LOWER"
 	case $1 in
 		create)
+			# Check if any OpenVPN Client is set up/available in NVRAM #
+			if ! _CheckForOpenVPN_ClientsAvailable_ ; then return 1 ; fi
+
 			if [ -f /jffs/scripts/openvpn-event ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/openvpn-event)"
@@ -1148,6 +1177,93 @@ Auto_OpenVpnEvent()
 					sed -i -e '/# '"$SCRIPT_NAME"'/d' /jffs/scripts/openvpn-event
 				fi
 			fi
+		;;
+	esac
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2025-Jul-13] ##
+##-------------------------------------##
+_CheckForWireGuard_ClientsAvailable_()
+{
+   local retCode
+   local nvramTempFile="/tmp/${SCRIPT_NAME}_nvramShow_$$.txt"
+
+   if ! nvram get "rc_support" | grep -qio "wireguard"
+   then return 1  #WireGuard NOT supported#
+   fi
+
+   nvram show 2>/dev/null | grep -E "^wgc[1-5]_.+" > "$nvramTempFile"
+   if [ ! -s "$nvramTempFile" ]
+   then
+       rm -f "$nvramTempFile"
+       return 1  #WireGuard clients NOT found#
+   fi
+
+   if grep -qE "^wgc[1-5]_enable=[1-2]$" "$nvramTempFile" || \
+      grep -qE "^wgc[1-5]_(ppub|priv)=.+$" "$nvramTempFile" || \
+      grep -qE "^wgc[1-5]_ep_addr=([0-9]{1,3}\.){3}[0-9]{1,3}$" "$nvramTempFile"
+   then retCode=0
+   else retCode=1
+   fi
+
+   rm -f "$nvramTempFile"
+   return "$retCode"
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2025-Jul-13] ##
+##-------------------------------------##
+Auto_WG_ClientEvent()
+{
+	local wgClientFilePath
+	local theScriptFilePath="/jffs/scripts/$SCRIPT_NAME_LOWER"
+
+	case $1 in
+		create)
+			# Check if any WireGuard Client is set up/available in NVRAM #
+			if ! _CheckForWireGuard_ClientsAvailable_ ; then return 1 ; fi
+
+            for wgClientEvent in stop start
+            do
+				wgClientFilePath="/jffs/scripts/wgclient-$wgClientEvent"
+				if [ -f "$wgClientFilePath" ]
+				then
+					STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" "$wgClientFilePath")"
+                	STARTUPLINECOUNTEX="$(grep -cx '\[ -x '"$theScriptFilePath"' \] && '"$theScriptFilePath"' wgclient_event '"$wgClientEvent"' "$@" & # '"$SCRIPT_NAME" "$wgClientFilePath")"
+
+					if [ "$STARTUPLINECOUNT" -gt 1 ] || { [ "$STARTUPLINECOUNTEX" -eq 0 ] && [ "$STARTUPLINECOUNT" -gt 0 ]; }
+					then
+						sed -i -e '/# '"$SCRIPT_NAME"'/d' "$wgClientFilePath"
+					fi
+					if [ "$STARTUPLINECOUNTEX" -eq 0 ]
+					then
+						{
+						  echo '[ -x '"$theScriptFilePath"' ] && '"$theScriptFilePath"' wgclient_event '"$wgClientEvent"' "$@" & # '"$SCRIPT_NAME"
+						} >> "$wgClientFilePath"
+					fi
+				else
+					{
+					  echo "#!/bin/sh" ; echo
+					  echo '[ -x '"$theScriptFilePath"' ] && '"$theScriptFilePath"' wgclient_event '"$wgClientEvent"' "$@" & # '"$SCRIPT_NAME"
+                	  echo
+					} > "$wgClientFilePath"
+					chmod 0755 "$wgClientFilePath"
+				fi
+			done
+		;;
+		delete)
+			for wgClientEvent in stop start
+			do
+				wgClientFilePath="/jffs/scripts/wgclient-$wgClientEvent"
+				if [ -f "$wgClientFilePath" ]
+				then
+					STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" "$wgClientFilePath")"
+					if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+						sed -i -e '/# '"$SCRIPT_NAME"'/d' "$wgClientFilePath"
+					fi
+				fi
+			done
 		;;
 	esac
 }
@@ -2063,7 +2179,7 @@ WriteStats_ToJS()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jul-11] ##
+## Modified by Martinski W. [2025-Jul-13] ##
 ##----------------------------------------##
 GenerateServerList()
 {
@@ -2112,15 +2228,14 @@ GenerateServerList()
 		printf "%2d) %6d|%s\n" "$COUNTER" "$serverIDnum" "$serverIDstr"
 		COUNTER="$((COUNTER + 1))"
 	done
+	maxServerCount="$serverCount"
 
 	if [ "$promptforservername" = "onetime" ]
 	then
 		serverMsgStr="server"
-		maxServerCount="$serverCount"
 	else
-		maxServerCount="$COUNTER"
 		serverMsgStr="preferred server"
-		printf "\n%2d)  Reset to ${GRNct}None configured${CLRct}" "$maxServerCount"
+		printf "\nrs)  Reset to ${GRNct}None configured${CLRct}"
 	fi
 	printf "\n e)  Go back\n"
 
@@ -2131,10 +2246,15 @@ GenerateServerList()
 		printf "\n${BOLD}Enter answer:${CLEARFORMAT}  "
 		read -r serverIndx
 
-		if [ "$serverIndx" = "e" ]
+		if echo "$serverIndx" | grep -qE "^(e|E)$"
 		then
 			serverNum="exit"
 			break
+		elif [ "$serverIndx" = "rs" ] && [ "$promptforservername" = "update" ]
+		then
+			serverNum=0
+			serverName="None configured"
+			echo ; break
 		elif [ "$serverIndx" = "c" ] || [ "$serverIndx" = "C" ]
 		then
 				while true
@@ -2193,11 +2313,6 @@ GenerateServerList()
 			if [ "$serverIndx" -lt 1 ] || [ "$serverIndx" -gt "$maxServerCount" ]
 			then
 				printf "\n${ERR}Please enter a number between 1 and %d.${CLEARFORMAT}\n" "$maxServerCount"
-			elif [ "$serverIndx" -eq "$COUNTER" ]
-			then
-				serverNum=0
-				serverName="None configured"
-				echo ; break
 			else
 				serverNum="$(echo "$serverList" | jq -r --argjson index "$((serverIndx-1))" '.servers[$index] | .id')"
 				serverName="$(echo "$serverList" | jq -r --argjson index "$((serverIndx-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
@@ -2917,7 +3032,8 @@ Run_Speedtest()
 	else Auto_Cron delete 2>/dev/null
 	fi
 	Auto_ServiceEvent create 2>/dev/null
-	Auto_OpenVpnEvent create 2>/dev/null
+	Auto_OpenVPN_Event create 2>/dev/null
+	Auto_WG_ClientEvent create 2>/dev/null
 	Shortcut_Script create
 	ScriptStorageLocation load
 	Create_Symlinks
@@ -4452,7 +4568,8 @@ Menu_Install()
 	Auto_Cron delete 2>/dev/null
 	AutomaticMode check && Auto_Cron create 2>/dev/null
 	Auto_ServiceEvent create 2>/dev/null
-	Auto_OpenVpnEvent create 2>/dev/null
+	Auto_OpenVPN_Event create 2>/dev/null
+	Auto_WG_ClientEvent create 2>/dev/null
 	Shortcut_Script create
 
 	Process_Upgrade
@@ -4511,7 +4628,8 @@ Menu_Startup()
 	else Auto_Cron delete 2>/dev/null
 	fi
 	Auto_ServiceEvent create 2>/dev/null
-	Auto_OpenVpnEvent create 2>/dev/null
+	Auto_OpenVPN_Event create 2>/dev/null
+	Auto_WG_ClientEvent create 2>/dev/null
 	Shortcut_Script create
 	Mount_WebUI
 	Clear_Lock
@@ -5788,7 +5906,8 @@ Menu_Uninstall()
 	Auto_Startup delete 2>/dev/null
 	Auto_Cron delete 2>/dev/null
 	Auto_ServiceEvent delete 2>/dev/null
-	Auto_OpenVpnEvent delete 2>/dev/null
+	Auto_OpenVPN_Event delete 2>/dev/null
+	Auto_WG_ClientEvent delete 2>/dev/null
 	Shortcut_Script delete
 
 	LOCKFILE=/tmp/addonwebui.lock
@@ -6019,7 +6138,8 @@ then
 	else Auto_Cron delete 2>/dev/null
 	fi
 	Auto_ServiceEvent create 2>/dev/null
-	Auto_OpenVpnEvent create 2>/dev/null
+	Auto_OpenVPN_Event create 2>/dev/null
+	Auto_WG_ClientEvent create 2>/dev/null
 	Shortcut_Script create
 	_CheckFor_WebGUI_Page_
 	ScriptHeader
@@ -6121,6 +6241,20 @@ case "$1" in
 		fi
 		exit 0
 	;;
+	wgclient_event)
+		if [ "$2" = "stop" ]
+		then
+			Print_Output true "WireGuard Client tunnel is going down." "$PASS"
+			sleep 3
+		elif [ "$2" = "start" ]
+		then
+			Print_Output true "WireGuard Client tunnel is coming up." "$PASS"
+			sleep 2
+		fi
+		_Reset_Interface_States_ force "$2"
+		Clear_Lock
+		exit 0
+	;;
 	outputcsv)
 		NTP_Ready
 		Entware_Ready
@@ -6166,7 +6300,8 @@ case "$1" in
 		else Auto_Cron delete 2>/dev/null
 		fi
 		Auto_ServiceEvent create 2>/dev/null
-		Auto_OpenVpnEvent create 2>/dev/null
+		Auto_OpenVPN_Event create 2>/dev/null
+		Auto_WG_ClientEvent create 2>/dev/null
 		Shortcut_Script create
 		Set_Version_Custom_Settings local "$SCRIPT_VERSION"
 		Set_Version_Custom_Settings server "$SCRIPT_VERSION"
