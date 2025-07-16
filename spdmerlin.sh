@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jul-14
+# Last Modified: 2025-Jul-15
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25071401"
+readonly SCRIPT_VERSTAG="25071523"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -6068,8 +6068,8 @@ Available commands:
   $SCRIPT_NAME_LOWER outputcsv        create CSVs from database, used by WebUI and export
   $SCRIPT_NAME_LOWER enable           enable automatic speedtests
   $SCRIPT_NAME_LOWER disable          disable automatic speedtests
-  $SCRIPT_NAME_LOWER develop          switch to development branch
-  $SCRIPT_NAME_LOWER stable           switch to stable branch
+  $SCRIPT_NAME_LOWER develop          switch to development branch version
+  $SCRIPT_NAME_LOWER stable           switch to stable/production branch version
 EOF
 	printf "\n"
 }
