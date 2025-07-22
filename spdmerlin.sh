@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jul-15
+# Last Modified: 2025-Jul-20
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25071523"
+readonly SCRIPT_VERSTAG="25072023"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -59,6 +59,7 @@ readonly FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 
 ##-------------------------------------##
 ## Added by Martinski W. [2025-Feb-28] ##
 ##-------------------------------------##
+readonly theUserName="$(nvram get http_username)"
 readonly scriptVersRegExp="v[0-9]{1,2}([.][0-9]{1,2})([.][0-9]{1,2})"
 readonly webPageMenuAddons="menuName: \"Addons\","
 readonly webPageHelpSupprt="tabName: \"Help & Support\"},"
@@ -67,8 +68,8 @@ readonly webPageLineTabExp="\{url: \"$webPageFileRegExp\", tabName: "
 readonly webPageLineRegExp="${webPageLineTabExp}\"$SCRIPT_NAME\"\},"
 readonly BEGIN_MenuAddOnsTag="/\*\*BEGIN:_AddOns_\*\*/"
 readonly ENDIN_MenuAddOnsTag="/\*\*ENDIN:_AddOns_\*\*/"
-readonly scriptVERINFO="[${SCRIPT_VERSION}_${SCRIPT_VERSTAG}, Branch: $SCRIPT_BRANCH]"
-readonly theUserName="$(nvram get http_username)"
+readonly branchx_TAG="Branch: $SCRIPT_BRANCH"
+readonly version_TAG="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
 
 # For daily CRON job to trim database #
 readonly defTrimDB_Hour=3
@@ -2827,7 +2828,7 @@ _SQLGetDBLogTimeStamp_()
 { printf "[$(date +"$sqlDBLogDateTime")]" ; }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-21] ##
+## Modified by Martinski W. [2025-Jul-20] ##
 ##----------------------------------------##
 readonly errorMsgsRegExp="Parse error|Runtime error|Error:"
 readonly corruptedBinExp="Illegal instruction|SQLite header and source version mismatch"
@@ -2915,7 +2916,7 @@ _ApplyDatabaseSQLCmds_()
     fi
     if "$foundError" || "$foundLocked"
     then
-        Print_Output true "SQLite process ${resultStr}" "$ERR"
+        Print_Output true "SQLite process[$callFlag] ${resultStr}" "$ERR"
     fi
 }
 
@@ -6100,9 +6101,9 @@ SCRIPT_INTERFACES_USER="$SCRIPT_STORAGE_DIR/.interfaces_user"
 JFFS_LowFreeSpaceStatus="OK"
 updateJFFS_SpaceInfo=false
 
-if [ "$SCRIPT_BRANCH" != "develop" ]
-then SCRIPT_VERS_INFO=""
-else SCRIPT_VERS_INFO="$scriptVERINFO"
+if [ "$SCRIPT_BRANCH" = "master" ]
+then SCRIPT_VERS_INFO="[$branchx_TAG]"
+else SCRIPT_VERS_INFO="[$version_TAG, $branchx_TAG]"
 fi
 
 ##----------------------------------------##
