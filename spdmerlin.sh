@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jul-20
+# Last Modified: 2025-Jul-25
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25072023"
+readonly SCRIPT_VERSTAG="25072522"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -5978,13 +5978,14 @@ NTP_Ready()
 			sleep "$theSleepDelay"
 			ntpWaitSecs="$((ntpWaitSecs + theSleepDelay))"
 		done
+
 		if [ "$ntpWaitSecs" -ge "$ntpMaxWaitSecs" ]
 		then
 			Print_Output true "NTP failed to sync after 10 minutes. Please resolve!" "$CRIT"
 			Clear_Lock
 			exit 1
 		else
-			Print_Output true "NTP synced, $SCRIPT_NAME will now continue" "$PASS"
+			Print_Output true "NTP has synced [$ntpWaitSecs secs]. $SCRIPT_NAME will now continue." "$PASS"
 			Clear_Lock
 		fi
 	fi
@@ -6012,13 +6013,14 @@ Entware_Ready()
 			sleep "$theSleepDelay"
 			sleepTimerSecs="$((sleepTimerSecs + theSleepDelay))"
 		done
+
 		if [ ! -f /opt/bin/opkg ]
 		then
 			Print_Output true "Entware NOT found and is required for $SCRIPT_NAME to run, please resolve!" "$CRIT"
 			Clear_Lock
 			exit 1
 		else
-			Print_Output true "Entware found. $SCRIPT_NAME will now continue" "$PASS"
+			Print_Output true "Entware found [$sleepTimerSecs secs]. $SCRIPT_NAME will now continue." "$PASS"
 			Clear_Lock
 		fi
 	fi
