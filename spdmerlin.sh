@@ -1461,7 +1461,8 @@ Set_Interface_State()
             then
                 # If it’s 'up' automatically exclude it #
                 sed -i "$1 s/$/ #excluded#/" "$SCRIPT_INTERFACES_USER"
-            else                # If it’s 'down' automatically exclude it with '- interface not up#' #
+            else
+				# If it’s 'down' automatically exclude it with '- interface not up#' #
                 sed -i "$1 s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
             fi
         fi
