@@ -896,7 +896,7 @@ Interfaces_FromSettings()
 				else
 					if ! "$interface_UP"
 					then
-						sed -i "$ifacelinenumber"'s/$/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
+						sed -i "${ifacelinenumber}s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 					fi
 				fi
 			done
@@ -1453,16 +1453,15 @@ Set_Interface_State()
                 sed -i "$1 s/#excluded - interface not up#/#excluded#/" "$SCRIPT_INTERFACES_USER"
             else
                 # The interface is 'down' so ensure we have "#excluded - interface not up#" #
-                if echo "$interfaceLine" | grep -q "#excluded#$"
-                then
-                    sed -i "$1 s/#excluded#/#excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
-                fi
+                sed -i "$1 s/#excluded#/#excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
             fi
         else
-            # No '#excluded' marker => user wanted it included #
-            if ! "$interface_UP"
+            # No '#excluded' marker => user wanted it excluded #
+            if "$interface_UP"
             then
-                # If it’s 'down' automatically exclude it with '- interface not up#' #
+                # If it’s 'up' automatically exclude it #
+                sed -i "$1 s/$/ #excluded#/" "$SCRIPT_INTERFACES_USER"
+            else                # If it’s 'down' automatically exclude it with '- interface not up#' #
                 sed -i "$1 s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
             fi
         fi
@@ -1528,17 +1527,17 @@ Generate_Interface_List()
             then
 				if "$interface_UP"
 				then
-					sed -i "$ifaceEntryNum"'s/ #excluded - interface not up#//' "$SCRIPT_INTERFACES_USER"
-					sed -i "$ifaceEntryNum"'s/ #excluded#//' "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/ #excluded - interface not up#//" "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/ #excluded#//" "$SCRIPT_INTERFACES_USER"
 				else
-					sed -i "$ifaceEntryNum"'s/ #excluded#/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/ #excluded#/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 				fi
 			else
 				if "$interface_UP"
 				then
-					sed -i "$ifaceEntryNum"'s/$/ #excluded#/' "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/$/ #excluded#/" "$SCRIPT_INTERFACES_USER"
 				else
-					sed -i "$ifaceEntryNum"'s/$/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 				fi
 			fi
 			sed -i 's/ *$//' "$SCRIPT_INTERFACES_USER"
