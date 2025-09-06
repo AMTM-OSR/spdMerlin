@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25090600"
+readonly SCRIPT_VERSTAG="25090601"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -627,9 +627,9 @@ _Set_All_Interface_States_()
 	done
 }
 
-##---------------------------------=---##
-## Added by Martinski W. [2025-Jun-23] ##
-##-------------------------------------##
+##----------------------------------------##
+## Modified by Martinski W. [2025-Sep-06] ##
+##----------------------------------------##
 _Check_All_Interface_States_()
 {
 	[ -f "$SCRIPT_INTERFACES" ] && \
@@ -638,6 +638,7 @@ _Check_All_Interface_States_()
 	printf "WAN\n" > "$SCRIPT_INTERFACES"
 
 	local ifaceTagStr
+	local excludedButUPstr=" #excluded#"
 	local excludedNotUPstr=" #excluded - interface not up#"
 
 	for index in 1 2 3 4 5
@@ -645,7 +646,7 @@ _Check_All_Interface_States_()
 		ifaceTagStr="$excludedNotUPstr"
 		if _CheckNetClientInterfaceUP_ "$index"
 		then
-			ifaceTagStr=""  #Assumes interface is included#
+			ifaceTagStr="$excludedButUPstr"
 		fi
 		printf "VPNC%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 	done
@@ -655,7 +656,7 @@ _Check_All_Interface_States_()
 		ifaceTagStr="$excludedNotUPstr"
 		if _Check_WG_ClientInterfaceUP_ "$index"
 		then
-			ifaceTagStr=""  #Assumes interface is included#
+			ifaceTagStr="$excludedButUPstr"
 		fi
 		printf "WGVPN%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 	done
@@ -667,6 +668,9 @@ _Check_All_Interface_States_()
 _Startup_All_Interface_States_()
 {
 	_Check_All_Interface_States_
+
+	[ -f "$SCRIPT_INTERFACES_USER" ] && \
+	cp -a "$SCRIPT_INTERFACES_USER" "${SCRIPT_INTERFACES_USER}.bak"
 
 	while IFS='' read -r line || [ -n "$line" ]
 	do
@@ -815,13 +819,14 @@ Conf_FromSettings()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-23] ##
+## Modified by Martinski W. [2025-Sep-06] ##
 ##----------------------------------------##
 Interfaces_FromSettings()
 {
 	SETTINGSFILE="/jffs/addons/custom_settings.txt"
 
 	local ifaceTagStr  interface_UP
+	local excludedButUPstr=" #excluded#"
 	local excludedNotUPstr=" #excluded - interface not up#"
 
 	if [ -f "$SETTINGSFILE" ]
@@ -841,7 +846,7 @@ Interfaces_FromSettings()
 				ifaceTagStr="$excludedNotUPstr"
 				if _CheckNetClientInterfaceUP_ "$index"
 				then
-				    ifaceTagStr=" #excluded#"
+				    ifaceTagStr="$excludedButUPstr"
 				fi
 				printf "VPNC%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 			done
@@ -851,7 +856,7 @@ Interfaces_FromSettings()
 				ifaceTagStr="$excludedNotUPstr"
 				if _Check_WG_ClientInterfaceUP_ "$index"
 				then
-				    ifaceTagStr=" #excluded#"
+				    ifaceTagStr="$excludedButUPstr"
 				fi
 				printf "WGVPN%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 			done
