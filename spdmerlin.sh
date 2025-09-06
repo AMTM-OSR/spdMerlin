@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Jul-25
+# Last Modified: 2025-Sep-06
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25072522"
+readonly SCRIPT_VERSTAG="25090600"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -642,7 +642,7 @@ _Check_All_Interface_States_()
 
 	for index in 1 2 3 4 5
 	do
-        ifaceTagStr="$excludedNotUPstr"
+		ifaceTagStr="$excludedNotUPstr"
 		if _CheckNetClientInterfaceUP_ "$index"
 		then
 			ifaceTagStr=""  #Assumes interface is included#
@@ -896,7 +896,7 @@ Interfaces_FromSettings()
 				else
 					if ! "$interface_UP"
 					then
-						sed -i "$ifacelinenumber"'s/$/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
+						sed -i "${ifacelinenumber}s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 					fi
 				fi
 			done
@@ -1528,17 +1528,17 @@ Generate_Interface_List()
             then
 				if "$interface_UP"
 				then
-					sed -i "$ifaceEntryNum"'s/ #excluded - interface not up#//' "$SCRIPT_INTERFACES_USER"
-					sed -i "$ifaceEntryNum"'s/ #excluded#//' "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/ #excluded - interface not up#//" "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/ #excluded#//" "$SCRIPT_INTERFACES_USER"
 				else
-					sed -i "$ifaceEntryNum"'s/ #excluded#/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/ #excluded#/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 				fi
 			else
 				if "$interface_UP"
 				then
-					sed -i "$ifaceEntryNum"'s/$/ #excluded#/' "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/$/ #excluded#/" "$SCRIPT_INTERFACES_USER"
 				else
-					sed -i "$ifaceEntryNum"'s/$/ #excluded - interface not up#/' "$SCRIPT_INTERFACES_USER"
+					sed -i "${ifaceEntryNum}s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 				fi
 			fi
 			sed -i 's/ *$//' "$SCRIPT_INTERFACES_USER"
@@ -1789,7 +1789,7 @@ CronTestSchedule()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-06] ##
+## Modified by Martinski W. [2025-Sep-05] ##
 ##----------------------------------------##
 ScriptStorageLocation()
 {
@@ -1800,8 +1800,10 @@ ScriptStorageLocation()
 			mkdir -p "/opt/share/$SCRIPT_NAME_LOWER.d/"
 			rm -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/spdstats.db-shm"
 			rm -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/spdstats.db-wal"
+			[ -d "/opt/share/$SCRIPT_NAME_LOWER.d/csv" ] && rm -fr "/opt/share/$SCRIPT_NAME_LOWER.d/csv"
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
+			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces.bak" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces_user" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces_user.bak" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.databaseupgraded" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
@@ -1820,8 +1822,10 @@ ScriptStorageLocation()
 			printf "Please wait..."
 			sed -i 's/^STORAGELOCATION=.*$/STORAGELOCATION=jffs/' "$SCRIPT_CONF"
 			mkdir -p "/jffs/addons/$SCRIPT_NAME_LOWER.d/"
+			[ -d "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv" ] && rm -fr "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv"
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/csv" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
+			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces.bak" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces_user" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces_user.bak" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.databaseupgraded" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
