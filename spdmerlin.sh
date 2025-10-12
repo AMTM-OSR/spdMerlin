@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Sep-06
+# Last Modified: 2025-Oct-12
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25090601"
+readonly SCRIPT_VERSTAG="25101202"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -56,6 +56,9 @@ readonly OOKLA_LICENSE_DIR="$SCRIPT_DIR/ooklalicense"
 readonly OOKLA_HOME_DIR="$HOME_DIR/.config/ookla"
 readonly FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 WGVPN4 WGVPN5"
 
+[ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
+[ -f /opt/bin/sqlite3 ] && SQLITE3_PATH=/opt/bin/sqlite3 || SQLITE3_PATH=/usr/sbin/sqlite3
+
 ##-------------------------------------##
 ## Added by Martinski W. [2025-Feb-28] ##
 ##-------------------------------------##
@@ -68,8 +71,9 @@ readonly webPageLineTabExp="\{url: \"$webPageFileRegExp\", tabName: "
 readonly webPageLineRegExp="${webPageLineTabExp}\"$SCRIPT_NAME\"\},"
 readonly BEGIN_MenuAddOnsTag="/\*\*BEGIN:_AddOns_\*\*/"
 readonly ENDIN_MenuAddOnsTag="/\*\*ENDIN:_AddOns_\*\*/"
-readonly branchx_TAG="Branch: $SCRIPT_BRANCH"
-readonly version_TAG="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
+readonly branchxStr_TAG="[Branch: $SCRIPT_BRANCH]"
+readonly versionDev_TAG="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
+readonly versionMod_TAG="$SCRIPT_VERSION on $ROUTER_MODEL"
 
 # For daily CRON job to trim database #
 readonly defTrimDB_Hour=3
@@ -95,9 +99,6 @@ readonly sqlDBLogFileName="${SCRIPT_NAME}_DBSQL_DEBUG.LOG"
 
 # Give priority to built-in binaries #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
-
-[ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
-[ -f /opt/bin/sqlite3 ] && SQLITE3_PATH=/opt/bin/sqlite3 || SQLITE3_PATH=/usr/sbin/sqlite3
 
 if [ "$(uname -m)" = "aarch64" ]; then
 	ARCH="aarch64"
@@ -614,7 +615,7 @@ _Check_WG_ClientInterfaceUP_()
 ##---------------------------------=---##
 ## Added by Martinski W. [2025-Jun-23] ##
 ##-------------------------------------##
-_Set_All_Interface_States_()
+_Set_All_InterfacesUser_Status_()
 {
 	local interfaceCount  COUNTER
 
@@ -622,7 +623,7 @@ _Set_All_Interface_States_()
 	COUNTER=1
 	until [ "$COUNTER" -gt "$interfaceCount" ]
 	do
-		Set_Interface_State "$COUNTER"
+		Set_InterfacesUser_State "$COUNTER"
 		COUNTER="$((COUNTER + 1))"
 	done
 }
@@ -633,7 +634,7 @@ _Set_All_Interface_States_()
 _Check_All_Interface_States_()
 {
 	[ -f "$SCRIPT_INTERFACES" ] && \
-	cp -a "$SCRIPT_INTERFACES" "${SCRIPT_INTERFACES}.bak"
+	cp -a "$SCRIPT_INTERFACES" "$SCRIPT_INTERFACES_BAK"
 
 	printf "WAN\n" > "$SCRIPT_INTERFACES"
 
@@ -663,24 +664,55 @@ _Check_All_Interface_States_()
 }
 
 ##---------------------------------=---##
+## Added by Martinski W. [2025-Oct-12] ##
+##-------------------------------------##
+_CheckFor_Duplicate_Interfaces_()
+{
+    if [ $# -eq 0 ] || [ -z "$1" ] || [ ! -s "$1" ]
+    then return 0
+    fi
+    local dupTempFile="${1}.DUPTMP.TXT"
+
+    setIFaceUserStatus=false
+    cat "$1" | sort -u | sort -d -t ' ' -k 1 > "$dupTempFile"
+    grep -E -m1 '^WAN.*' "$dupTempFile" > "$1"
+
+    for ifaceID in VPNC WGVPN
+    do
+        for ifaceNum in 1 2 3 4 5
+        do
+            grep -E -m1 "^${ifaceID}${ifaceNum}.*" "$dupTempFile" >> "$1"
+        done
+    done
+
+    if ! diff -q "$1" "$dupTempFile" >/dev/null 2>&1
+    then
+        setIFaceUserStatus=true
+    fi
+    rm -f "$dupTempFile"
+}
+
+##---------------------------------=---##
 ## Added by Martinski W. [2025-Jun-23] ##
 ##-------------------------------------##
 _Startup_All_Interface_States_()
 {
+	local theIFACE
 	_Check_All_Interface_States_
+	_CheckFor_Duplicate_Interfaces_ "$SCRIPT_INTERFACES_USER"
 
-	[ -f "$SCRIPT_INTERFACES_USER" ] && \
-	cp -a "$SCRIPT_INTERFACES_USER" "${SCRIPT_INTERFACES_USER}.bak"
-
-	while IFS='' read -r line || [ -n "$line" ]
+	while IFS='' read -r theLine || [ -n "$theLine" ]
 	do
-		if [ "$(grep -c "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')" "$SCRIPT_INTERFACES_USER")" -eq 0 ]
+		theIFACE="$(echo "$theLine" | cut -d'#' -f1 | sed 's/ *$//')"
+		if [ "$(grep -wc "^$theIFACE" "$SCRIPT_INTERFACES_USER")" -eq 0 ]
 		then
-			printf "%s\n" "$line" >> "$SCRIPT_INTERFACES_USER"
+			printf "%s\n" "$theLine" >> "$SCRIPT_INTERFACES_USER"
+		else
+			sed -i "s/^${theIFACE}.*/${theLine}/g" "$SCRIPT_INTERFACES_USER"
 		fi
 	done < "$SCRIPT_INTERFACES"
 
-	_Set_All_Interface_States_
+	_Set_All_InterfacesUser_Status_
 }
 
 ##----------------------------------------##
@@ -736,6 +768,27 @@ Create_Symlinks()
 		ln -s "$SHARED_DIR" "$SHARED_WEB_DIR" 2>/dev/null
 	fi
 }
+
+##-------------------------------------##
+## Added by Martinski W. [2025-Sep-06] ##
+##-------------------------------------##
+Save_InterfacesUser_SAVEDBAK()
+{
+    local doCheck=false
+
+    if [ $# -gt 0 ] && [ "$1" = "check" ]
+    then doCheck=true
+    fi
+    [ ! -s "$SCRIPT_INTERFACES_USER" ] && return 1
+
+    if ! "$doCheck" || [ ! -s "$SCRIPT_INTERFACES_USER_SAVBAK" ]
+    then
+        cp -a "$SCRIPT_INTERFACES_USER" "$SCRIPT_INTERFACES_USER_SAVBAK"
+    fi
+}
+
+Delete_InterfacesUser_SAVEDBAK()
+{ rm -f "$SCRIPT_INTERFACES_USER_SAVBAK" ;}
 
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Jul-11] ##
@@ -825,7 +878,8 @@ Interfaces_FromSettings()
 {
 	SETTINGSFILE="/jffs/addons/custom_settings.txt"
 
-	local ifaceTagStr  interface_UP
+	local ifaceTagStr  interface_UP  ifaceLineIndx  interfaceLine
+	local doUpdateSavedBak=false
 	local excludedButUPstr=" #excluded#"
 	local excludedNotUPstr=" #excluded - interface not up#"
 
@@ -834,8 +888,8 @@ Interfaces_FromSettings()
 		if grep -q "spdmerlin_ifaces_enabled" "$SETTINGSFILE"
 		then
 			Print_Output true "Updated interfaces from WebUI found, merging into $SCRIPT_INTERFACES_USER" "$PASS"
-			cp -a "$SCRIPT_INTERFACES" "${SCRIPT_INTERFACES}.bak"
-			cp -a "$SCRIPT_INTERFACES_USER" "${SCRIPT_INTERFACES_USER}.bak"
+			cp -a "$SCRIPT_INTERFACES" "$SCRIPT_INTERFACES_BAK"
+			cp -a "$SCRIPT_INTERFACES_USER" "$SCRIPT_INTERFACES_USER_BAK"
 			SETTINGVALUE="$(grep "spdmerlin_ifaces_enabled" "$SETTINGSFILE" | cut -f2 -d' ')"
 			sed -i "\\~spdmerlin_ifaces_enabled~d" "$SETTINGSFILE"
 
@@ -861,21 +915,21 @@ Interfaces_FromSettings()
 				printf "WGVPN%s%s\n" "$index" "$ifaceTagStr" >> "$SCRIPT_INTERFACES"
 			done
 
-			echo "" > "$SCRIPT_INTERFACES_USER"
+			printf '' > "$SCRIPT_INTERFACES_USER"
 			while IFS='' read -r line || [ -n "$line" ]
 			do
 				if [ "$(grep -c "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')" "$SCRIPT_INTERFACES_USER")" -eq 0 ]
-				then
+				then  # Add new interface #
 					printf "%s\n" "$line" >> "$SCRIPT_INTERFACES_USER"
 				fi
 			done < "$SCRIPT_INTERFACES"
 
-			_Set_All_Interface_States_
+			_Set_All_InterfacesUser_Status_
 
 			for IFACEname in $(echo "$SETTINGVALUE" | sed "s/,/ /g")
 			do
-				ifacelinenumber="$(grep -n "$IFACEname" "$SCRIPT_INTERFACES_USER" | cut -f1 -d':')"
-				interfaceLine="$(sed "$ifacelinenumber!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+				ifaceLineIndx="$(grep -n "$IFACEname" "$SCRIPT_INTERFACES_USER" | cut -f1 -d':')"
+				interfaceLine="$(sed "${ifaceLineIndx}!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
 				IFACE_NAME="$(echo "$interfaceLine" | cut -f1 -d"#" | sed 's/ *$//')"
 				IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
 
@@ -893,21 +947,23 @@ Interfaces_FromSettings()
 				then
 					if "$interface_UP"
 					then
-						sed -i "${ifacelinenumber}s/ #excluded - interface not up#//" "$SCRIPT_INTERFACES_USER"
-						sed -i "${ifacelinenumber}s/ #excluded#//" "$SCRIPT_INTERFACES_USER"
+						sed -i "${ifaceLineIndx}s/ #excluded - interface not up#//" "$SCRIPT_INTERFACES_USER"
+						sed -i "${ifaceLineIndx}s/ #excluded#//" "$SCRIPT_INTERFACES_USER"
 					else
-						sed -i "${ifacelinenumber}s/ #excluded#/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
+						sed -i "${ifaceLineIndx}s/ #excluded#/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 					fi
 				else
 					if ! "$interface_UP"
 					then
-						sed -i "${ifacelinenumber}s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
+						sed -i "${ifaceLineIndx}s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
 					fi
 				fi
+				doUpdateSavedBak=true
 			done
 
 			awk 'NF' "$SCRIPT_INTERFACES_USER" > /tmp/spd-interfaces
 			mv -f /tmp/spd-interfaces "$SCRIPT_INTERFACES_USER"
+			"$doUpdateSavedBak" && Save_InterfacesUser_SAVEDBAK
 
 			Print_Output true "Merge of updated interfaces from WebUI completed successfully" "$PASS"
 		else
@@ -1119,21 +1175,20 @@ Auto_ServiceEvent()
 ##-------------------------------------##
 _CheckForOpenVPN_ClientsAvailable_()
 {
-   local retCode
+   local retCode=1
    local nvramTempFile="/tmp/${SCRIPT_NAME}_nvramShow_$$.txt"
 
    nvram show 2>/dev/null | grep -E "^vpn_client[1-5]_.+" > "$nvramTempFile"
    if [ ! -s "$nvramTempFile" ]
    then
        rm -f "$nvramTempFile"
-       return 1  #OpenVPN clients NOT found#
+       return 1  #OpenVPN Clients NOT found#
    fi
 
    if grep -qE "^vpn_client[1-5]_state=[1-3]$" "$nvramTempFile" || \
       grep -qE "^vpn_client[1-5]_(username|password)=.+$" "$nvramTempFile" || \
       grep -qE "^vpn_client[1-5]_addr=([0-9]{1,3}\.){3}[0-9]{1,3}$" "$nvramTempFile"
    then retCode=0
-   else retCode=1
    fi
 
    rm -f "$nvramTempFile"
@@ -1192,10 +1247,10 @@ Auto_OpenVPN_Event()
 ##-------------------------------------##
 _CheckForWireGuard_ClientsAvailable_()
 {
-   local retCode
+   local retCode=1
    local nvramTempFile="/tmp/${SCRIPT_NAME}_nvramShow_$$.txt"
 
-   if ! nvram get "rc_support" | grep -qio "wireguard"
+   if ! nvram get "rc_support" | grep -qwo "wireguard"
    then return 1  #WireGuard NOT supported#
    fi
 
@@ -1203,14 +1258,13 @@ _CheckForWireGuard_ClientsAvailable_()
    if [ ! -s "$nvramTempFile" ]
    then
        rm -f "$nvramTempFile"
-       return 1  #WireGuard clients NOT found#
+       return 1  #WireGuard Clients NOT found#
    fi
 
-   if grep -qE "^wgc[1-5]_enable=[1-2]$" "$nvramTempFile" || \
+   if grep -qE "^wgc[1-5]_enable=[1-2]$" "$nvramTempFile"  || \
       grep -qE "^wgc[1-5]_(ppub|priv)=.+$" "$nvramTempFile" || \
-      grep -qE "^wgc[1-5]_ep_addr=([0-9]{1,3}\.){3}[0-9]{1,3}$" "$nvramTempFile"
+      grep -qE "^wgc[1-5]_addr=([0-9]{1,3}\.){3}[0-9]{1,3}" "$nvramTempFile"
    then retCode=0
-   else retCode=1
    fi
 
    rm -f "$nvramTempFile"
@@ -1424,17 +1478,19 @@ Get_Interface_From_Name()
 	echo "$IFACEname"
 }
 
-##------------------------------------=---##
-## Modified by Martinski W. [2025-Mar-08] ##
 ##----------------------------------------##
-Set_Interface_State()
+## Modified by Martinski W. [2025-Sep-06] ##
+##----------------------------------------##
+Set_InterfacesUser_State()
 {
-    local interfaceLine  interface_UP  index
-    interfaceLine="$(sed "$1!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+    local ifaceLineStr  interface_UP  index="$1"
+    local savedIFaceLine  setIncludeStatus=false
 
-    if echo "$interfaceLine" | grep -qE "^(VPNC|WGVPN)"
+    ifaceLineStr="$(sed "${index}!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+
+    if echo "$ifaceLineStr" | grep -qE "^(VPNC|WGVPN)"
     then
-        IFACE_NAME="$(echo "$interfaceLine" | cut -f1 -d"#" | sed 's/ *$//')"
+        IFACE_NAME="$(echo "$ifaceLineStr" | cut -f1 -d"#" | sed 's/ *$//')"
         IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
 
         # Check if interface is 'up' vs 'down' #
@@ -1449,52 +1505,62 @@ Set_Interface_State()
         fi
 
         # Decide how to update the '#excluded' marker based on up/down #
-        if echo "$interfaceLine" | grep -q "#excluded"
+        if echo "$ifaceLineStr" | grep -q '#excluded'
         then
-            # The user has explicitly excluded this interface at some point #
             if "$interface_UP"
             then
-                # If it was '#excluded - interface not up#' strip off the suffix #
-                sed -i "$1 s/#excluded - interface not up#/#excluded#/" "$SCRIPT_INTERFACES_USER"
-            else
-                # The interface is 'down' so ensure we have "#excluded - interface not up#" #
-                if echo "$interfaceLine" | grep -q "#excluded#$"
+                if "$vpnClientUpEvent" && [ -s "$SCRIPT_INTERFACES_USER_SAVBAK" ]
                 then
-                    sed -i "$1 s/#excluded#/#excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
+                    savedIFaceLine="$(grep "^$IFACE_NAME" "$SCRIPT_INTERFACES_USER_SAVBAK")"
+                    if [ -n "$savedIFaceLine" ] && ! echo "$savedIFaceLine" | grep -q '#excluded'
+                    then setIncludeStatus=true
+                    fi
                 fi
+                if "$setIncludeStatus"  # Remove any '#excluded' marker #
+                then
+                    sed -i "${index}s/ #excluded#//" "$SCRIPT_INTERFACES_USER"
+                    sed -i "${index}s/ #excluded - interface not up#//" "$SCRIPT_INTERFACES_USER"
+                else
+                    # If it had '- interface not up#' remove it but keep it 'excluded' #
+                    sed -i "${index}s/#excluded - interface not up#/#excluded#/" "$SCRIPT_INTERFACES_USER"
+                fi
+            else
+                # The interface is 'down' so ensure we have '- interface not up#' #
+                sed -i "${index}s/#excluded#/#excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
             fi
         else
-            # No '#excluded' marker => user wanted it included #
+            # No '#excluded' marker => user wanted it included when UP #
             if ! "$interface_UP"
             then
                 # If it’s 'down' automatically exclude it with '- interface not up#' #
-                sed -i "$1 s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
+                sed -i "${index}s/$/ #excluded - interface not up#/" "$SCRIPT_INTERFACES_USER"
             fi
         fi
     fi
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-08] ##
+## Modified by Martinski W. [2025-Sep-06] ##
 ##----------------------------------------##
 Generate_Interface_List()
 {
-    local ifaceCount  ifaceEntryNum  interfaceLine  interface_UP
+	local ifaceCount  ifaceEntryNum  ifaceLineStr  interface_UP
+	local doUpdateSavedBak=false
 	printf "\nRetrieving list of interfaces...\n\n"
 
-    _GenerateIFaceList_()
-    {
-        ifaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
-        COUNTER=1
-        until [ "$COUNTER" -gt "$ifaceCount" ]
-        do
-	        Set_Interface_State "$COUNTER"
-	        ifaceLine="$(sed "$COUNTER!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
-	        printf "%2d)  %s\n" "$COUNTER" "$ifaceLine"
-	        COUNTER="$((COUNTER + 1))"
-        done
-        printf " e)  Exit to Main Menu\n"
-    }
+	_GenerateIFaceList_()
+	{
+		ifaceCount="$(wc -l < "$SCRIPT_INTERFACES_USER")"
+		COUNTER=1
+		until [ "$COUNTER" -gt "$ifaceCount" ]
+		do
+			Set_InterfacesUser_State "$COUNTER"
+			ifaceLine="$(sed "${COUNTER}!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+			printf "%2d)  %s\n" "$COUNTER" "$ifaceLine"
+			COUNTER="$((COUNTER + 1))"
+		done
+		printf " e)  Exit to Main Menu\n"
+	}
 
 	while true
 	do
@@ -1515,8 +1581,8 @@ Generate_Interface_List()
 			printf "\n${ERR}Please enter a number between 1 and ${ifaceCount}.${CLEARFORMAT}\n"
 			PressEnter
 		else
-			interfaceLine="$(sed "$ifaceEntryNum!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
-			IFACE_NAME="$(echo "$interfaceLine" | cut -f1 -d"#" | sed 's/ *$//')"
+			ifaceLineStr="$(sed "$ifaceEntryNum!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
+			IFACE_NAME="$(echo "$ifaceLineStr" | cut -f1 -d"#" | sed 's/ *$//')"
 			IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
 
 			interface_UP=false
@@ -1529,8 +1595,8 @@ Generate_Interface_List()
 			    then interface_UP=true ; fi
 			fi
 
-			if echo "$interfaceLine" | grep -q "#excluded"
-            then
+			if echo "$ifaceLineStr" | grep -q "#excluded"
+			then
 				if "$interface_UP"
 				then
 					sed -i "${ifaceEntryNum}s/ #excluded - interface not up#//" "$SCRIPT_INTERFACES_USER"
@@ -1547,9 +1613,12 @@ Generate_Interface_List()
 				fi
 			fi
 			sed -i 's/ *$//' "$SCRIPT_INTERFACES_USER"
+			doUpdateSavedBak=true
 			printf "\n"
 		fi
 	done
+
+	"$doUpdateSavedBak" && Save_InterfacesUser_SAVEDBAK
 }
 
 ##----------------------------------------##
@@ -1794,7 +1863,7 @@ CronTestSchedule()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Sep-05] ##
+## Modified by Martinski W. [2025-Sep-06] ##
 ##----------------------------------------##
 ScriptStorageLocation()
 {
@@ -1811,6 +1880,7 @@ ScriptStorageLocation()
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces.bak" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces_user" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces_user.bak" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
+			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces_user.save.bak" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.databaseupgraded" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/config" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/config.bak" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
@@ -1833,6 +1903,7 @@ ScriptStorageLocation()
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces.bak" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces_user" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces_user.bak" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
+			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces_user.save.bak" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.databaseupgraded" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/config" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/config.bak" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
@@ -1862,7 +1933,10 @@ ScriptStorageLocation()
 			SPEEDSTATS_DB="$SCRIPT_STORAGE_DIR/spdstats.db"
 			CSV_OUTPUT_DIR="$SCRIPT_STORAGE_DIR/csv"
 			SCRIPT_INTERFACES="$SCRIPT_STORAGE_DIR/.interfaces"
+			SCRIPT_INTERFACES_BAK="${SCRIPT_INTERFACES}.bak"
 			SCRIPT_INTERFACES_USER="$SCRIPT_STORAGE_DIR/.interfaces_user"
+			SCRIPT_INTERFACES_USER_BAK="${SCRIPT_INTERFACES_USER}.bak"
+			SCRIPT_INTERFACES_USER_SAVBAK="${SCRIPT_INTERFACES_USER}.save.bak"
 			if [ $# -gt 1 ] && [ "$2" = "true" ]
 			then _UpdateJFFS_FreeSpaceInfo_ ; fi
 		    ;;
@@ -2333,10 +2407,12 @@ GenerateServerList()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jul-11] ##
+## Modified by Martinski W. [2025-Oct-12] ##
 ##----------------------------------------##
 GenerateServerList_WebUI()
 {
+	local setIFaceUserStatus=false
+
 	spdifacename="$1"
 	serverlistfile="$2"
 	rm -f "/tmp/${serverlistfile}.txt"
@@ -2376,6 +2452,13 @@ GenerateServerList_WebUI()
 			fi
 		done < "$SCRIPT_INTERFACES_USER"
 		IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
+
+		_CheckFor_Duplicate_Interfaces_ "$SCRIPT_INTERFACES_USER"
+		if "$setIFaceUserStatus"
+		then
+			_Set_All_InterfacesUser_Status_
+			Save_InterfacesUser_SAVEDBAK
+		fi
 
 		for IFACE_NAME in $IFACELIST
 		do
@@ -3224,7 +3307,7 @@ Run_Speedtest()
 					fi
 
 					echo 'var spdteststatus = "InProgress_'"$IFACE_NAME"'";' > /tmp/detect_spdtest.js
-					printf "" > "$tmpfile"
+					printf '' > "$tmpfile"
 
 					if [ "$mode" = "auto" ]
 					then
@@ -4070,27 +4153,56 @@ PressEnter()
 	return 0
 }
 
+##-------------------------------------##
+## Added by Martinski W. [2025-Sep-06] ##
+##-------------------------------------##
+_CenterTextStr_()
+{
+    if [ $# -lt 2 ] || [ -z "$1" ] || [ -z "$2" ] || \
+       ! echo "$2" | grep -qE "^[1-9][0-9]+$"
+    then echo ; return 1
+    fi
+    local stringLen="${#1}"
+    local space1Len="$((($2 - stringLen)/2))"
+    local space2Len="$space1Len"
+    local totalLen="$((space1Len + stringLen + space2Len))"
+
+    if [ "$totalLen" -lt "$2" ]
+    then space2Len="$((space2Len + 1))"
+    elif [ "$totalLen" -gt "$2" ]
+    then space1Len="$((space1Len - 1))"
+    fi
+    if [ "$space1Len" -gt 0 ] && [ "$space2Len" -gt 0 ]
+    then printf "%*s%s%*s" "$space1Len" '' "$1" "$space2Len" ''
+    else printf "%s" "$1"
+    fi
+}
+
+##----------------------------------------##
+## Modified by Martinski W. [2025-Sep-06] ##
+##----------------------------------------##
 ScriptHeader()
 {
 	clear
-	printf "\\n"
-	printf "${BOLD}################################################################${CLEARFORMAT}\\n"
-	printf "${BOLD}##                     _  __  __              _  _            ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##                    | ||  \/  |            | |(_)           ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##     ___  _ __    __| || \  / |  ___  _ __ | | _  _ __      ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##    / __|| '_ \  / _  || |\/| | / _ \| '__|| || || '_ \     ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##    \__ \| |_) || (_| || |  | ||  __/| |   | || || | | |    ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##    |___/| .__/  \__,_||_|  |_| \___||_|   |_||_||_| |_|    ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##        | |                                                 ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##        |_|                                                 ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##                  %9s on %-18s           ##${CLEARFORMAT}\n" "$SCRIPT_VERSION" "$ROUTER_MODEL"
-	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##            https://github.com/AMTM-OSR/spdMerlin           ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##      Forked from https://github.com/jackyaz/spdMerlin      ##${CLEARFORMAT}\\n"
-	printf "${BOLD}##                                                            ##${CLEARFORMAT}\\n"
-	printf "${BOLD}################################################################${CLEARFORMAT}\\n"
-	printf "\\n"
+	local spaceLen=58  colorCT
+	[ "$SCRIPT_BRANCH" = "master" ] && colorCT="$GRNct" || colorCT="$MGNTct"
+	echo
+	printf "${BOLD}################################################################${CLRct}\n"
+	printf "${BOLD}##                     _  __  __              _  _            ##${CLRct}\n"
+	printf "${BOLD}##                    | ||  \/  |            | |(_)           ##${CLRct}\n"
+	printf "${BOLD}##     ___  _ __    __| || \  / |  ___  _ __ | | _  _ __      ##${CLRct}\n"
+	printf "${BOLD}##    / __|| '_ \  / _  || |\/| | / _ \| '__|| || || '_ \     ##${CLRct}\n"
+	printf "${BOLD}##    \__ \| |_) || (_| || |  | ||  __/| |   | || || | | |    ##${CLRct}\n"
+	printf "${BOLD}##    |___/| .__/  \__,_||_|  |_| \___||_|   |_||_||_| |_|    ##${CLRct}\n"
+	printf "${BOLD}##        | |                                                 ##${CLRct}\n"
+	printf "${BOLD}##        |_|                                                 ##${CLRct}\n"
+	printf "${BOLD}## ${GRNct}%s${CLRct}${BOLD} ##${CLRct}\n" "$(_CenterTextStr_ "$versionMod_TAG" "$spaceLen")"
+	printf "${BOLD}## ${colorCT}%s${CLRct}${BOLD} ##${CLRct}\n" "$(_CenterTextStr_ "$branchxStr_TAG" "$spaceLen")"
+	printf "${BOLD}##                                                            ##${CLRct}\n"
+	printf "${BOLD}##            https://github.com/AMTM-OSR/spdMerlin           ##${CLRct}\n"
+	printf "${BOLD}##      Forked from https://github.com/jackyaz/spdMerlin      ##${CLRct}\n"
+	printf "${BOLD}##                                                            ##${CLRct}\n"
+	printf "${BOLD}################################################################${CLRct}\n\n"
 }
 
 ##-------------------------------------##
@@ -4595,7 +4707,7 @@ Menu_Install()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-23] ##
+## Modified by Martinski W. [2025-Oct-12] ##
 ##----------------------------------------##
 Menu_Startup()
 {
@@ -4637,6 +4749,7 @@ Menu_Startup()
 	then Auto_Cron create 2>/dev/null
 	else Auto_Cron delete 2>/dev/null
 	fi
+	Set_Version_Custom_Settings local "$SCRIPT_VERSION"
 	Auto_ServiceEvent create 2>/dev/null
 	Auto_OpenVPN_Event create 2>/dev/null
 	Auto_WG_ClientEvent create 2>/dev/null
@@ -6108,17 +6221,23 @@ SCRIPT_CONF="$SCRIPT_STORAGE_DIR/config"
 SPEEDSTATS_DB="$SCRIPT_STORAGE_DIR/spdstats.db"
 CSV_OUTPUT_DIR="$SCRIPT_STORAGE_DIR/csv"
 SCRIPT_INTERFACES="$SCRIPT_STORAGE_DIR/.interfaces"
+SCRIPT_INTERFACES_BAK="${SCRIPT_INTERFACES}.bak"
 SCRIPT_INTERFACES_USER="$SCRIPT_STORAGE_DIR/.interfaces_user"
+SCRIPT_INTERFACES_USER_BAK="${SCRIPT_INTERFACES_USER}.bak"
+SCRIPT_INTERFACES_USER_SAVBAK="${SCRIPT_INTERFACES_USER}.save.bak"
 JFFS_LowFreeSpaceStatus="OK"
 updateJFFS_SpaceInfo=false
+vpnClientUpIDstr=""
+vpnClientUpEvent=false
+vpnClientDownEvent=false
 
 if [ "$SCRIPT_BRANCH" = "master" ]
-then SCRIPT_VERS_INFO="[$branchx_TAG]"
-else SCRIPT_VERS_INFO="[$version_TAG, $branchx_TAG]"
+then SCRIPT_VERS_INFO=""
+else SCRIPT_VERS_INFO="[$versionDev_TAG]"
 fi
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Oct-12] ##
 ##----------------------------------------##
 if [ $# -eq 0 ] || [ -z "$1" ]
 then
@@ -6149,6 +6268,7 @@ then
 	then Auto_Cron create 2>/dev/null
 	else Auto_Cron delete 2>/dev/null
 	fi
+	Set_Version_Custom_Settings local "$SCRIPT_VERSION"
 	Auto_ServiceEvent create 2>/dev/null
 	Auto_OpenVPN_Event create 2>/dev/null
 	Auto_WG_ClientEvent create 2>/dev/null
@@ -6242,13 +6362,16 @@ case "$1" in
 			if [ "$3" = "route-pre-down" ]
 			then
 				Print_Output true "VPN Client tunnel is going down." "$PASS"
+				vpnClientDownEvent=true
+				Save_InterfacesUser_SAVEDBAK check
 				sleep 3
 			elif [ "$3" = "route-up" ]
 			then
 				Print_Output true "VPN Client tunnel is coming up." "$PASS"
+				vpnClientUpEvent=true ; vpnClientUpIDstr="$2"
 				sleep 2
 			fi
-			_Reset_Interface_States_ force "$2"
+			_Reset_Interface_States_ force
 			Clear_Lock
 		fi
 		exit 0
@@ -6257,13 +6380,16 @@ case "$1" in
 		if [ "$2" = "stop" ]
 		then
 			Print_Output true "WireGuard Client tunnel is going down." "$PASS"
+			vpnClientDownEvent=true
+			Save_InterfacesUser_SAVEDBAK check
 			sleep 3
 		elif [ "$2" = "start" ]
 		then
 			Print_Output true "WireGuard Client tunnel is coming up." "$PASS"
+			vpnClientUpEvent=true ; vpnClientUpIDstr="wg$2"
 			sleep 2
 		fi
-		_Reset_Interface_States_ force "$2"
+		_Reset_Interface_States_ force
 		Clear_Lock
 		exit 0
 	;;
