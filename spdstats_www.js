@@ -1,14 +1,14 @@
 /**----------------------------**/
-/** Last Modified: 2025-Jul-13 **/
+/** Last Modified: 2025-Oct-11 **/
 /**----------------------------**/
 
 var daysofweek = ['Mon','Tues','Wed','Thurs','Fri','Sat','Sun'];
 var maxNoCharts = 0;
 var currentNoCharts = 0;
 
-var interfacelist = '';
-var interfacescomplete = [];
-var interfacesdisabled = [];
+let interfaceList = '';
+let interfacesComplete = [];
+let interfacesDisabled = [];
 
 var arraysortlistlinesWAN = [];
 var sortnameWAN = 'Time';
@@ -696,7 +696,7 @@ function round(value,decimals){
 }
 
 function ToggleLines(){
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	if(ShowLines == ''){
 		ShowLines = 'line';
 		SetCookie('ShowLines','line');
@@ -722,7 +722,7 @@ function ToggleLines(){
 }
 
 function ToggleFill(){
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	if(ShowFill == 'origin'){
 		ShowFill = 'false';
 		SetCookie('ShowFill','false');
@@ -747,7 +747,7 @@ function ToggleFill(){
 }
 
 function RedrawAllCharts(){
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	var i;
 	for(var i2 = 0; i2 < chartlist.length; i2++){
 		for(var i3 = 0; i3 < interfacetextarray.length; i3++){
@@ -765,7 +765,7 @@ function SetGlobalDataset(txtchartname,dataobject){
 	window[txtchartname] = dataobject;
 	currentNoCharts++;
 	if(currentNoCharts == maxNoCharts){
-		var interfacetextarray = interfacelist.split(',');
+		var interfacetextarray = interfaceList.split(',');
 		for(var i = 0; i < interfacetextarray.length; i++){
 			$('#'+interfacetextarray[i]+'_Interval_Combined').val(GetCookie(interfacetextarray[i]+'_Interval_Combined','number'));
 			$('#'+interfacetextarray[i]+'_Interval_Quality').val(GetCookie(interfacetextarray[i]+'_Interval_Quality','number'));
@@ -972,7 +972,7 @@ function getChartScale(scale){
 }
 
 function ResetZoom(){
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	for(var i = 0; i < interfacetextarray.length; i++){
 		for(var i2 = 0; i2 < typelist.length; i2++){
 			var chartobj = window['LineChart_'+interfacetextarray[i]+'_'+typelist[i2]];
@@ -1001,7 +1001,7 @@ function ToggleDragZoom(button){
 		buttonvalue = 'Drag Zoom On';
 	}
 	
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	for(var i = 0; i < interfacetextarray.length; i++){
 		for(var i2 = 0; i2 < typelist.length; i2++){
 			var chartobj = window['LineChart_'+interfacetextarray[i]+'_'+typelist[i2]];
@@ -1178,12 +1178,12 @@ function get_manualspdtestservers_file()
 				showhide('spdtest_serverprefselect',true);
 				showhide('imgManualServerList',false);
 			}
-			for (var i = 0; i < interfacescomplete.length; i++)
+			for (var i = 0; i < interfacesComplete.length; i++)
 			{
-				if (interfacesdisabled.includes(interfacescomplete[i]) == false)
+				if (interfacesDisabled.includes(interfacesComplete[i]) == false)
 				{
-					$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-					$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+					$('#spdtest_enabled_'+interfacesComplete[i].toLowerCase()).prop('disabled',false);
+					$('#spdtest_enabled_'+interfacesComplete[i].toLowerCase()).removeClass('disabled');
 				}
 			}
 			$.each($('input[name=spdtest_serverpref]'),function(){
@@ -1393,14 +1393,14 @@ function SaveConfig()
 	if (validateAll())
 	{
 		$('[name*=spdmerlin_]').prop('disabled',false);
-		for (var indx = 0; indx < interfacescomplete.length; indx++)
+		for (var indx = 0; indx < interfacesComplete.length; indx++)
 		{
-			$('#spdmerlin_iface_enabled_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
-			$('#spdmerlin_iface_enabled_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
-			$('#spdmerlin_usepreferred_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
-			$('#spdmerlin_usepreferred_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
-			$('#changepref_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
-			$('#changepref_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
+			$('#spdmerlin_iface_enabled_'+interfacesComplete[indx].toLowerCase()).prop('disabled',false);
+			$('#spdmerlin_iface_enabled_'+interfacesComplete[indx].toLowerCase()).removeClass('disabled');
+			$('#spdmerlin_usepreferred_'+interfacesComplete[indx].toLowerCase()).prop('disabled',false);
+			$('#spdmerlin_usepreferred_'+interfacesComplete[indx].toLowerCase()).removeClass('disabled');
+			$('#changepref_'+interfacesComplete[indx].toLowerCase()).prop('disabled',false);
+			$('#changepref_'+interfacesComplete[indx].toLowerCase()).removeClass('disabled');
 		}
 
 		if (document.form.spdmerlin_automaticmode.value === 'true')
@@ -1570,7 +1570,7 @@ function getConfigFile()
 }
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Jul-13] **/
+/** Modified by Martinski W. [2025-Oct-11] **/
 /**----------------------------------------**/
 function getInterfacesFile()
 {
@@ -1587,13 +1587,13 @@ function getInterfacesFile()
 			showhide('btnRunSpeedtest',true);
 			showhide('databaseSize_text',true);
 
-			var interfaces = data.split('\n');
+			var theInterfaces = data.split('\n');
 			const styleLeftMarginIndx = [2, 3, 4, 5, 7, 8, 9, 10];
-			let interfacename, ifaceNameUpper, ifaceNameLower, ifaceLabel, ifaceStyle;
-			interfaces = interfaces.filter(Boolean);
-			interfacelist = '';
-			interfacescomplete = [];
-			interfacesdisabled = [];
+			let interfaceName, ifaceExcluded, ifaceNameUpper, ifaceNameLower, ifaceLabel, ifaceStyle, indxCount;
+			theInterfaces = theInterfaces.filter(Boolean);
+			interfaceList = '';
+			interfacesComplete = [];
+			interfacesDisabled = [];
 
 			var interfacecharttablehtml='<div style="line-height:10px;">&nbsp;</div>';
 			interfacecharttablehtml += '<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable" id="table_allinterfaces">';
@@ -1610,89 +1610,101 @@ function getInterfacesFile()
 			speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_all" onchange="Change_SpdTestInterface(this)" class="input" settingvalueradio" value="All" checked>';
 			speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_all">All</label>';
 
-			const ifaceMaxCount = interfaces.length;
+			indxCount = 0;
+			const ifaceMaxCount = theInterfaces.length;
 			const breakStartIndex = 1, breakStopIndex = 5;
 
 			for (var ifaceIndx = 0; ifaceIndx < ifaceMaxCount; ifaceIndx++)
 			{
-				interfacename = '';
-				if (interfaces[ifaceIndx].indexOf('#') !== -1)
+				if (theInterfaces[ifaceIndx].indexOf('#') === -1)
 				{
-					interfacename = interfaces[ifaceIndx].substring(0,interfaces[ifaceIndx].indexOf('#')).trim();
-					interfacescomplete.push(interfacename);
-                    ifaceNameUpper = interfacename.toUpperCase();
-                    ifaceNameLower = interfacename.toLowerCase();
+					ifaceExcluded = false;
+					interfaceName = theInterfaces[ifaceIndx].trim();
+				}
+				else
+				{
+					ifaceExcluded = true;
+					interfaceName = theInterfaces[ifaceIndx].substring(0,theInterfaces[ifaceIndx].indexOf('#')).trim();
+				}
+				if (interfacesComplete.includes(interfaceName))
+				{
+					console.log(`ERROR: getInterfacesFile(): Duplicate Interface Found [${interfaceName}]`);
+					continue;
+				}
+				indxCount = interfacesComplete.length;
+				interfacesComplete.push(interfaceName);
+				ifaceNameUpper = interfaceName.toUpperCase();
+				ifaceNameLower = interfaceName.toLowerCase();
+
+				if (ifaceExcluded)
+				{
 					ifaceStyle = 'style="margin-left:0px;"';
 					ifaceLabel = ifaceNameUpper;
 					var changelabel = 'Change?';
-					var interfacedisabled = '';
+					var interfaceDisabled = '';
 
-					if (interfaces[ifaceIndx].indexOf('interface not up') !== -1)
+					if (theInterfaces[ifaceIndx].indexOf('interface not up') !== -1)
 					{
-						interfacesdisabled.push(interfacename);
-						interfacedisabled = 'disabled';
+						interfacesDisabled.push(interfaceName);
+						interfaceDisabled = 'disabled';
 						ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(1,this);">'+ifaceNameUpper+'</a>';
 						changelabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(1,this);">Change?</a>';
 					}
 
 					// For AUTOMATIC Speedtests //
-					if (breakStartIndex === ifaceIndx) { interfaceconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx))
+					if (breakStartIndex === indxCount) { interfaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
 					{
 						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
 						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
 						else
 						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
 					}
-					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input '+interfaceDisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfaceDisabled+' '+ifaceStyle+'>';
 					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { interfaceconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { interfaceconfigtablehtml += '</br>'; }
 
 					// For PREFERRED Servers //
-					if (breakStartIndex === ifaceIndx) { prefserverconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx))
+					if (breakStartIndex === indxCount) { prefserverconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
 					{
 						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
 						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
 						else
 						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
 					}
-					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input '+interfaceDisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfaceDisabled+' '+ifaceStyle+'>';
 					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { prefserverconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { prefserverconfigtablehtml += '</br>'; }
 
 					// Select a Preferred Server //
 					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+ifaceNameLower+'">'+ifaceNameUpper+':</span><br />';
-					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+ifaceNameLower+'" id="changepref_'+ifaceNameLower+'" class="input settingvalue '+interfacedisabled+'" '+interfacedisabled+' onchange="Toggle_ChangePrefServer(this)">';
+					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+ifaceNameLower+'" id="changepref_'+ifaceNameLower+'" class="input settingvalue '+interfaceDisabled+'" '+interfaceDisabled+' onchange="Toggle_ChangePrefServer(this)">';
 					prefserverselecttablehtml += '<label for="changepref_'+ifaceNameLower+'">'+changelabel+'</label>';
 					prefserverselecttablehtml += '<img id="imgServerList_'+ifaceNameLower+'" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
 					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+ifaceNameLower+'" id="spdmerlin_preferredserver_'+ifaceNameLower+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
 
 					// For MANUAL Speedtests //
-					if (breakStartIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx))
+					if (breakStartIndex === indxCount) { speedtestifaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
 					{
 						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
 						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
 						else
 						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
 					}
-					speedtestifaceconfigtablehtml += '<input autocomplete="off" autocapitalize="off" type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input '+interfacedisabled+' settingvalueradio" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					speedtestifaceconfigtablehtml += '<input autocomplete="off" autocapitalize="off" type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input '+interfaceDisabled+' settingvalueradio" value="'+ifaceNameUpper+'" '+interfaceDisabled+' '+ifaceStyle+'>';
 					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { speedtestifaceconfigtablehtml += '</br>'; }
 				}
-				else
+				else  //Interface UP and INCLUDED//
 				{
-					interfacename = interfaces[ifaceIndx].trim();
-					interfacescomplete.push(interfacename);
-                    ifaceNameUpper = interfacename.toUpperCase();
-                    ifaceNameLower = interfacename.toLowerCase();
 					ifaceStyle = 'style="margin-left:0px;"';
-                    ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
+					ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
 
 					// For AUTOMATIC Speedtests //
-					if (breakStartIndex === ifaceIndx) { interfaceconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx))
+					if (breakStartIndex === indxCount) { interfaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
 					{
 						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
 						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
@@ -1701,11 +1713,11 @@ function getInterfacesFile()
 					}
 					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked '+ifaceStyle+'>';
 					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { interfaceconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { interfaceconfigtablehtml += '</br>'; }
 
 					// For PREFERRED Servers //
-					if (breakStartIndex === ifaceIndx) { prefserverconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx))
+					if (breakStartIndex === indxCount) { prefserverconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
 					{
 						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
 						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
@@ -1714,7 +1726,7 @@ function getInterfacesFile()
 					}
 					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked '+ifaceStyle+'>';
 					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { prefserverconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { prefserverconfigtablehtml += '</br>'; }
 
 					// Select a Preferred Server //
 					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+ifaceNameLower+'">'+ifaceNameUpper+':</span><br />';
@@ -1724,8 +1736,8 @@ function getInterfacesFile()
 					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+ifaceNameLower+'" id="spdmerlin_preferredserver_'+ifaceNameLower+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
 
 					// For MANUAL Speedtests //
-					if (breakStartIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx))
+					if (breakStartIndex === indxCount) { speedtestifaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
 					{
 						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
 						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
@@ -1734,11 +1746,11 @@ function getInterfacesFile()
 					}
 					speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input settingvalueradio" value="'+ifaceNameUpper+'" '+ifaceStyle+'>';
 					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { speedtestifaceconfigtablehtml += '</br>'; }
 				}
 
-				interfacecharttablehtml += BuildInterfaceTable(interfacename);
-				interfacelist += interfacename+',';
+				interfacecharttablehtml += BuildInterfaceTable(interfaceName);
+				interfaceList += interfaceName+',';
 			}
 
 			interfacecharttablehtml += '</td></tr></table>';
@@ -1755,16 +1767,16 @@ function getInterfacesFile()
 			GenerateManualSpdTestServerPrefSelect();
 			document.form.spdtest_serverpref.value = 'auto';
 
-			if (interfacelist.charAt(interfacelist.length-1) == ',')
-            { interfacelist = interfacelist.slice(0,-1); }
+			if (interfaceList.charAt(interfaceList.length-1) == ',')
+			{ interfaceList = interfaceList.slice(0,-1); }
 
 			$('#table_buttons2').after(interfacecharttablehtml);
-			maxNoCharts = interfacelist.split(',').length*3*3*2;
+			maxNoCharts = interfaceList.split(',').length*3*3*2;
 			RedrawAllCharts();
 
 			AddEventHandlers();
 
-			var interfacetextarray = interfacelist.split(',');
+			var interfacetextarray = interfaceList.split(',');
 			for (var indx = 0; indx < interfacetextarray.length; indx++)
 			{
 				$('#sortTable'+interfacetextarray[indx]).empty();
@@ -2020,7 +2032,7 @@ function changeAllCharts(e)
 	value = e.value * 1;
 	name = e.id.substring(0,e.id.indexOf('_'));
 	SetCookie(e.id,value);
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	for (var i = 0; i < interfacetextarray.length; i++)
 	{
 		Draw_Chart(interfacetextarray[i],'Combined');
@@ -2044,7 +2056,7 @@ function changeChart(e)
 }
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Mar-03] **/
+/** Modified by Martinski W. [2025-Oct-11] **/
 /**----------------------------------------**/
 function SettingHint (hintID, formField)
 {
@@ -2052,24 +2064,26 @@ function SettingHint (hintID, formField)
 	for (var i = 0; i < tag_name.length; i++)
 	{ tag_name[i].onmouseout=nd; }
 
-	let hintMsg = '';
+	let hintMsg = '', ifaceNum = 0;
 	if (hintID === 1)
 	{
-	    if (formField.name.match(/^WGVPN[1-5]/) !== null)
-	    { hintMsg = 'WireGuard interface is <b>not</b> enabled.'; }
-	    else if (formField.name.match(/^VPNC[1-5]/) !== null)
-	    { hintMsg = 'OpenVPN client interface is <b>not</b> enabled.'; }
-	    else
-	    { hintMsg = 'Interface is <b>not</b> enabled.'; }
+		ifaceNum = formField.name.replace(/\D/g,'');
+		if (formField.name.match(/^WGVPN[1-5]/) !== null)
+		{ hintMsg = `WireGuard client ${ifaceNum} interface is <b>not</b> enabled.`; }
+		else if (formField.name.match(/^VPNC[1-5]/) !== null)
+		{ hintMsg = `OpenVPN client ${ifaceNum} interface is <b>not</b> enabled.`; }
+		else
+		{ hintMsg = 'Interface is <b>not</b> enabled.'; }
 	}
 	else if (hintID === 2)
 	{
-	    if (formField.name.match(/^WGVPN[1-5]/) !== null)
-	    { hintMsg = 'WireGuard interface is enabled.'; }
-	    else if (formField.name.match(/^VPNC[1-5]/) !== null)
-	    { hintMsg = 'OpenVPN client interface is enabled.'; }
-	    else
-	    { hintMsg = 'Interface is enabled.'; }
+		ifaceNum = formField.name.replace(/\D/g,'');
+		if (formField.name.match(/^WGVPN[1-5]/) !== null)
+		{ hintMsg = `WireGuard client ${ifaceNum} interface is enabled.`; }
+		else if (formField.name.match(/^VPNC[1-5]/) !== null)
+		{ hintMsg = `OpenVPN client ${ifaceNum} interface is enabled.`; }
+		else
+		{ hintMsg = 'Interface is enabled.'; }
 	}
 	else if (hintID === 3)
 	{ hintMsg = 'Hour(s) of day to run speedtests.<br />Use an asterisk (<b>*</b>) to run every hour.<br />Valid numbers are between 0 and 23.<br />Use commas (<b>,</b>) for multiple entries.<br />Use a hyphen (<b>-</b>) to indicate a range.'; }
@@ -2211,14 +2225,14 @@ function AutomaticInterfaceEnableDisable(forminput)
 
 	if (inputvalue == 'false')
 	{
-		for (var i = 0; i < interfacescomplete.length; i++)
+		for (var i = 0; i < interfacesComplete.length; i++)
 		{
-			$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
-			$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
-			$('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$('#changepref_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
+			$('#'+prefix+'_iface_enabled_'+interfacesComplete[i].toLowerCase()).prop('disabled',true);
+			$('#'+prefix+'_iface_enabled_'+interfacesComplete[i].toLowerCase()).addClass('disabled');
+			$('#'+prefix+'_usepreferred_'+interfacesComplete[i].toLowerCase()).prop('disabled',true);
+			$('#'+prefix+'_usepreferred_'+interfacesComplete[i].toLowerCase()).addClass('disabled');
+			$('#changepref_'+interfacesComplete[i].toLowerCase()).prop('disabled',true);
+			$('#changepref_'+interfacesComplete[i].toLowerCase()).addClass('disabled');
 		}
 		for (var i = 0; i < fieldNames.length; i++)
 		{
@@ -2237,16 +2251,16 @@ function AutomaticInterfaceEnableDisable(forminput)
 	}
 	else if (inputvalue == 'true')
 	{
-		for (var i = 0; i < interfacescomplete.length; i++)
+		for (var i = 0; i < interfacesComplete.length; i++)
 		{
-			if (interfacesdisabled.includes(interfacescomplete[i]) == false)
+			if (interfacesDisabled.includes(interfacesComplete[i]) == false)
 			{
-				$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
-				$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
-				$('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$('#changepref_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+				$('#'+prefix+'_iface_enabled_'+interfacesComplete[i].toLowerCase()).prop('disabled',false);
+				$('#'+prefix+'_iface_enabled_'+interfacesComplete[i].toLowerCase()).removeClass('disabled');
+				$('#'+prefix+'_usepreferred_'+interfacesComplete[i].toLowerCase()).prop('disabled',false);
+				$('#'+prefix+'_usepreferred_'+interfacesComplete[i].toLowerCase()).removeClass('disabled');
+				$('#changepref_'+interfacesComplete[i].toLowerCase()).prop('disabled',false);
+				$('#changepref_'+interfacesComplete[i].toLowerCase()).removeClass('disabled');
 			}
 		}
 		for (var i = 0; i < fieldNames.length; i++)
@@ -2384,10 +2398,10 @@ function Toggle_SpdTestServerPref(forminput)
 	{
 		document.formScriptActions.action_script.value='start_spdmerlinserverlistmanual_'+document.form.spdtest_enabled.value;
 		document.formScriptActions.submit();
-		for (var i = 0; i < interfacescomplete.length; i++)
+		for (var i = 0; i < interfacesComplete.length; i++)
 		{
-			$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
+			$('#spdtest_enabled_'+interfacesComplete[i].toLowerCase()).prop('disabled',true);
+			$('#spdtest_enabled_'+interfacesComplete[i].toLowerCase()).addClass('disabled');
 		}
 		$.each($('input[name=spdtest_serverpref]'),function(){
 			$(this).prop('disabled',true);
@@ -2441,12 +2455,12 @@ function GenerateManualSpdTestServerPrefSelect()
 
 	if (document.form.spdtest_enabled.value == 'All')
 	{
-		for (var i = 0; i < interfacescomplete.length; i++)
+		for (var i = 0; i < interfacesComplete.length; i++)
 		{
-			if (interfacesdisabled.includes(interfacescomplete[i]) == false)
+			if (interfacesDisabled.includes(interfacesComplete[i]) == false)
 			{
-				ifaceNameUpper = interfacescomplete[i].toUpperCase();
-				ifaceNameLower = interfacescomplete[i].toLowerCase();
+				ifaceNameUpper = interfacesComplete[i].toUpperCase();
+				ifaceNameLower = interfacesComplete[i].toLowerCase();
 
 				if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
 				{ styleSetting = 'style="width:58px; display:none;"'; }
@@ -2455,7 +2469,7 @@ function GenerateManualSpdTestServerPrefSelect()
 				else
 				{ styleSetting = 'style="width:33px; display:none;"'; }
 
-				serverprefhtml += '<span '+styleSetting+' id="spdtest_serverprefselectspan_'+ifaceNameLower+'">'+interfacescomplete[i]+':</span><select name="spdtest_serverprefselect_'+ifaceNameLower+'" id="spdtest_serverprefselect_'+ifaceNameLower+'" style="display:none;max-width:415px;"></select><br />';
+				serverprefhtml += '<span '+styleSetting+' id="spdtest_serverprefselectspan_'+ifaceNameLower+'">'+interfacesComplete[i]+':</span><select name="spdtest_serverprefselect_'+ifaceNameLower+'" id="spdtest_serverprefselect_'+ifaceNameLower+'" style="display:none;max-width:415px;"></select><br />';
 			}
 		}
 	}
