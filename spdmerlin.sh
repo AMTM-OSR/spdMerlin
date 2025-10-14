@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Oct-12
+# Last Modified: 2025-Oct-14
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25101202"
+readonly SCRIPT_VERSTAG="25101422"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -674,7 +674,7 @@ _CheckFor_Duplicate_Interfaces_()
     local dupTempFile="${1}.DUPTMP.TXT"
 
     setIFaceUserStatus=false
-    cat "$1" | sort -u | sort -d -t ' ' -k 1 > "$dupTempFile"
+    cat "$1" | sort -u > "$dupTempFile"
     grep -E -m1 '^WAN.*' "$dupTempFile" > "$1"
 
     for ifaceID in VPNC WGVPN
@@ -707,7 +707,8 @@ _Startup_All_Interface_States_()
 		if [ "$(grep -wc "^$theIFACE" "$SCRIPT_INTERFACES_USER")" -eq 0 ]
 		then
 			printf "%s\n" "$theLine" >> "$SCRIPT_INTERFACES_USER"
-		else
+		elif [ "$theIFACE" != "WAN" ]
+		then
 			sed -i "s/^${theIFACE}.*/${theLine}/g" "$SCRIPT_INTERFACES_USER"
 		fi
 	done < "$SCRIPT_INTERFACES"

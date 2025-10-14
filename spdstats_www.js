@@ -1,5 +1,5 @@
 /**----------------------------**/
-/** Last Modified: 2025-Oct-11 **/
+/** Last Modified: 2025-Oct-14 **/
 /**----------------------------**/
 
 var daysofweek = ['Mon','Tues','Wed','Thurs','Fri','Sat','Sun'];
@@ -1570,7 +1570,7 @@ function getConfigFile()
 }
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Oct-11] **/
+/** Modified by Martinski W. [2025-Oct-14] **/
 /**----------------------------------------**/
 function getInterfacesFile()
 {
@@ -1587,10 +1587,19 @@ function getInterfacesFile()
 			showhide('btnRunSpeedtest',true);
 			showhide('databaseSize_text',true);
 
-			var theInterfaces = data.split('\n');
 			const styleLeftMarginIndx = [2, 3, 4, 5, 7, 8, 9, 10];
-			let interfaceName, ifaceExcluded, ifaceNameUpper, ifaceNameLower, ifaceLabel, ifaceStyle, indxCount;
+			let interfaceName, ifaceExcluded, ifaceNameUpper, ifaceNameLower;
+			let changelabel, ifaceLabel, ifaceStyle, foundIndex, indxCount;
+
+			var theInterfaces = data.split('\n');
 			theInterfaces = theInterfaces.filter(Boolean);
+			theInterfaces.sort();
+			foundIndex = theInterfaces.findIndex(item => item.startsWith('WAN'));
+			if (foundIndex > 0)
+			{   //Make sure 'WAN' is always FIRST//
+				const wanIFace = theInterfaces.splice(foundIndex, 1)[0];
+				theInterfaces.unshift(wanIFace);
+			}
 			interfaceList = '';
 			interfacesComplete = [];
 			interfacesDisabled = [];
@@ -1640,7 +1649,7 @@ function getInterfacesFile()
 				{
 					ifaceStyle = 'style="margin-left:0px;"';
 					ifaceLabel = ifaceNameUpper;
-					var changelabel = 'Change?';
+					changelabel = 'Change?';
 					var interfaceDisabled = '';
 
 					if (theInterfaces[ifaceIndx].indexOf('interface not up') !== -1)
@@ -1649,6 +1658,11 @@ function getInterfacesFile()
 						interfaceDisabled = 'disabled';
 						ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(1,this);">'+ifaceNameUpper+'</a>';
 						changelabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(1,this);">Change?</a>';
+					}
+					else
+					{
+						ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
+						changelabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">Change?</a>';
 					}
 
 					// For AUTOMATIC Speedtests //
@@ -1701,6 +1715,7 @@ function getInterfacesFile()
 				{
 					ifaceStyle = 'style="margin-left:0px;"';
 					ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
+					changelabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">Change?</a>';
 
 					// For AUTOMATIC Speedtests //
 					if (breakStartIndex === indxCount) { interfaceconfigtablehtml += '<br>'; }
@@ -1731,7 +1746,7 @@ function getInterfacesFile()
 					// Select a Preferred Server //
 					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+ifaceNameLower+'">'+ifaceNameUpper+':</span><br />';
 					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+ifaceNameLower+'" id="changepref_'+ifaceNameLower+'" class="input settingvalue" onchange="Toggle_ChangePrefServer(this)">';
-					prefserverselecttablehtml += '<label for="changepref_'+ifaceNameLower+'" style="margin-right: 3px !important;" >Change?</label>';
+					prefserverselecttablehtml += '<label for="changepref_'+ifaceNameLower+'">'+changelabel+'</label>';
 					prefserverselecttablehtml += '<img id="imgServerList_'+ifaceNameLower+'" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
 					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+ifaceNameLower+'" id="spdmerlin_preferredserver_'+ifaceNameLower+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
 
