@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Oct-14
+# Last Modified: 2025-Oct-19
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25101422"
+readonly SCRIPT_VERSTAG="25101906"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -697,19 +697,17 @@ _CheckFor_Duplicate_Interfaces_()
 ##-------------------------------------##
 _Startup_All_Interface_States_()
 {
-	local theIFACE
+	local theIFaceID  ifaceCount
 	_Check_All_Interface_States_
 	_CheckFor_Duplicate_Interfaces_ "$SCRIPT_INTERFACES_USER"
 
 	while IFS='' read -r theLine || [ -n "$theLine" ]
 	do
-		theIFACE="$(echo "$theLine" | cut -d'#' -f1 | sed 's/ *$//')"
-		if [ "$(grep -wc "^$theIFACE" "$SCRIPT_INTERFACES_USER")" -eq 0 ]
+		theIFaceID="$(echo "$theLine" | cut -d'#' -f1 | sed 's/ *$//')"
+		ifaceCount="$(grep -wc "^$theIFaceID" "$SCRIPT_INTERFACES_USER")"
+		if [ "$ifaceCount" -eq 0 ]
 		then
 			printf "%s\n" "$theLine" >> "$SCRIPT_INTERFACES_USER"
-		elif [ "$theIFACE" != "WAN" ]
-		then
-			sed -i "s/^${theIFACE}.*/${theLine}/g" "$SCRIPT_INTERFACES_USER"
 		fi
 	done < "$SCRIPT_INTERFACES"
 
