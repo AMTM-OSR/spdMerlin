@@ -1,4 +1,9 @@
-*.tar.gz binary
 *.sh text eol=lf
 *.md text eol=lf
 *.asp text eol=lf
+*.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.zip binary
+*.tar.gz binary
