@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Oct-19
+# Last Modified: 2025-Oct-25
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25101906"
+readonly SCRIPT_VERSTAG="25102522"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -4193,8 +4193,8 @@ ScriptHeader()
 	printf "${BOLD}##    / __|| '_ \  / _  || |\/| | / _ \| '__|| || || '_ \     ##${CLRct}\n"
 	printf "${BOLD}##    \__ \| |_) || (_| || |  | ||  __/| |   | || || | | |    ##${CLRct}\n"
 	printf "${BOLD}##    |___/| .__/  \__,_||_|  |_| \___||_|   |_||_||_| |_|    ##${CLRct}\n"
-	printf "${BOLD}##        | |                                                 ##${CLRct}\n"
-	printf "${BOLD}##        |_|                                                 ##${CLRct}\n"
+	printf "${BOLD}##         | |                                                ##${CLRct}\n"
+	printf "${BOLD}##         |_|                                                ##${CLRct}\n"
 	printf "${BOLD}## ${GRNct}%s${CLRct}${BOLD} ##${CLRct}\n" "$(_CenterTextStr_ "$versionMod_TAG" "$spaceLen")"
 	printf "${BOLD}## ${colorCT}%s${CLRct}${BOLD} ##${CLRct}\n" "$(_CenterTextStr_ "$branchxStr_TAG" "$spaceLen")"
 	printf "${BOLD}##                                                            ##${CLRct}\n"
