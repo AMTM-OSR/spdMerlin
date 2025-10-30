@@ -26,14 +26,12 @@ p{font-weight:bolder;}thead.collapsible-jquery{color:white;padding:0;width:100%;
 <script language="JavaScript" type="text/javascript" src="/popup.js"></script>
 <script language="JavaScript" type="text/javascript" src="/help.js"></script>
 <script language="JavaScript" type="text/javascript" src="/ext/shared-jy/detect.js"></script>
-<script language="JavaScript" type="text/javascript" src="/tmhist.js"></script>
-<script language="JavaScript" type="text/javascript" src="/tmmenu.js"></script>
 <script language="JavaScript" type="text/javascript" src="/client_function.js"></script>
 <script language="JavaScript" type="text/javascript" src="/validator.js"></script>
 <script>
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Oct-14] **/
+/** Modified by Martinski W. [2025-Oct-27] **/
 /**----------------------------------------**/
 
 var custom_settings;
