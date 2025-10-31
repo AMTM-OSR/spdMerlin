@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Oct-25
+# Last Modified: 2025-Oct-30
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25102522"
+readonly SCRIPT_VERSTAG="25103023"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -1126,7 +1126,7 @@ Conf_Exists()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jan-19] ##
+## Modified by Martinski W. [2025-Oct-28] ##
 ##----------------------------------------##
 Auto_ServiceEvent()
 {
@@ -1136,7 +1136,7 @@ Auto_ServiceEvent()
 			if [ -f /jffs/scripts/service-event ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/service-event)"
-				STARTUPLINECOUNTEX="$(grep -cx 'if echo "$2" | /bin/grep -q "'"$SCRIPT_NAME_LOWER"'"; then { '"$theScriptFilePath"' service_event "$@" & }; fi # '"$SCRIPT_NAME" /jffs/scripts/service-event)"
+				STARTUPLINECOUNTEX="$(grep -cx 'if echo "$2" | /bin/grep -qE "('"$SCRIPT_NAME_LOWER"'|vpnclient)" ; then { '"$theScriptFilePath"' service_event "$@" & }; fi # '"$SCRIPT_NAME" /jffs/scripts/service-event)"
 
 				if [ "$STARTUPLINECOUNT" -gt 1 ] || { [ "$STARTUPLINECOUNTEX" -eq 0 ] && [ "$STARTUPLINECOUNT" -gt 0 ] ; }
 				then
@@ -1145,13 +1145,13 @@ Auto_ServiceEvent()
 				if [ "$STARTUPLINECOUNTEX" -eq 0 ]
 				then
 					{
-					  echo 'if echo "$2" | /bin/grep -q "'"$SCRIPT_NAME_LOWER"'"; then { '"$theScriptFilePath"' service_event "$@" & }; fi # '"$SCRIPT_NAME"
+					  echo 'if echo "$2" | /bin/grep -qE "('"$SCRIPT_NAME_LOWER"'|vpnclient)" ; then { '"$theScriptFilePath"' service_event "$@" & }; fi # '"$SCRIPT_NAME"
 					} >> /jffs/scripts/service-event
 				fi
 			else
 				{
 				  echo "#!/bin/sh" ; echo
-				  echo 'if echo "$2" | /bin/grep -q "'"$SCRIPT_NAME_LOWER"'"; then { '"$theScriptFilePath"' service_event "$@" & }; fi # '"$SCRIPT_NAME"
+				  echo 'if echo "$2" | /bin/grep -qE "('"$SCRIPT_NAME_LOWER"'|vpnclient)" ; then { '"$theScriptFilePath"' service_event "$@" & }; fi # '"$SCRIPT_NAME"
 				  echo
 				} > /jffs/scripts/service-event
 				chmod 0755 /jffs/scripts/service-event
@@ -1478,7 +1478,7 @@ Get_Interface_From_Name()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Sep-06] ##
+## Modified by Martinski W. [2025-Oct-26] ##
 ##----------------------------------------##
 Set_InterfacesUser_State()
 {
@@ -1508,7 +1508,7 @@ Set_InterfacesUser_State()
         then
             if "$interface_UP"
             then
-                if "$vpnClientUpEvent" && [ -s "$SCRIPT_INTERFACES_USER_SAVBAK" ]
+                if [ -s "$SCRIPT_INTERFACES_USER_SAVBAK" ]
                 then
                     savedIFaceLine="$(grep "^$IFACE_NAME" "$SCRIPT_INTERFACES_USER_SAVBAK")"
                     if [ -n "$savedIFaceLine" ] && ! echo "$savedIFaceLine" | grep -q '#excluded'
@@ -3094,7 +3094,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-30] ##
+## Modified by Martinski W. [2025-Oct-30] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -3141,6 +3141,7 @@ Run_Speedtest()
 
 	local stoppedQoS  nvramQoSenable  nvramQoStype
 	local spdIndx  spdTestOK  verboseNUM  verboseARG
+	local serverLine  serverIDno
 	verboseNUM="$(_GetConfigParam_ VERBOSE_TEST 0)"
 	if ! echo "$verboseNUM" | grep -qE "^[0-3]$"
 	then verboseNUM=0
@@ -3377,7 +3378,12 @@ Run_Speedtest()
 					timenow="$(date +'%s')"
 					timenowfriendly="$(date +'%c')"
 
-					## New if-then-else block added to with ookla output when buffer bloat has been added to the human readable output ##
+					serverLine="$(grep -E '[[:blank:]]+Server:[[:blank:]]+.*[[:blank:]]+[(]id(:| =)[[:blank:]]+[0-9]+[)]' "$tmpfile")"
+					serverLine="$(echo "$serverLine" | sed 's/ *$//' | sed 's/^ *//' | tr -d '\r')"
+					serverName="$(echo "$serverLine" | sed 's/^Server: *//' | sed 's/ *(id[: =]\+ [0-9]\+)$//')"
+					serverIDno="$(echo "$serverLine" | grep -Eo '[(]id(:| =)[[:blank:]]+[0-9]+[)]' | awk -F' ' '{print $NF}' | tr -d ')')"
+
+					## if-then-else block added to with ookla output when buffer bloat has been added to the human readable output ##
 					BUFFBLOAT="$(grep "Idle Latency:" "$tmpfile")"
 					if [ -n "$BUFFBLOAT" ]
 					then
@@ -3394,9 +3400,6 @@ Run_Speedtest()
 
 						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
-
-						serverName="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
-						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $2}' | tr -d ')')"
 					else
 						download="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
 						upload="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print $2}')"
@@ -3410,15 +3413,14 @@ Run_Speedtest()
 
 						datadownloadunit="$(grep "Download:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
 						datauploadunit="$(grep "Upload:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | awk '{print substr($7,1,2)}')"
-
-						serverName="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f1 -d'(' | cut -f2 -d':' | awk '{$1=$1;print}')"
-						serverid="$(grep "Server:" "$tmpfile" | awk 'BEGIN { FS = "\r" } ;{print $NF};' | cut -f2 -d'(' | awk '{print $3}' | tr -d ')')"
 					fi
 
-					if [ -z "$download" ] || [ -z "$upload" ] || [ -z "$datadownload" ] || [ -z "$dataupload" ]
+					if [ -z "$download" ] || [ -z "$upload" ]      || \
+					   [ -z "$serverName" ] || [ -z "$serverIDno" ] || \
+					   [ -z "$datadownload" ] || [ -z "$dataupload" ]
 					then
 						cp -fp "$tmpfile" "$spdTestDBGFile"
-						Print_Output true "ERROR running speedtest for $IFACE_NAME [Empty Values]" "$CRIT"
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [Empty or Bad Values]" "$CRIT"
 						if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
 						continue
 					fi
@@ -3454,7 +3456,7 @@ Run_Speedtest()
 							curllatency=0
 						fi
 
-						curlresult=$(curl -fsL  --retry 4 --retry-delay 5 -d "recommendedserverid=$serverid" \
+						curlresult=$(curl -fsL  --retry 4 --retry-delay 5 -d "recommendedserverid=$serverIDno" \
 -d "ping=$(echo "$curllatency" | awk '{printf("%.0f\n", $1);}')" \
 -d "screenresolution=" \
 -d "promo=" \
@@ -3468,7 +3470,7 @@ Run_Speedtest()
 -d "accuracy=1" \
 -d "bytesreceived=$(echo "$datadownload" | awk '{printf("%.0f\n", $1*1024);}')" \
 -d "bytessent=$(echo "$dataupload" | awk '{printf("%.0f\n", $1*1024);}')" \
--d "serverid=$serverid" \
+-d "serverid=$serverIDno" \
 -H "Referer: http://c.speedtest.net/flash/speedtest.swf" https://www.speedtest.net/api/api.php)
 
 						resulturl="https://www.speedtest.net/result/$(echo "$curlresult" | cut -f2 -d'&' | cut -f2 -d'=')"
@@ -3489,13 +3491,13 @@ Run_Speedtest()
 					then
 						{
 						   echo "PRAGMA temp_store=1;"
-						   echo "INSERT INTO spdstats_$IFACE_NAME ([Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[ResultURL],[DataDownload],[DataUpload],[ServerID],[ServerName]) values($timenow,$download,$upload,$latency,$jitter,$pktloss,'$resulturl',$datadownload,$dataupload,$serverid,'$serverName');"
+						   echo "INSERT INTO spdstats_$IFACE_NAME ([Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[ResultURL],[DataDownload],[DataUpload],[ServerID],[ServerName]) values($timenow,$download,$upload,$latency,$jitter,$pktloss,'$resulturl',$datadownload,$dataupload,$serverIDno,'$serverName');"
 						} > /tmp/spdTest-stats.sql
 					elif [ "$STORERESULTURL" = "false" ]
 					then
 						{
 						   echo "PRAGMA temp_store=1;"
-						   echo "INSERT INTO spdstats_$IFACE_NAME ([Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[ResultURL],[DataDownload],[DataUpload],[ServerID],[ServerName]) values($timenow,$download,$upload,$latency,$jitter,$pktloss,'',$datadownload,$dataupload,$serverid,'$serverName');"
+						   echo "INSERT INTO spdstats_$IFACE_NAME ([Timestamp],[Download],[Upload],[Latency],[Jitter],[PktLoss],[ResultURL],[DataDownload],[DataUpload],[ServerID],[ServerName]) values($timenow,$download,$upload,$latency,$jitter,$pktloss,'',$datadownload,$dataupload,$serverIDno,'$serverName');"
 						} > /tmp/spdTest-stats.sql
 					fi
 					_ApplyDatabaseSQLCmds_ /tmp/spdTest-stats.sql "spd2$spdIndx"
@@ -4353,7 +4355,7 @@ MainMenu()
 		jffsFreeSpaceStr="${WarnBYLWct} $jffsFreeSpace ${CLRct}  ${jffsSpaceMsgTag}${CLRct}"
 	fi
 
-	printf "WebUI for %s is available at:\n${SETTING}%s${CLEARFORMAT}\n\n" "$SCRIPT_NAME" "$(Get_WebUI_URL)"
+	printf " WebUI for %s is available at:\n ${SETTING}%s${CLRct}\n\n" "$SCRIPT_NAME" "$(Get_WebUI_URL)"
 
 	printf "1.    Run a speedtest now\n"
 	printf "      Database size: ${SETTING}%s${CLEARFORMAT}\n\n" "$(_GetFileSize_ "$SPEEDSTATS_DB" HRx)"
@@ -4705,8 +4707,27 @@ Menu_Install()
 	MainMenu
 }
 
+##-------------------------------------##
+## Added by Martinski W. [2025-Oct-26] ##
+##-------------------------------------##
+_SetParameters_()
+{
+    if [ -f "/opt/share/${SCRIPT_NAME_LOWER}.d/config" ]
+    then SCRIPT_STORAGE_DIR="/opt/share/${SCRIPT_NAME_LOWER}.d"
+    else SCRIPT_STORAGE_DIR="/jffs/addons/${SCRIPT_NAME_LOWER}.d"
+    fi
+    SCRIPT_CONF="$SCRIPT_STORAGE_DIR/config"
+    SPEEDSTATS_DB="$SCRIPT_STORAGE_DIR/spdstats.db"
+    CSV_OUTPUT_DIR="$SCRIPT_STORAGE_DIR/csv"
+    SCRIPT_INTERFACES="$SCRIPT_STORAGE_DIR/.interfaces"
+    SCRIPT_INTERFACES_BAK="${SCRIPT_INTERFACES}.bak"
+    SCRIPT_INTERFACES_USER="$SCRIPT_STORAGE_DIR/.interfaces_user"
+    SCRIPT_INTERFACES_USER_BAK="${SCRIPT_INTERFACES_USER}.bak"
+    SCRIPT_INTERFACES_USER_SAVBAK="${SCRIPT_INTERFACES_USER}.save.bak"
+}
+
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Oct-12] ##
+## Modified by Martinski W. [2025-Oct-26] ##
 ##----------------------------------------##
 Menu_Startup()
 {
@@ -4726,6 +4747,8 @@ Menu_Startup()
 	fi
 
 	NTP_Ready
+	Entware_Ready
+	_SetParameters_
 	Check_Lock
 
 	if [ "$1" != "force" ]; then
@@ -4768,7 +4791,9 @@ _Reset_Interface_States_()
         return 1
     fi
     Print_Output true "Resetting interfaces for ${SCRIPT_NAME}..." "$PASS"
-    NTP_Ready
+    NTP_Ready noLockCheck
+    Entware_Ready noLockCheck
+    _SetParameters_
     Check_Lock
     Create_Dirs
     Conf_Exists
@@ -6078,18 +6103,25 @@ Menu_Uninstall()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Oct-26] ##
 ##----------------------------------------##
 NTP_Ready()
 {
-	local theSleepDelay=15  ntpMaxWaitSecs=600  ntpWaitSecs
+	local theSleepDelay=15  ntpMaxWaitSecs=600  ntpWaitSecs  doLockCheck=true
+
+	if [ $# -gt 0 ] && [ "$1" = "noLockCheck" ]
+	then doLockCheck=false
+	fi
 
 	if [ "$(nvram get ntp_ready)" -eq 0 ]
 	then
-		Check_Lock
-		ntpWaitSecs=0
+		if "$doLockCheck"
+		then Check_Lock
+		else theSleepDelay=5
+		fi
 		Print_Output true "Waiting for NTP to sync..." "$WARN"
 
+		ntpWaitSecs=0
 		while [ "$(nvram get ntp_ready)" -eq 0 ] && [ "$ntpWaitSecs" -lt "$ntpMaxWaitSecs" ]
 		do
 			if [ "$ntpWaitSecs" -gt 0 ] && [ "$((ntpWaitSecs % 30))" -eq 0 ]
@@ -6103,28 +6135,34 @@ NTP_Ready()
 		if [ "$ntpWaitSecs" -ge "$ntpMaxWaitSecs" ]
 		then
 			Print_Output true "NTP failed to sync after 10 minutes. Please resolve!" "$CRIT"
-			Clear_Lock
+			"$doLockCheck" && Clear_Lock
 			exit 1
 		else
 			Print_Output true "NTP has synced [$ntpWaitSecs secs]. $SCRIPT_NAME will now continue." "$PASS"
-			Clear_Lock
+			"$doLockCheck" && Clear_Lock
 		fi
 	fi
 }
 
-### function based on @Adamm00's Skynet USB wait function ###
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Feb-28] ##
+## Modified by Martinski W. [2025-Oct-26] ##
 ##----------------------------------------##
 Entware_Ready()
 {
-	local theSleepDelay=5  maxSleepTimer=120  sleepTimerSecs
+	local theSleepDelay=10  maxSleepTimer=150  sleepTimerSecs  doLockCheck=true
+
+	if [ $# -gt 0 ] && [ "$1" = "noLockCheck" ]
+	then doLockCheck=false
+	fi
 
 	if [ ! -f /opt/bin/opkg ]
 	then
-		Check_Lock
-		sleepTimerSecs=0
+		if "$doLockCheck"
+		then Check_Lock
+		else theSleepDelay=5
+		fi
 
+		sleepTimerSecs=0
 		while [ ! -f /opt/bin/opkg ] && [ "$sleepTimerSecs" -lt "$maxSleepTimer" ]
 		do
 			if [ "$((sleepTimerSecs % 10))" -eq 0 ]
@@ -6138,11 +6176,11 @@ Entware_Ready()
 		if [ ! -f /opt/bin/opkg ]
 		then
 			Print_Output true "Entware NOT found and is required for $SCRIPT_NAME to run, please resolve!" "$CRIT"
-			Clear_Lock
+			"$doLockCheck" && Clear_Lock
 			exit 1
 		else
 			Print_Output true "Entware found [$sleepTimerSecs secs]. $SCRIPT_NAME will now continue." "$PASS"
-			Clear_Lock
+			"$doLockCheck" && Clear_Lock
 		fi
 	fi
 }
@@ -6175,10 +6213,11 @@ EOF
 
 ### function based on @dave14305's FlexQoS show_help function ###
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jul-11] ##
+## Modified by Martinski W. [2025-Oct-27] ##
 ##----------------------------------------##
 Show_Help()
 {
+	printf " WebUI for %s is available at:\n ${SETTING}%s${CLRct}\n\n" "$SCRIPT_NAME" "$(Get_WebUI_URL)"
 	printf "HELP ${MGNTct}${SCRIPT_VERS_INFO}${CLRct}\n"
 	cat <<EOF
 Available commands:
@@ -6211,19 +6250,7 @@ else sqlDBLogFilePath="/tmp/var/tmp/$sqlDBLogFileName"
 fi
 _SQLCheckDBLogFileSize_
 
-if [ -f "/opt/share/${SCRIPT_NAME_LOWER}.d/config" ]
-then SCRIPT_STORAGE_DIR="/opt/share/${SCRIPT_NAME_LOWER}.d"
-else SCRIPT_STORAGE_DIR="/jffs/addons/${SCRIPT_NAME_LOWER}.d"
-fi
-
-SCRIPT_CONF="$SCRIPT_STORAGE_DIR/config"
-SPEEDSTATS_DB="$SCRIPT_STORAGE_DIR/spdstats.db"
-CSV_OUTPUT_DIR="$SCRIPT_STORAGE_DIR/csv"
-SCRIPT_INTERFACES="$SCRIPT_STORAGE_DIR/.interfaces"
-SCRIPT_INTERFACES_BAK="${SCRIPT_INTERFACES}.bak"
-SCRIPT_INTERFACES_USER="$SCRIPT_STORAGE_DIR/.interfaces_user"
-SCRIPT_INTERFACES_USER_BAK="${SCRIPT_INTERFACES_USER}.bak"
-SCRIPT_INTERFACES_USER_SAVBAK="${SCRIPT_INTERFACES_USER}.save.bak"
+_SetParameters_
 JFFS_LowFreeSpaceStatus="OK"
 updateJFFS_SpaceInfo=false
 vpnClientUpIDstr=""
@@ -6317,8 +6344,9 @@ case "$1" in
 		exit 0
 	;;
 	service_event)
+		[ "$2" != "start" ] && exit 0
 		updateJFFS_SpaceInfo=true
-		if [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}spdtest"
+		if echo "$3" | grep -q "${SCRIPT_NAME_LOWER}spdtest"
 		then
 			rm -f /tmp/detect_spdtest.js
 			rm -f /tmp/spd-result.txt
@@ -6328,28 +6356,36 @@ case "$1" in
 			Run_Speedtest_WebUI "$3"
 			updateJFFS_SpaceInfo=false
 			Clear_Lock
-		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlistmanual"
+		elif echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlistmanual"
 		then
 			Check_Lock webui
 			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlistmanual_//" | cut -f1 -d'_' | tr 'a-z' 'A-Z')";
 			GenerateServerList_WebUI "$spdifacename" "spdmerlin_manual_serverlist"
 			Clear_Lock
-		elif [ "$2" = "start" ] && echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlist"
+		elif echo "$3" | grep -q "${SCRIPT_NAME_LOWER}serverlist"
 		then
 			Check_Lock webui
 			spdifacename="$(echo "$3" | sed "s/${SCRIPT_NAME_LOWER}serverlist_//" | cut -f1 -d'_' | tr 'a-z' 'A-Z')";
 			GenerateServerList_WebUI "$spdifacename" "spdmerlin_serverlist_$spdifacename"
 			Clear_Lock
-		elif [ "$2" = "start" ] && [ "$3" = "${SCRIPT_NAME_LOWER}config" ]
+		elif [ "$3" = "${SCRIPT_NAME_LOWER}config" ]
 		then
 			Interfaces_FromSettings
 			Conf_FromSettings
-		elif [ "$2" = "start" ] && [ "$3" = "${SCRIPT_NAME_LOWER}checkupdate" ]
+		elif [ "$3" = "${SCRIPT_NAME_LOWER}checkupdate" ]
 		then
 			Update_Check
-		elif [ "$2" = "start" ] && [ "$3" = "${SCRIPT_NAME_LOWER}doupdate" ]
+		elif [ "$3" = "${SCRIPT_NAME_LOWER}doupdate" ]
 		then
 			Update_Version force unattended
+		elif echo "$3" | grep -qE '^vpnclient[1-5]'
+		then
+			vpnClientUpIDstr="$(echo "$3" | sed 's/^vpnclient//')"
+			Print_Output true "VPN Client tunnel is coming up." "$PASS"
+			vpnClientUpEvent=true ; vpnClientDownEvent=false
+			sleep 2
+			_Reset_Interface_States_ force
+			Clear_Lock
 		fi
 		"$updateJFFS_SpaceInfo" && _UpdateJFFS_FreeSpaceInfo_
 		exit 0
@@ -6361,14 +6397,14 @@ case "$1" in
 			if [ "$3" = "route-pre-down" ]
 			then
 				Print_Output true "VPN Client tunnel is going down." "$PASS"
-				vpnClientDownEvent=true
+				vpnClientDownEvent=true ; vpnClientUpEvent=false
 				Save_InterfacesUser_SAVEDBAK check
-				sleep 3
 			elif [ "$3" = "route-up" ]
 			then
 				Print_Output true "VPN Client tunnel is coming up." "$PASS"
-				vpnClientUpEvent=true ; vpnClientUpIDstr="$2"
-				sleep 2
+				vpnClientUpEvent=true ; vpnClientDownEvent=false
+				vpnClientUpIDstr="$2"
+				sleep 3
 			fi
 			_Reset_Interface_States_ force
 			Clear_Lock
@@ -6379,14 +6415,14 @@ case "$1" in
 		if [ "$2" = "stop" ]
 		then
 			Print_Output true "WireGuard Client tunnel is going down." "$PASS"
-			vpnClientDownEvent=true
+			vpnClientDownEvent=true ; vpnClientUpEvent=false
 			Save_InterfacesUser_SAVEDBAK check
-			sleep 3
 		elif [ "$2" = "start" ]
 		then
 			Print_Output true "WireGuard Client tunnel is coming up." "$PASS"
-			vpnClientUpEvent=true ; vpnClientUpIDstr="wg$2"
-			sleep 2
+			vpnClientUpEvent=true ; vpnClientDownEvent=false
+			vpnClientUpIDstr="wg$3"
+			sleep 3
 		fi
 		_Reset_Interface_States_ force
 		Clear_Lock
