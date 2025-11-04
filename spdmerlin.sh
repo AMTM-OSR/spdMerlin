@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Oct-30
+# Last Modified: 2025-Nov-04
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25103023"
+readonly SCRIPT_VERSTAG="25110400"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -157,7 +157,7 @@ Print_Output()
 		    "$PASS") prioNum=6 ;; #INFO#
 		          *) prioNum=5 ;; #NOTICE#
 		esac
-		logger -t "$SCRIPT_NAME" -p $prioNum "$2"
+		logger -t "${SCRIPT_NAME}_[$$]" -p $prioNum "$2"
 	fi
 	printf "${BOLD}${3}%s${CLEARFORMAT}\n\n" "$2"
 }
@@ -172,8 +172,13 @@ Firmware_Version_Check()
 }
 
 ### Code for these functions inspired by https://github.com/Adamm00 - credit to @Adamm ###
+##----------------------------------------##
+## Modified by Martinski W. [2025-Nov-03] ##
+##----------------------------------------##
 Check_Lock()
 {
+	local doExit=false
+
 	if [ -f "/tmp/$SCRIPT_NAME.lock" ]
 	then
 		ageoflock="$(($(/bin/date "+%s") - $(/bin/date "+%s" -r "/tmp/$SCRIPT_NAME.lock")))"
@@ -185,18 +190,23 @@ Check_Lock()
 			echo "$$" > "/tmp/$SCRIPT_NAME.lock"
 			return 0
 		else
-			Print_Output true "Lock file found (age: $ageoflock seconds) - stopping to prevent duplicate runs" "$ERR"
 			if [ $# -eq 0 ] || [ -z "$1" ]
 			then
-				exit 1
+				doExit=true
 			else
 				if [ "$1" = "webui" ]
 				then
 					echo 'var spdteststatus = "LOCKED";' > /tmp/detect_spdtest.js
-					exit 1
+					doExit=true
 				fi
-				return 1
 			fi
+			if "$doExit"
+			then
+				Print_Output true "Lock file found (age: $ageoflock seconds) - stopping to prevent duplicate runs" "$ERR"
+				exit 1
+			fi
+			Print_Output true "Lock file found (age: $ageoflock seconds)" "$WARN"
+			return 1
 		fi
 	else
 		echo "$$" > "/tmp/$SCRIPT_NAME.lock"
@@ -2855,7 +2865,7 @@ _JFFS_WarnLowFreeSpace_()
    then
        JFFS_WarningLogTime update "$currTimeSecs"
        logMsgStr="${logTagStr} JFFS Available Free Space ($1) is getting LOW."
-       logger -t "$SCRIPT_NAME" -p $logPriNum "$logMsgStr"
+       logger -t "${SCRIPT_NAME}_[$$]" -p $logPriNum "$logMsgStr"
    fi
 }
 
