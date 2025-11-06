@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Nov-04
+# Last Modified: 2025-Nov-05
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25110400"
+readonly SCRIPT_VERSTAG="25110522"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -4804,7 +4804,7 @@ _Reset_Interface_States_()
     NTP_Ready noLockCheck
     Entware_Ready noLockCheck
     _SetParameters_
-    Check_Lock
+    ##OFF## Check_Lock [NO LockCheck] ##
     Create_Dirs
     Conf_Exists
     ScriptStorageLocation load true
