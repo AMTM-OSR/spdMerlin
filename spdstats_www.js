@@ -1,14 +1,14 @@
 /**----------------------------**/
-/** Last Modified: 2025-Jul-10 **/
+/** Last Modified: 2025-Oct-14 **/
 /**----------------------------**/
 
 var daysofweek = ['Mon','Tues','Wed','Thurs','Fri','Sat','Sun'];
 var maxNoCharts = 0;
 var currentNoCharts = 0;
 
-var interfacelist = '';
-var interfacescomplete = [];
-var interfacesdisabled = [];
+let interfaceList = '';
+let interfacesComplete = [];
+let interfacesDisabled = [];
 
 var arraysortlistlinesWAN = [];
 var sortnameWAN = 'Time';
@@ -696,7 +696,7 @@ function round(value,decimals){
 }
 
 function ToggleLines(){
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	if(ShowLines == ''){
 		ShowLines = 'line';
 		SetCookie('ShowLines','line');
@@ -722,7 +722,7 @@ function ToggleLines(){
 }
 
 function ToggleFill(){
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	if(ShowFill == 'origin'){
 		ShowFill = 'false';
 		SetCookie('ShowFill','false');
@@ -747,7 +747,7 @@ function ToggleFill(){
 }
 
 function RedrawAllCharts(){
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	var i;
 	for(var i2 = 0; i2 < chartlist.length; i2++){
 		for(var i3 = 0; i3 < interfacetextarray.length; i3++){
@@ -765,7 +765,7 @@ function SetGlobalDataset(txtchartname,dataobject){
 	window[txtchartname] = dataobject;
 	currentNoCharts++;
 	if(currentNoCharts == maxNoCharts){
-		var interfacetextarray = interfacelist.split(',');
+		var interfacetextarray = interfaceList.split(',');
 		for(var i = 0; i < interfacetextarray.length; i++){
 			$('#'+interfacetextarray[i]+'_Interval_Combined').val(GetCookie(interfacetextarray[i]+'_Interval_Combined','number'));
 			$('#'+interfacetextarray[i]+'_Interval_Quality').val(GetCookie(interfacetextarray[i]+'_Interval_Quality','number'));
@@ -972,7 +972,7 @@ function getChartScale(scale){
 }
 
 function ResetZoom(){
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	for(var i = 0; i < interfacetextarray.length; i++){
 		for(var i2 = 0; i2 < typelist.length; i2++){
 			var chartobj = window['LineChart_'+interfacetextarray[i]+'_'+typelist[i2]];
@@ -1001,7 +1001,7 @@ function ToggleDragZoom(button){
 		buttonvalue = 'Drag Zoom On';
 	}
 	
-	var interfacetextarray = interfacelist.split(',');
+	var interfacetextarray = interfaceList.split(',');
 	for(var i = 0; i < interfacetextarray.length; i++){
 		for(var i2 = 0; i2 < typelist.length; i2++){
 			var chartobj = window['LineChart_'+interfacetextarray[i]+'_'+typelist[i2]];
@@ -1014,31 +1014,38 @@ function ToggleDragZoom(button){
 	}
 }
 
-function ExportCSV(){
+function ExportCSV()
+{
 	location.href = '/ext/spdmerlin/csv/spdmerlindata.zip';
 	return 0;
 }
 
-function update_status(){
+function update_status()
+{
 	$.ajax({
 		url: '/ext/spdmerlin/detect_update.js',
 		dataType: 'script',
 		error: function(xhr){
 			setTimeout(update_status,1000);
 		},
-		success: function(){
-			if(updatestatus == 'InProgress'){
+		success: function()
+		{
+			if (updatestatus == 'InProgress')
+			{
 				setTimeout(update_status,1000);
 			}
-			else{
+			else
+			{
 				document.getElementById('imgChkUpdate').style.display = 'none';
 				showhide('spdmerlin_version_server',true);
-				if(updatestatus != 'None'){
+				if (updatestatus != 'None')
+				{
 					$('#spdmerlin_version_server').text('Updated version available: '+updatestatus);
 					showhide('btnChkUpdate',false);
 					showhide('btnDoUpdate',true);
 				}
-				else{
+				else
+				{
 					$('#spdmerlin_version_server').text('No update available');
 					showhide('btnChkUpdate',true);
 					showhide('btnDoUpdate',false);
@@ -1048,7 +1055,8 @@ function update_status(){
 	});
 }
 
-function CheckUpdate(){
+function CheckUpdate()
+{
 	showhide('btnChkUpdate',false);
 	document.formScriptActions.action_script.value='start_spdmerlincheckupdate'
 	document.formScriptActions.submit();
@@ -1056,31 +1064,36 @@ function CheckUpdate(){
 	setTimeout(update_status,2000);
 }
 
-function DoUpdate(){
+function DoUpdate()
+{
 	document.form.action_script.value = 'start_spdmerlindoupdate';
 	document.form.action_wait.value = 10;
 	showLoading();
 	document.form.submit();
 }
 
-function getAllIndexes(arr,val){
+function getAllIndexes(arr,val)
+{
 	var indexes = [];
-	for(var i = 0; i < arr.length; i++){
-		if(arr[i].id == val){
+	for (var i = 0; i < arr.length; i++)
+	{
+		if (arr[i].id == val){
 			indexes.push(i);
 		}
 	}
 	return indexes;
 }
 
-function get_spdtestservers_file(ifacename){
+function get_spdtestservers_file(ifacename)
+{
 	$.ajax({
 		url: '/ext/spdmerlin/spdmerlin_serverlist_'+ifacename.toUpperCase()+'.htm?cachebuster='+new Date().getTime(),
 		dataType: 'text',
 		error: function(xhr){
 			setTimeout(get_spdtestservers_file,1000,ifacename);
 		},
-		success: function(data){
+		success: function(data)
+		{
 			var servers = [];
 			$.each(data.split('\n').filter(Boolean),function (key,entry){
 				var obj = {};
@@ -1105,14 +1118,16 @@ function get_spdtestservers_file(ifacename){
 	});
 }
 
-function get_manualspdtestservers_file(){
+function get_manualspdtestservers_file()
+{
 	$.ajax({
 		url: '/ext/spdmerlin/spdmerlin_manual_serverlist.htm?cachebuster='+new Date().getTime(),
 		dataType: 'text',
 		error: function(xhr){
 			setTimeout(get_manualspdtestservers_file,2000);
 		},
-		success: function(data){
+		success: function(data)
+		{
 			var servers = [];
 			$.each(data.split('\n').filter(Boolean),function (key,entry){
 				var obj = {};
@@ -1121,16 +1136,18 @@ function get_manualspdtestservers_file(){
 				servers.push(obj);
 			});
 			
-			if(document.form.spdtest_enabled.value == 'All'){
+			if (document.form.spdtest_enabled.value == 'All')
+			{
 				var arrifaceindex = getAllIndexes(servers,'-----');
-				for(var i = 0; i < arrifaceindex.length; i++){
+				for (var i = 0; i < arrifaceindex.length; i++)
+				{
 					let dropdown = $($('select[name^=spdtest_serverprefselect]')[i]);
 					dropdown.empty();
 					var arrtmp = [];
-					if(i == 0){
+					if (i == 0){
 						arrtmp = servers.slice(0,arrifaceindex[i]);
 					}
-					else if(i == arrifaceindex.length-1){
+					else if (i == arrifaceindex.length-1){
 						arrtmp = servers.slice(arrifaceindex[i-1]+1,servers.length-1);
 					}
 					else{
@@ -1150,7 +1167,8 @@ function get_manualspdtestservers_file(){
 				});
 				showhide('imgManualServerList',false);
 			}
-			else{
+			else
+			{
 				let dropdown = $('select[name=spdtest_serverprefselect]');
 				dropdown.empty();
 				$.each(servers,function (key,entry){
@@ -1160,10 +1178,12 @@ function get_manualspdtestservers_file(){
 				showhide('spdtest_serverprefselect',true);
 				showhide('imgManualServerList',false);
 			}
-			for(var i = 0; i < interfacescomplete.length; i++){
-				if(interfacesdisabled.includes(interfacescomplete[i]) == false){
-					$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-					$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+			for (var i = 0; i < interfacesComplete.length; i++)
+			{
+				if (interfacesDisabled.includes(interfacesComplete[i]) == false)
+				{
+					$('#spdtest_enabled_'+interfacesComplete[i].toLowerCase()).prop('disabled',false);
+					$('#spdtest_enabled_'+interfacesComplete[i].toLowerCase()).removeClass('disabled');
 				}
 			}
 			$.each($('input[name=spdtest_serverpref]'),function(){
@@ -1174,7 +1194,8 @@ function get_manualspdtestservers_file(){
 	});
 }
 
-function get_spdtestresult_file(){
+function get_spdtestresult_file()
+{
 	$.ajax({
 		url: '/ext/spdmerlin/spd-result.htm',
 		dataType: 'text',
@@ -1190,22 +1211,24 @@ function get_spdtestresult_file(){
 	});
 }
 
-function get_spdtest_file(){
+function get_spdtest_file()
+{
 	$.ajax({
 		url: '/ext/spdmerlin/spd-stats.htm',
 		dataType: 'text',
 		error: function(xhr){
 			//do nothing
 		},
-		success: function(data){
+		success: function(data)
+		{
 			var lines = data.trim().split('\n');
 			var arrlastLine = lines.slice(-1)[0].split('%').filter(Boolean);
 			
-			if(speedtestbinary == "builtin"){
+			if (speedtestbinary == "builtin"){
 				lines.unshift("");
 				lines.unshift("Speedtest by Ookla")
 			}
-			if(lines.length > 5){
+			if (lines.length > 5){
 				$('#spdtest_output').html(lines[0]+'\n'+lines[1]+'\n'+lines[2]+'\n'+lines[3]+'\n'+lines[4]+'\n'+arrlastLine[arrlastLine.length-1]+'%');
 			}
 			else{
@@ -1370,14 +1393,14 @@ function SaveConfig()
 	if (validateAll())
 	{
 		$('[name*=spdmerlin_]').prop('disabled',false);
-		for (var indx = 0; indx < interfacescomplete.length; indx++)
+		for (var indx = 0; indx < interfacesComplete.length; indx++)
 		{
-			$('#spdmerlin_iface_enabled_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
-			$('#spdmerlin_iface_enabled_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
-			$('#spdmerlin_usepreferred_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
-			$('#spdmerlin_usepreferred_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
-			$('#changepref_'+interfacescomplete[indx].toLowerCase()).prop('disabled',false);
-			$('#changepref_'+interfacescomplete[indx].toLowerCase()).removeClass('disabled');
+			$('#spdmerlin_iface_enabled_'+interfacesComplete[indx].toLowerCase()).prop('disabled',false);
+			$('#spdmerlin_iface_enabled_'+interfacesComplete[indx].toLowerCase()).removeClass('disabled');
+			$('#spdmerlin_usepreferred_'+interfacesComplete[indx].toLowerCase()).prop('disabled',false);
+			$('#spdmerlin_usepreferred_'+interfacesComplete[indx].toLowerCase()).removeClass('disabled');
+			$('#changepref_'+interfacesComplete[indx].toLowerCase()).prop('disabled',false);
+			$('#changepref_'+interfacesComplete[indx].toLowerCase()).removeClass('disabled');
 		}
 
 		if (document.form.spdmerlin_automaticmode.value === 'true')
@@ -1547,7 +1570,7 @@ function getConfigFile()
 }
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Mar-04] **/
+/** Modified by Martinski W. [2025-Oct-14] **/
 /**----------------------------------------**/
 function getInterfacesFile()
 {
@@ -1564,13 +1587,22 @@ function getInterfacesFile()
 			showhide('btnRunSpeedtest',true);
 			showhide('databaseSize_text',true);
 
-			var interfaces = data.split('\n');
-			const styleLeftMarginIndx = [2, 3, 4, 5];
-            let interfacename, ifaceNameUpper, ifaceNameLower, ifaceLabel, ifaceStyle;
-			interfaces = interfaces.filter(Boolean);
-			interfacelist = '';
-			interfacescomplete = [];
-			interfacesdisabled = [];
+			const styleLeftMarginIndx = [2, 3, 4, 5, 7, 8, 9, 10];
+			let interfaceName, ifaceExcluded, ifaceNameUpper, ifaceNameLower;
+			let changelabel, ifaceLabel, ifaceStyle, foundIndex, indxCount;
+
+			var theInterfaces = data.split('\n');
+			theInterfaces = theInterfaces.filter(Boolean);
+			theInterfaces.sort();
+			foundIndex = theInterfaces.findIndex(item => item.startsWith('WAN'));
+			if (foundIndex > 0)
+			{   //Make sure 'WAN' is always FIRST//
+				const wanIFace = theInterfaces.splice(foundIndex, 1)[0];
+				theInterfaces.unshift(wanIFace);
+			}
+			interfaceList = '';
+			interfacesComplete = [];
+			interfacesDisabled = [];
 
 			var interfacecharttablehtml='<div style="line-height:10px;">&nbsp;</div>';
 			interfacecharttablehtml += '<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable" id="table_allinterfaces">';
@@ -1587,99 +1619,153 @@ function getInterfacesFile()
 			speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_all" onchange="Change_SpdTestInterface(this)" class="input" settingvalueradio" value="All" checked>';
 			speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_all">All</label>';
 
-			const ifaceMaxCount = interfaces.length;
+			indxCount = 0;
+			const ifaceMaxCount = theInterfaces.length;
 			const breakStartIndex = 1, breakStopIndex = 5;
 
 			for (var ifaceIndx = 0; ifaceIndx < ifaceMaxCount; ifaceIndx++)
 			{
-				interfacename = '';
-				if (interfaces[ifaceIndx].indexOf('#') !== -1)
+				if (theInterfaces[ifaceIndx].indexOf('#') === -1)
 				{
-					interfacename = interfaces[ifaceIndx].substring(0,interfaces[ifaceIndx].indexOf('#')).trim();
-					interfacescomplete.push(interfacename);
-                    ifaceNameUpper = interfacename.toUpperCase();
-                    ifaceNameLower = interfacename.toLowerCase();
+					ifaceExcluded = false;
+					interfaceName = theInterfaces[ifaceIndx].trim();
+				}
+				else
+				{
+					ifaceExcluded = true;
+					interfaceName = theInterfaces[ifaceIndx].substring(0,theInterfaces[ifaceIndx].indexOf('#')).trim();
+				}
+				if (interfacesComplete.includes(interfaceName))
+				{
+					console.log(`ERROR: getInterfacesFile(): Duplicate Interface Found [${interfaceName}]`);
+					continue;
+				}
+				indxCount = interfacesComplete.length;
+				interfacesComplete.push(interfaceName);
+				ifaceNameUpper = interfaceName.toUpperCase();
+				ifaceNameLower = interfaceName.toLowerCase();
+
+				if (ifaceExcluded)
+				{
 					ifaceStyle = 'style="margin-left:0px;"';
 					ifaceLabel = ifaceNameUpper;
-					var changelabel = 'Change?';
-					var interfacedisabled = '';
+					changelabel = 'Change?';
+					var interfaceDisabled = '';
 
-					if (interfaces[ifaceIndx].indexOf('interface not up') !== -1)
+					if (theInterfaces[ifaceIndx].indexOf('interface not up') !== -1)
 					{
-						interfacesdisabled.push(interfacename);
-						interfacedisabled = 'disabled';
+						interfacesDisabled.push(interfaceName);
+						interfaceDisabled = 'disabled';
 						ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(1,this);">'+ifaceNameUpper+'</a>';
 						changelabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(1,this);">Change?</a>';
 					}
+					else
+					{
+						ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
+						changelabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">Change?</a>';
+					}
 
 					// For AUTOMATIC Speedtests //
-					if (breakStartIndex === ifaceIndx) { interfaceconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
-					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					if (breakStartIndex === indxCount) { interfaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
+					{
+						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
+						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
+						else
+						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
+					}
+					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input '+interfaceDisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfaceDisabled+' '+ifaceStyle+'>';
 					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { interfaceconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { interfaceconfigtablehtml += '</br>'; }
 
 					// For PREFERRED Servers //
-					if (breakStartIndex === ifaceIndx) { prefserverconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
-					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input '+interfacedisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					if (breakStartIndex === indxCount) { prefserverconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
+					{
+						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
+						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
+						else
+						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
+					}
+					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input '+interfaceDisabled+' settingvalue" value="'+ifaceNameUpper+'" '+interfaceDisabled+' '+ifaceStyle+'>';
 					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { prefserverconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { prefserverconfigtablehtml += '</br>'; }
 
 					// Select a Preferred Server //
 					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+ifaceNameLower+'">'+ifaceNameUpper+':</span><br />';
-					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+ifaceNameLower+'" id="changepref_'+ifaceNameLower+'" class="input settingvalue '+interfacedisabled+'" '+interfacedisabled+' onchange="Toggle_ChangePrefServer(this)">';
+					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+ifaceNameLower+'" id="changepref_'+ifaceNameLower+'" class="input settingvalue '+interfaceDisabled+'" '+interfaceDisabled+' onchange="Toggle_ChangePrefServer(this)">';
 					prefserverselecttablehtml += '<label for="changepref_'+ifaceNameLower+'">'+changelabel+'</label>';
 					prefserverselecttablehtml += '<img id="imgServerList_'+ifaceNameLower+'" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
 					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+ifaceNameLower+'" id="spdmerlin_preferredserver_'+ifaceNameLower+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
 
 					// For MANUAL Speedtests //
-					if (breakStartIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
-					speedtestifaceconfigtablehtml += '<input autocomplete="off" autocapitalize="off" type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input '+interfacedisabled+' settingvalueradio" value="'+ifaceNameUpper+'" '+interfacedisabled+' '+ifaceStyle+'>';
+					if (breakStartIndex === indxCount) { speedtestifaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
+					{
+						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
+						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
+						else
+						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
+					}
+					speedtestifaceconfigtablehtml += '<input autocomplete="off" autocapitalize="off" type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input '+interfaceDisabled+' settingvalueradio" value="'+ifaceNameUpper+'" '+interfaceDisabled+' '+ifaceStyle+'>';
 					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { speedtestifaceconfigtablehtml += '</br>'; }
 				}
-				else
+				else  //Interface UP and INCLUDED//
 				{
-					interfacename = interfaces[ifaceIndx].trim();
-					interfacescomplete.push(interfacename);
-                    ifaceNameUpper = interfacename.toUpperCase();
-                    ifaceNameLower = interfacename.toLowerCase();
 					ifaceStyle = 'style="margin-left:0px;"';
-                    ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
+					ifaceLabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">'+ifaceNameUpper+'</a>';
+					changelabel = '<a class="hintstyle" name="'+ifaceNameUpper+'" href="javascript:void(0);" onclick="SettingHint(2,this);">Change?</a>';
 
 					// For AUTOMATIC Speedtests //
-					if (breakStartIndex === ifaceIndx) { interfaceconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					if (breakStartIndex === indxCount) { interfaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
+					{
+						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
+						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
+						else
+						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
+					}
 					interfaceconfigtablehtml += '<input type="checkbox" name="spdmerlin_iface_enabled" id="spdmerlin_iface_enabled_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked '+ifaceStyle+'>';
 					interfaceconfigtablehtml += '<label for="spdmerlin_iface_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { interfaceconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { interfaceconfigtablehtml += '</br>'; }
 
 					// For PREFERRED Servers //
-					if (breakStartIndex === ifaceIndx) { prefserverconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					if (breakStartIndex === indxCount) { prefserverconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
+					{
+						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
+						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
+						else
+						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
+					}
 					prefserverconfigtablehtml += '<input type="checkbox" name="spdmerlin_usepreferred_'+ifaceNameLower+'" id="spdmerlin_usepreferred_'+ifaceNameLower+'" class="input settingvalue" value="'+ifaceNameUpper+'" checked '+ifaceStyle+'>';
 					prefserverconfigtablehtml += '<label for="spdmerlin_usepreferred_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { prefserverconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { prefserverconfigtablehtml += '</br>'; }
 
 					// Select a Preferred Server //
 					prefserverselecttablehtml += '<span style="margin-left:4px;vertical-align:top;max-width:465px;display:inline-block;" id="span_spdmerlin_preferredserver_'+ifaceNameLower+'">'+ifaceNameUpper+':</span><br />';
 					prefserverselecttablehtml += '<input type="checkbox" name="changepref_'+ifaceNameLower+'" id="changepref_'+ifaceNameLower+'" class="input settingvalue" onchange="Toggle_ChangePrefServer(this)">';
-					prefserverselecttablehtml += '<label for="changepref_'+ifaceNameLower+'">Change?</label>';
+					prefserverselecttablehtml += '<label for="changepref_'+ifaceNameLower+'">'+changelabel+'</label>';
 					prefserverselecttablehtml += '<img id="imgServerList_'+ifaceNameLower+'" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
 					prefserverselecttablehtml += '<select class="disabled" name="spdmerlin_preferredserver_'+ifaceNameLower+'" id="spdmerlin_preferredserver_'+ifaceNameLower+'" style="min-width:100px;max-width:400px;display:none;vertical-align:top;" disabled></select><br />';
 
 					// For MANUAL Speedtests //
-					if (breakStartIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '<br>'; }
-					if (styleLeftMarginIndx.includes(ifaceIndx)) { ifaceStyle = 'style="margin-left:15px !important;"'; }
+					if (breakStartIndex === indxCount) { speedtestifaceconfigtablehtml += '<br>'; }
+					if (styleLeftMarginIndx.includes(indxCount))
+					{
+						if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
+						{ ifaceStyle = 'style="margin-left:6px !important;"'; }
+						else
+						{ ifaceStyle = 'style="margin-left:18px !important;"'; }
+					}
 					speedtestifaceconfigtablehtml += '<input type="radio" name="spdtest_enabled" id="spdtest_enabled_'+ifaceNameLower+'" onchange="Change_SpdTestInterface(this)" class="input settingvalueradio" value="'+ifaceNameUpper+'" '+ifaceStyle+'>';
 					speedtestifaceconfigtablehtml += '<label for="spdtest_enabled_'+ifaceNameLower+'">'+ifaceLabel+'</label>';
-					if (breakStopIndex === ifaceIndx) { speedtestifaceconfigtablehtml += '</br>'; }
+					if (breakStopIndex === indxCount) { speedtestifaceconfigtablehtml += '</br>'; }
 				}
 
-				interfacecharttablehtml += BuildInterfaceTable(interfacename);
-				interfacelist += interfacename+',';
+				interfacecharttablehtml += BuildInterfaceTable(interfaceName);
+				interfaceList += interfaceName+',';
 			}
 
 			interfacecharttablehtml += '</td></tr></table>';
@@ -1696,16 +1782,16 @@ function getInterfacesFile()
 			GenerateManualSpdTestServerPrefSelect();
 			document.form.spdtest_serverpref.value = 'auto';
 
-			if (interfacelist.charAt(interfacelist.length-1) == ',')
-            { interfacelist = interfacelist.slice(0,-1); }
+			if (interfaceList.charAt(interfaceList.length-1) == ',')
+			{ interfaceList = interfaceList.slice(0,-1); }
 
 			$('#table_buttons2').after(interfacecharttablehtml);
-			maxNoCharts = interfacelist.split(',').length*3*3*2;
+			maxNoCharts = interfaceList.split(',').length*3*3*2;
 			RedrawAllCharts();
 
 			AddEventHandlers();
 
-			var interfacetextarray = interfacelist.split(',');
+			var interfacetextarray = interfaceList.split(',');
 			for (var indx = 0; indx < interfacetextarray.length; indx++)
 			{
 				$('#sortTable'+interfacetextarray[indx]).empty();
@@ -1783,7 +1869,7 @@ function ParseLastXData(name,data)
 	var arraysortlines = data.split('\n');
 	arraysortlines = arraysortlines.filter(Boolean);
 	window['arraysortlistlines'+name] = [];
-	for(var i = 0; i < arraysortlines.length; i++)
+	for (var i = 0; i < arraysortlines.length; i++)
 	{
 		try{
 			var resultfields = arraysortlines[i].split(',');
@@ -1813,7 +1899,8 @@ function SortTable(tableid,arrayid,sorttext,sortname,sortdir)
 	window[sortname] = sorttext.replace('↑','').replace('↓','').trim();
 	var sorttype = 'number';
 	var sortfield = window[sortname];
-	switch(window[sortname]){
+	switch(window[sortname])
+	{
 		case 'Time':
 			sorttype = 'date';
 		break
@@ -1822,8 +1909,9 @@ function SortTable(tableid,arrayid,sorttext,sortname,sortdir)
 			sorttype = 'string';
 		break
 	}
-	
-	if(sorttype == 'string'){
+
+	if (sorttype == 'string')
+	{
 		if(sorttext.indexOf('↓') == -1 && sorttext.indexOf('↑') == -1){
 			eval(arrayid+' = '+arrayid+'.sort((a,b) => (a.'+sortfield+'.toLowerCase() > b.'+sortfield+'.toLowerCase()) ? 1 : ((b.'+sortfield+'.toLowerCase() > a.'+sortfield+'.toLowerCase()) ? -1 : 0));');
 			window[sortdir] = 'asc';
@@ -1837,12 +1925,13 @@ function SortTable(tableid,arrayid,sorttext,sortname,sortdir)
 			window[sortdir] = 'desc';
 		}
 	}
-	else if(sorttype == 'number'){
-		if(sorttext.indexOf('↓') == -1 && sorttext.indexOf('↑') == -1){
+	else if (sorttype == 'number')
+	{
+		if (sorttext.indexOf('↓') == -1 && sorttext.indexOf('↑') == -1){
 			eval(arrayid+' = '+arrayid+'.sort((a,b) => parseFloat(a.'+sortfield+'.replace("m","000")) - parseFloat(b.'+sortfield+'.replace("m","000")));');
 			window[sortdir] = 'asc';
 		}
-		else if(sorttext.indexOf('↓') != -1){
+		else if (sorttext.indexOf('↓') != -1){
 			eval(arrayid+' = '+arrayid+'.sort((a,b) => parseFloat(a.'+sortfield+'.replace("m","000")) - parseFloat(b.'+sortfield+'.replace("m","000")));');
 			window[sortdir] = 'asc';
 		}
@@ -1851,12 +1940,13 @@ function SortTable(tableid,arrayid,sorttext,sortname,sortdir)
 			window[sortdir] = 'desc';
 		}
 	}
-	else if(sorttype == 'date'){
-		if(sorttext.indexOf('↓') == -1 && sorttext.indexOf('↑') == -1){
+	else if (sorttype == 'date')
+	{
+		if (sorttext.indexOf('↓') == -1 && sorttext.indexOf('↑') == -1){
 			eval(arrayid+' = '+arrayid+'.sort((a, b) => new Date(a.'+sortfield+') - new Date(b.'+sortfield+'));');
 			window[sortdir] = 'asc';
 		}
-		else if(sorttext.indexOf('↓') != -1){
+		else if (sorttext.indexOf('↓') != -1){
 			eval(arrayid+' = '+arrayid+'.sort((a, b) => new Date(a.'+sortfield+') - new Date(b.'+sortfield+'));');
 			window[sortdir] = 'asc';
 		}
@@ -1865,13 +1955,13 @@ function SortTable(tableid,arrayid,sorttext,sortname,sortdir)
 			window[sortdir] = 'desc';
 		}
 	}
-	
+
 	$('#'+tableid).empty();
 	$('#'+tableid).append(BuildLastXTable(tableid.replace('sortTable','')));
-	
+
 	$('#'+tableid).find('.sortable').each(function(index,element){
 		if(element.innerHTML.replace(/ \(.*\)/,'').replace(' ','') == window[sortname]){
-			if(window[sortdir] == 'asc'){
+			if (window[sortdir] == 'asc'){
 				element.innerHTML = element.innerHTML+' ↑';
 			}
 			else{
@@ -1907,7 +1997,7 @@ function BuildLastXTable(name)
 	tablehtml += '<col style="width:130px;">';
 	tablehtml += '<col style="width:80px;">';
 	tablehtml += '<col style="width:250px;">';
-	
+
 	tablehtml += '<thead class="sortTableHeader">';
 	tablehtml += '<tr>';
 	tablehtml += '<th class="sortable" onclick="SortTable(\'sortTable'+name+'\',\'arraysortlistlines'+name+'\',this.innerHTML.replace(/ \\(.*\\)/,\'\'),\'sortname'+name+'\',\'sortdir'+name+'\')">Time</th>';
@@ -1924,7 +2014,7 @@ function BuildLastXTable(name)
 	tablehtml += '</tr>';
 	tablehtml += '</thead>';
 	tablehtml += '<tbody class="sortTableContent">';
-	
+
 	for (var i = 0; i < window['arraysortlistlines'+name].length; i++)
 	{
 		tablehtml += '<tr class="sortRow">';
@@ -1946,7 +2036,7 @@ function BuildLastXTable(name)
 		tablehtml += '<td>'+window['arraysortlistlines'+name][i].ServerName.replace("null","")+'</td>';
 		tablehtml += '</tr>';
 	}
-	
+
 	tablehtml += '</tbody>';
 	tablehtml += '</table>';
 	return tablehtml;
@@ -1957,8 +2047,9 @@ function changeAllCharts(e)
 	value = e.value * 1;
 	name = e.id.substring(0,e.id.indexOf('_'));
 	SetCookie(e.id,value);
-	var interfacetextarray = interfacelist.split(',');
-	for(var i = 0; i < interfacetextarray.length; i++){
+	var interfacetextarray = interfaceList.split(',');
+	for (var i = 0; i < interfacetextarray.length; i++)
+	{
 		Draw_Chart(interfacetextarray[i],'Combined');
 		Draw_Chart(interfacetextarray[i],'Quality');
 	}
@@ -1969,16 +2060,18 @@ function changeChart(e)
 	value = e.value * 1;
 	name = e.id.substring(0,e.id.indexOf('_'));
 	SetCookie(e.id,value);
-	if(e.id.indexOf('Combined') != -1){
+	if (e.id.indexOf('Combined') != -1)
+	{
 		Draw_Chart(name,'Combined');
 	}
-	else if(e.id.indexOf('Quality') != -1){
+	else if (e.id.indexOf('Quality') != -1)
+	{
 		Draw_Chart(name,'Quality');
 	}
 }
 
 /**----------------------------------------**/
-/** Modified by Martinski W. [2025-Mar-03] **/
+/** Modified by Martinski W. [2025-Oct-11] **/
 /**----------------------------------------**/
 function SettingHint (hintID, formField)
 {
@@ -1986,24 +2079,26 @@ function SettingHint (hintID, formField)
 	for (var i = 0; i < tag_name.length; i++)
 	{ tag_name[i].onmouseout=nd; }
 
-	let hintMsg = '';
+	let hintMsg = '', ifaceNum = 0;
 	if (hintID === 1)
 	{
-	    if (formField.name.match(/^WGVPN[1-9]/) !== null)
-	    { hintMsg = 'WireGuard interface is <b>not</b> enabled.'; }
-	    else if (formField.name.match(/^VPNC[1-9]/) !== null)
-	    { hintMsg = 'OpenVPN client interface is <b>not</b> enabled.'; }
-	    else
-	    { hintMsg = 'Interface is <b>not</b> enabled.'; }
+		ifaceNum = formField.name.replace(/\D/g,'');
+		if (formField.name.match(/^WGVPN[1-5]/) !== null)
+		{ hintMsg = `WireGuard client ${ifaceNum} interface is <b>not</b> enabled.`; }
+		else if (formField.name.match(/^VPNC[1-5]/) !== null)
+		{ hintMsg = `OpenVPN client ${ifaceNum} interface is <b>not</b> enabled.`; }
+		else
+		{ hintMsg = 'Interface is <b>not</b> enabled.'; }
 	}
 	else if (hintID === 2)
 	{
-	    if (formField.name.match(/^WGVPN[1-9]/) !== null)
-	    { hintMsg = 'WireGuard interface is enabled.'; }
-	    else if (formField.name.match(/^VPNC[1-9]/) !== null)
-	    { hintMsg = 'OpenVPN client interface is enabled.'; }
-	    else
-	    { hintMsg = 'Interface is enabled.'; }
+		ifaceNum = formField.name.replace(/\D/g,'');
+		if (formField.name.match(/^WGVPN[1-5]/) !== null)
+		{ hintMsg = `WireGuard client ${ifaceNum} interface is enabled.`; }
+		else if (formField.name.match(/^VPNC[1-5]/) !== null)
+		{ hintMsg = `OpenVPN client ${ifaceNum} interface is enabled.`; }
+		else
+		{ hintMsg = 'Interface is enabled.'; }
 	}
 	else if (hintID === 3)
 	{ hintMsg = 'Hour(s) of day to run speedtests.<br />Use an asterisk (<b>*</b>) to run every hour.<br />Valid numbers are between 0 and 23.<br />Use commas (<b>,</b>) for multiple entries.<br />Use a hyphen (<b>-</b>) to indicate a range.'; }
@@ -2139,20 +2234,20 @@ function AutomaticInterfaceEnableDisable(forminput)
 	var inputname = forminput.name;
 	var inputvalue = forminput.value;
 	var prefix = inputname.substring(0,inputname.lastIndexOf('_'));
-	
+
 	var fieldNames = ['schhours','schmins'];
 	var fieldnames2 = ['schedulemode','everyxselect','everyxvalue'];
-	
+
 	if (inputvalue == 'false')
 	{
-		for (var i = 0; i < interfacescomplete.length; i++)
+		for (var i = 0; i < interfacesComplete.length; i++)
 		{
-			$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
-			$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
-			$('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$('#changepref_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
+			$('#'+prefix+'_iface_enabled_'+interfacesComplete[i].toLowerCase()).prop('disabled',true);
+			$('#'+prefix+'_iface_enabled_'+interfacesComplete[i].toLowerCase()).addClass('disabled');
+			$('#'+prefix+'_usepreferred_'+interfacesComplete[i].toLowerCase()).prop('disabled',true);
+			$('#'+prefix+'_usepreferred_'+interfacesComplete[i].toLowerCase()).addClass('disabled');
+			$('#changepref_'+interfacesComplete[i].toLowerCase()).prop('disabled',true);
+			$('#changepref_'+interfacesComplete[i].toLowerCase()).addClass('disabled');
 		}
 		for (var i = 0; i < fieldNames.length; i++)
 		{
@@ -2171,16 +2266,16 @@ function AutomaticInterfaceEnableDisable(forminput)
 	}
 	else if (inputvalue == 'true')
 	{
-		for (var i = 0; i < interfacescomplete.length; i++)
+		for (var i = 0; i < interfacesComplete.length; i++)
 		{
-			if (interfacesdisabled.includes(interfacescomplete[i]) == false)
+			if (interfacesDisabled.includes(interfacesComplete[i]) == false)
 			{
-				$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$('#'+prefix+'_iface_enabled_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
-				$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$('#'+prefix+'_usepreferred_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
-				$('#changepref_'+interfacescomplete[i].toLowerCase()).prop('disabled',false);
-				$('#changepref_'+interfacescomplete[i].toLowerCase()).removeClass('disabled');
+				$('#'+prefix+'_iface_enabled_'+interfacesComplete[i].toLowerCase()).prop('disabled',false);
+				$('#'+prefix+'_iface_enabled_'+interfacesComplete[i].toLowerCase()).removeClass('disabled');
+				$('#'+prefix+'_usepreferred_'+interfacesComplete[i].toLowerCase()).prop('disabled',false);
+				$('#'+prefix+'_usepreferred_'+interfacesComplete[i].toLowerCase()).removeClass('disabled');
+				$('#changepref_'+interfacesComplete[i].toLowerCase()).prop('disabled',false);
+				$('#changepref_'+interfacesComplete[i].toLowerCase()).removeClass('disabled');
 			}
 		}
 		for (var i = 0; i < fieldNames.length; i++)
@@ -2204,7 +2299,7 @@ function ScheduleModeToggle(forminput)
 {
 	var inputname = forminput.name;
 	var inputvalue = forminput.value;
-	
+
 	if (inputvalue == 'EveryX')
 	{
 		showhide('schfrequency',true);
@@ -2231,7 +2326,7 @@ function EveryXToggle(forminput)
 {
 	var inputname = forminput.name;
 	var inputvalue = forminput.value;
-	
+
 	if (inputvalue == 'hours')
 	{
 		showhide('spanxhours',true);
@@ -2283,7 +2378,6 @@ function Toggle_ChangePrefServer(forminput)
 {
 	var inputname = forminput.name;
 	var inputvalue = forminput.checked;
-
 	var ifacename = inputname.split('_')[1];
 
 	if (inputvalue == true)
@@ -2314,15 +2408,15 @@ function Toggle_SpdTestServerPref(forminput)
 {
 	var inputname = forminput.name;
 	var inputvalue = forminput.value;
-	
+
 	if (inputvalue == 'onetime')
 	{
 		document.formScriptActions.action_script.value='start_spdmerlinserverlistmanual_'+document.form.spdtest_enabled.value;
 		document.formScriptActions.submit();
-		for (var i = 0; i < interfacescomplete.length; i++)
+		for (var i = 0; i < interfacesComplete.length; i++)
 		{
-			$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).prop('disabled',true);
-			$('#spdtest_enabled_'+interfacescomplete[i].toLowerCase()).addClass('disabled');
+			$('#spdtest_enabled_'+interfacesComplete[i].toLowerCase()).prop('disabled',true);
+			$('#spdtest_enabled_'+interfacesComplete[i].toLowerCase()).addClass('disabled');
 		}
 		$.each($('input[name=spdtest_serverpref]'),function(){
 			$(this).prop('disabled',true);
@@ -2330,7 +2424,7 @@ function Toggle_SpdTestServerPref(forminput)
 		});
 		showhide('rowmanualserverprefselect',true);
 		showhide('imgManualServerList',true);
-		
+
 		if (document.form.spdtest_enabled.value == 'All')
 		{
 			$.each($('select[name^=spdtest_serverprefselect]'),function(){
@@ -2363,20 +2457,34 @@ function Toggle_SpdTestServerPref(forminput)
 	}
 }
 
+/**----------------------------------------**/
+/** Modified by Martinski W. [2025-Jul-13] **/
+/**----------------------------------------**/
 function GenerateManualSpdTestServerPrefSelect()
 {
 	$('#rowmanualserverprefselect').remove();
 	var serverprefhtml = '<tr class="even" id="rowmanualserverprefselect" style="display:none;">';
 	serverprefhtml += '<td class="settingname">Choose a server</th><td class="settingvalue"><img id="imgManualServerList" style="display:none;vertical-align:middle;" src="images/InternetScan.gif"/>';
-	
+
+	let ifaceNameUpper, ifaceNameLower, styleSetting;
+
 	if (document.form.spdtest_enabled.value == 'All')
 	{
-		for (var i = 0; i < interfacescomplete.length; i++)
+		for (var i = 0; i < interfacesComplete.length; i++)
 		{
-			if (interfacesdisabled.includes(interfacescomplete[i]) == false)
+			if (interfacesDisabled.includes(interfacesComplete[i]) == false)
 			{
-				var interfacename = interfacescomplete[i].toLowerCase();
-				serverprefhtml += '<span style="width:50px;display:none;" id="spdtest_serverprefselectspan_'+interfacename+'">'+interfacescomplete[i]+':</span><select name="spdtest_serverprefselect_'+interfacename+'" id="spdtest_serverprefselect_'+interfacename+'" style="display:none;max-width:415px;"></select><br />';
+				ifaceNameUpper = interfacesComplete[i].toUpperCase();
+				ifaceNameLower = interfacesComplete[i].toLowerCase();
+
+				if (ifaceNameUpper.match(/^WGVPN[1-5]/) !== null)
+				{ styleSetting = 'style="width:58px; display:none;"'; }
+				else if (ifaceNameUpper.match(/^VPNC[1-5]/) !== null)
+				{ styleSetting = 'style="width:46px;display:none;"'; }
+				else
+				{ styleSetting = 'style="width:33px; display:none;"'; }
+
+				serverprefhtml += '<span '+styleSetting+' id="spdtest_serverprefselectspan_'+ifaceNameLower+'">'+interfacesComplete[i]+':</span><select name="spdtest_serverprefselect_'+ifaceNameLower+'" id="spdtest_serverprefselect_'+ifaceNameLower+'" style="display:none;max-width:415px;"></select><br />';
 			}
 		}
 	}
@@ -2384,7 +2492,7 @@ function GenerateManualSpdTestServerPrefSelect()
 	{
 		serverprefhtml += '<select name="spdtest_serverprefselect" id="spdtest_serverprefselect" style="display:none;"></select>';
 	}
-	
+
 	serverprefhtml += '</td></tr>';
 	$('#rowmanualserverpref').after(serverprefhtml);
 }
