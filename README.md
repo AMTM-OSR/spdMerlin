@@ -24,6 +24,10 @@ Using your preferred SSH client/terminal, copy and paste the following command, 
 ```sh
 /usr/sbin/curl -fsL --retry 3 "https://raw.githubusercontent.com/AMTM-OSR/spdMerlin/master/spdmerlin.sh" -o /jffs/scripts/spdmerlin && chmod 0755 /jffs/scripts/spdmerlin && /jffs/scripts/spdmerlin install
 ```
+## Prerequisites
+Asuswrt-Merlin running on a supported ASUS router
+Entware installed, preferably using amtm
+jffs scripts enabled in the firmware; installing Entware should have taken care of this part
 
 ## Usage
 ### WebUI
