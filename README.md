@@ -11,8 +11,6 @@ spdMerlin is free to use under the [GNU General Public License version 3](https:
 spdMerlin uses [Speedtest CLI](https://www.speedtest.net/apps/cli) and includes the required licenses, which must be accepted on install of spdMerlin.
 As of spdMerlin v4.4.0 the Asus built-in Ookla speedtest binary is used to run the speedtests.
 
-A swap file is required, you can set one up easily by using amtm, which is built into the router.
-
 This script began as a user-friendly installer for a personal project developed by [JGrana](https://www.snbforums.com/members/jgrana.20663/)
 
 ## Supported firmware versions
@@ -28,6 +26,7 @@ Using your preferred SSH client/terminal, copy and paste the following command, 
 Asuswrt-Merlin running on a supported ASUS router
 Entware installed, preferably using amtm
 jffs scripts enabled in the firmware; installing Entware should have taken care of this part
+A swap file is required, you can set one up easily by using amtm, which is built into the router.
 
 ## Usage
 ### WebUI
