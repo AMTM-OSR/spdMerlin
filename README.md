@@ -23,10 +23,10 @@ Using your preferred SSH client/terminal, copy and paste the following command, 
 /usr/sbin/curl -fsL --retry 3 "https://raw.githubusercontent.com/AMTM-OSR/spdMerlin/master/spdmerlin.sh" -o /jffs/scripts/spdmerlin && chmod 0755 /jffs/scripts/spdmerlin && /jffs/scripts/spdmerlin install
 ```
 ## Prerequisites
-- Asuswrt-Merlin running on a supported ASUS router
-- Entware installed, preferably using amtm
-- jffs scripts enabled in the firmware; this can be set manually, and installing Entware via amtm usually takes care of it
-- A swap file is required, you can set one up easily by using amtm, which is built into the router.
+1. [Asuswrt-Merlin](https://asuswrt.lostrealm.ca/ "Pure Freaking Magic") running on a supported ASUS router
+2. **Entware** installed, preferably using [amtm](https://github.com/decoderman/amtm "amtm")
+3. jffs scripts enabled in the firmware; this can be set manually, and installing **Entware** via amtm usually takes care of it
+4. A swap file is required, you can set one up easily by using amtm, which is built into the router.
 
 ## Usage
 ### WebUI
