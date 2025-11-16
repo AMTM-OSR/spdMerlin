@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Nov-05
+# Last Modified: 2025-Nov-16
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,8 +38,8 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.15"
-readonly SCRIPT_VERSTAG="25110522"
+readonly SCRIPT_VERSION="v4.4.16"
+readonly SCRIPT_VERSTAG="25111608"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -50,7 +50,7 @@ readonly SHARED_REPO="https://raw.githubusercontent.com/AMTM-OSR/shared-jy/maste
 readonly SHARED_WEB_DIR="$SCRIPT_WEBPAGE_DIR/shared-jy"
 readonly TEMP_MENU_TREE="/tmp/menuTree.js"
 
-readonly HOME_DIR="/$(readlink "$HOME")"
+readonly HOME_DIR="/home/root"
 readonly OOKLA_DIR="$SCRIPT_DIR/ookla"
 readonly OOKLA_LICENSE_DIR="$SCRIPT_DIR/ooklalicense"
 readonly OOKLA_HOME_DIR="$HOME_DIR/.config/ookla"
@@ -800,7 +800,7 @@ Delete_InterfacesUser_SAVEDBAK()
 { rm -f "$SCRIPT_INTERFACES_USER_SAVBAK" ;}
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jul-11] ##
+## Modified by Martinski W. [2025-Nov-15] ##
 ##----------------------------------------##
 Conf_FromSettings()
 {
@@ -840,7 +840,7 @@ Conf_FromSettings()
 			rm -f "$TMPFILE"
 			rm -f "${SETTINGSFILE}.bak"
 
-			if diff "$SCRIPT_CONF" "${SCRIPT_CONF}.bak" | grep -q "STORAGELOCATION="
+			if diff -U0 "$SCRIPT_CONF" "${SCRIPT_CONF}.bak" | grep -qE "[-+]STORAGELOCATION="
 			then
 				STORAGEtype="$(ScriptStorageLocation check)"
 				if [ "$STORAGEtype" = "jffs" ]
@@ -854,9 +854,11 @@ Conf_FromSettings()
 				then
 				    ScriptStorageLocation usb
 				fi
+				Create_Dirs
+				Conf_Exists
 				Create_Symlinks
 			fi
-			if diff "$SCRIPT_CONF" "${SCRIPT_CONF}.bak" | grep -qE "(SCHDAYS|SCHHOUR|SCHMINS|AUTOMATICMODE=)"
+			if diff -U0 "$SCRIPT_CONF" "${SCRIPT_CONF}.bak" | grep -qE "(SCHDAYS|SCHHOUR|SCHMINS|AUTOMATICMODE=)"
 			then
 				Auto_Cron delete 2>/dev/null
 				AutomaticMode check && Auto_Cron create 2>/dev/null
@@ -869,7 +871,7 @@ Conf_FromSettings()
 					ExcludeFromQoS enable
 				fi
 			fi
-			if diff "$SCRIPT_CONF" "${SCRIPT_CONF}.bak" | grep -qE "(STORERESULTURL=|OUTPUTTIMEMODE=|DAYSTOKEEP=|LASTXRESULTS=)"
+			if diff -U0 "$SCRIPT_CONF" "${SCRIPT_CONF}.bak" | grep -qE "(STORERESULTURL=|OUTPUTTIMEMODE=|DAYSTOKEEP=|LASTXRESULTS=)"
 			then
 				Generate_CSVs
 			fi
@@ -1883,7 +1885,10 @@ ScriptStorageLocation()
 			mkdir -p "/opt/share/$SCRIPT_NAME_LOWER.d/"
 			rm -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/spdstats.db-shm"
 			rm -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/spdstats.db-wal"
-			[ -d "/opt/share/$SCRIPT_NAME_LOWER.d/csv" ] && rm -fr "/opt/share/$SCRIPT_NAME_LOWER.d/csv"
+			if [ -d "/opt/share/$SCRIPT_NAME_LOWER.d/csv" ] && \
+			   [ -d "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv" ]
+			then rm -fr "/opt/share/$SCRIPT_NAME_LOWER.d/csv"
+			fi
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/jffs/addons/$SCRIPT_NAME_LOWER.d/.interfaces.bak" "/opt/share/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
@@ -1906,7 +1911,10 @@ ScriptStorageLocation()
 			printf "Please wait..."
 			sed -i 's/^STORAGELOCATION=.*$/STORAGELOCATION=jffs/' "$SCRIPT_CONF"
 			mkdir -p "/jffs/addons/$SCRIPT_NAME_LOWER.d/"
-			[ -d "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv" ] && rm -fr "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv"
+			if [ -d "/opt/share/$SCRIPT_NAME_LOWER.d/csv" ] && \
+			   [ -d "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv" ]
+			then rm -fr "/jffs/addons/$SCRIPT_NAME_LOWER.d/csv"
+			fi
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/csv" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
 			mv -f "/opt/share/$SCRIPT_NAME_LOWER.d/.interfaces.bak" "/jffs/addons/$SCRIPT_NAME_LOWER.d/" 2>/dev/null
@@ -4804,7 +4812,6 @@ _Reset_Interface_States_()
     NTP_Ready noLockCheck
     Entware_Ready noLockCheck
     _SetParameters_
-    ##OFF## Check_Lock [NO LockCheck] ##
     Create_Dirs
     Conf_Exists
     ScriptStorageLocation load true
