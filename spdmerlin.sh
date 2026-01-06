@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2025-Nov-16
+# Last Modified: 2026-Jan-05
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,9 +38,9 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.16"
-readonly SCRIPT_VERSTAG="25111608"
-SCRIPT_BRANCH="master"
+readonly SCRIPT_VERSION="v4.4.17"
+readonly SCRIPT_VERSTAG="26010522"
+SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
 readonly SCRIPT_WEBPAGE_DIR="$(readlink -f /www/user)"
@@ -113,8 +113,10 @@ readonly ERR="\\e[31m"
 readonly WARN="\\e[33m"
 readonly PASS="\\e[32m"
 readonly BOLD="\\e[1m"
-readonly SETTING="${BOLD}\\e[36m"
-readonly CLEARFORMAT="\\e[0m"
+readonly SETTING="${BOLD}\e[36m"
+readonly UNDERLINE="\e[4m"
+readonly CLEARFORMAT="\e[0m"
+readonly BOLDUNDERLN="\e[1;4m"
 
 ##-------------------------------------##
 ## Added by Martinski W. [2025-Feb-15] ##
@@ -129,6 +131,7 @@ readonly PassBGRNct="\e[30;102m"
 readonly WarnBYLWct="\e[30;103m"
 readonly WarnIMGNct="\e[45m"
 readonly WarnBMGNct="\e[30;105m"
+readonly menuSepStr="${BOLD}################################################################${CLRct}"
 
 ### End of output format variables ###
 
@@ -818,8 +821,8 @@ Conf_FromSettings()
 
 			while IFS='' read -r line || [ -n "$line" ]
 			do
-				SETTINGNAME="$(echo "$line" | cut -f1 -d'=' | awk '{print toupper($1)}')"
-				SETTINGVALUE="$(echo "$line" | cut -f2- -d'=' | sed "s/=/ /g")"
+				SETTINGNAME="$(echo "$line" | cut -d'=' -f1 | awk '{print toupper($1)}')"
+				SETTINGVALUE="$(echo "$line" | cut -d'=' -f2- | sed "s/=/ /g")"
 				if [ "$SETTINGNAME" = "SPEEDTESTBINARY" ]
 				then
 					SpeedtestBinary "$SETTINGVALUE"
@@ -1018,17 +1021,17 @@ _GetConfigParam_()
        fi
    fi
 
-   keyValue="$(grep "^${1}=" "$SCRIPT_CONF" | cut -d'=' -f2)"
+   keyValue="$(grep "^${1}=" "$SCRIPT_CONF" | cut -d'=' -f2-)"
    echo "${keyValue:=$defValue}"
    return 0
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Mar-14] ##
+## Modified by Martinski W. [2025-Dec-27] ##
 ##----------------------------------------##
 Conf_Exists()
 {
-	local AUTOMATEDopt
+	local AUTOMATEDopt  delCRON=false
 
 	if [ -f "$SCRIPT_CONF" ]
 	then
@@ -1046,15 +1049,27 @@ Conf_Exists()
 		if grep -q "SCHEDULESTART" "$SCRIPT_CONF"
 		then
 			{
-			  echo "SCHDAYS=*";
-			  echo "SCHHOURS=*";
-			  echo "SCHMINS=12,42";
+			   echo "SCHDAYS=*";
+			   echo "SCHHOURS=*";
+			   echo "SCHMINS=12,42";
 			} >> "$SCRIPT_CONF"
 			sed -i '/SCHEDULESTART/d;/SCHEDULEEND/d;/MINUTE/d;/TESTFREQUENCY/d' "$SCRIPT_CONF"
-			Auto_Cron delete 2>/dev/null
+			delCRON=true
 		fi
-		if ! grep -q "^AUTOBW_AVERAGE_CALC=" "$SCRIPT_CONF"; then
-			echo "AUTOBW_AVERAGE_CALC=10" >> "$SCRIPT_CONF"
+		if ! grep -q "^SCHDAYS=" "$SCRIPT_CONF"; then
+			echo "SCHDAYS=*" >> "$SCRIPT_CONF"
+			delCRON=true
+		fi
+		if ! grep -q "^SCHHOURS=" "$SCRIPT_CONF"; then
+			echo "SCHHOURS=*" >> "$SCRIPT_CONF"
+			delCRON=true
+		fi
+		if ! grep -q "^SCHMINS=" "$SCRIPT_CONF"; then
+			echo "SCHMINS=12,42" >> "$SCRIPT_CONF"
+			delCRON=true
+		fi
+		if "$delCRON"
+		then Auto_Cron delete 2>/dev/null
 		fi
 		if grep -q "OUTPUTDATAMODE" "$SCRIPT_CONF"; then
 			sed -i '/OUTPUTDATAMODE/d;' "$SCRIPT_CONF"
@@ -1080,6 +1095,9 @@ Conf_Exists()
 		if ! grep -q "^EXCLUDEFROMQOS=" "$SCRIPT_CONF"; then
 			echo "EXCLUDEFROMQOS=true" >> "$SCRIPT_CONF"
 		fi
+		if ! grep -q "^STORERESULTURL=" "$SCRIPT_CONF"; then
+			echo "STORERESULTURL=true" >> "$SCRIPT_CONF"
+		fi
 		if ! grep -q "^SPEEDTESTBINARY=" "$SCRIPT_CONF"
 		then
 			echo "SPEEDTESTBINARY=$(_GetDefaultSpeedTestBinary_)" >> "$SCRIPT_CONF"
@@ -1090,47 +1108,107 @@ Conf_Exists()
 		if ! grep -q "^PREFERREDSERVER_WAN=" "$SCRIPT_CONF"; then
 			echo "PREFERREDSERVER_WAN=0|None configured" >> "$SCRIPT_CONF"
 		fi
-		if ! grep -q "^PREFERREDSERVER_WGVPN" "$SCRIPT_CONF"
+		if ! grep -Eq "^USEPREFERRED_VPNC[1-5]=" "$SCRIPT_CONF" || \
+		   ! grep -Eq "^PREFERREDSERVER_VPNC[1-5]=" "$SCRIPT_CONF"
 		then
 			for index in 1 2 3 4 5
 			do
 			   {
-			     echo "USEPREFERRED_WGVPN$index=false";
-			     echo "PREFERREDSERVER_WGVPN$index=0|None configured"
+			      echo "USEPREFERRED_VPNC${index}=false"
+			      echo "PREFERREDSERVER_VPNC${index}=0|None configured"
 			   } >> "$SCRIPT_CONF"
 			done
+		fi
+		if ! grep -Eq "^USEPREFERRED_WGVPN[1-5]=" "$SCRIPT_CONF" || \
+		   ! grep -Eq "^PREFERREDSERVER_WGVPN[1-5]=" "$SCRIPT_CONF"
+		then
+			for index in 1 2 3 4 5
+			do
+			   {
+			      echo "USEPREFERRED_WGVPN${index}=false";
+			      echo "PREFERREDSERVER_WGVPN${index}=0|None configured"
+			   } >> "$SCRIPT_CONF"
+			done
+		fi
+		if ! grep -q "^AUTOBW_ENABLED=" "$SCRIPT_CONF"; then
+			echo "AUTOBW_ENABLED=false" >> "$SCRIPT_CONF"
+		fi
+		if ! grep -q "^AUTOBW_SF_UP=" "$SCRIPT_CONF" || \
+		   ! grep -q "^AUTOBW_SF_DOWN=" "$SCRIPT_CONF"
+		then
+			{
+			   echo "AUTOBW_SF_UP=95"
+			   echo "AUTOBW_SF_DOWN=95"
+			} >> "$SCRIPT_CONF" 
+		fi
+		if ! grep -q "^AUTOBW_ULIMIT_UP=" "$SCRIPT_CONF" || \
+		   ! grep -q "^AUTOBW_ULIMIT_DOWN=" "$SCRIPT_CONF"
+		then
+			{
+			   echo "AUTOBW_ULIMIT_UP=0"
+			   echo "AUTOBW_ULIMIT_DOWN=0"
+			} >> "$SCRIPT_CONF" 
+		fi
+		if ! grep -q "^AUTOBW_LLIMIT_UP=" "$SCRIPT_CONF" || \
+		   ! grep -q "^AUTOBW_LLIMIT_DOWN=" "$SCRIPT_CONF"
+		then
+			{
+			   echo "AUTOBW_LLIMIT_UP=0"
+			   echo "AUTOBW_LLIMIT_DOWN=0"
+			} >> "$SCRIPT_CONF" 
+		fi
+		if ! grep -q "^AUTOBW_THRESHOLD_UP=" "$SCRIPT_CONF" || \
+		   ! grep -q "^AUTOBW_THRESHOLD_DOWN=" "$SCRIPT_CONF"
+		then
+			{
+			   echo "AUTOBW_THRESHOLD_UP=10"
+			   echo "AUTOBW_THRESHOLD_DOWN=10"
+			} >> "$SCRIPT_CONF" 
+		fi
+		if ! grep -q "^AUTOBW_AVERAGE_CALC=" "$SCRIPT_CONF"; then
+			echo "AUTOBW_AVERAGE_CALC=10" >> "$SCRIPT_CONF"
 		fi
 		return 0
 	else
 		{
-		  echo "PREFERREDSERVER_WAN=0|None configured"
-		  echo "USEPREFERRED_WAN=false"; echo "AUTOMATICMODE=true"
-		  echo "OUTPUTTIMEMODE=unix"; echo "STORAGELOCATION=jffs"
-		  echo "SCHDAYS=*" ; echo "SCHHOURS=*" ; echo "SCHMINS=12,42"
-		  echo "DAYSTOKEEP=30" ; echo "LASTXRESULTS=10" ; echo "EXCLUDEFROMQOS=true"
-		  echo "JFFS_MSGLOGTIME=0" ; echo "VERBOSE_TEST=0"
+		   echo "AUTOMATICMODE=true"
+		   echo "OUTPUTTIMEMODE=unix"
+		   echo "STORAGELOCATION=jffs"
+		   echo "SCHDAYS=*" ; echo "SCHHOURS=*" ; echo "SCHMINS=12,42"
+		   echo "DAYSTOKEEP=30"
+		   echo "LASTXRESULTS=10"
+		   echo "EXCLUDEFROMQOS=true"
+		   echo "STORERESULTURL=true"
+		   echo "JFFS_MSGLOGTIME=0"
+		   echo "VERBOSE_TEST=0"
+		   echo "USEPREFERRED_WAN=false"
+		   echo "PREFERREDSERVER_WAN=0|None configured"
 		} > "$SCRIPT_CONF"
 		for index in 1 2 3 4 5
 		do
-		   {
-		     echo "USEPREFERRED_VPNC${index}=false"
-		     echo "PREFERREDSERVER_VPNC${index}=0|None configured"
-		   } >> "$SCRIPT_CONF"
+			{
+			   echo "USEPREFERRED_VPNC${index}=false"
+			   echo "PREFERREDSERVER_VPNC${index}=0|None configured"
+			} >> "$SCRIPT_CONF"
 		done
 		for index in 1 2 3 4 5
 		do
-		   {
-		     echo "USEPREFERRED_WGVPN$index=false"
-		     echo "PREFERREDSERVER_WGVPN$index=0|None configured";
-		   } >> "$SCRIPT_CONF"
+			{
+			   echo "USEPREFERRED_WGVPN${index}=false"
+			   echo "PREFERREDSERVER_WGVPN${index}=0|None configured"
+			} >> "$SCRIPT_CONF"
 		done
 		{
-		  echo "AUTOBW_ENABLED=false"
-		  echo "AUTOBW_SF_DOWN=95" ; echo "AUTOBW_SF_UP=95"
-		  echo "AUTOBW_ULIMIT_DOWN=0" ; echo "AUTOBW_LLIMIT_DOWN=0"
-		  echo "AUTOBW_ULIMIT_UP=0" ; echo "AUTOBW_LLIMIT_UP=0"
-		  echo "AUTOBW_THRESHOLD_UP=10" ; echo "AUTOBW_THRESHOLD_DOWN=10"
-		  echo "AUTOBW_AVERAGE_CALC=10" ; echo "STORERESULTURL=true"
+		   echo "AUTOBW_ENABLED=false"
+		   echo "AUTOBW_SF_UP=95"
+		   echo "AUTOBW_SF_DOWN=95"
+		   echo "AUTOBW_ULIMIT_UP=0"
+		   echo "AUTOBW_LLIMIT_UP=0"
+		   echo "AUTOBW_ULIMIT_DOWN=0"
+		   echo "AUTOBW_LLIMIT_DOWN=0"
+		   echo "AUTOBW_THRESHOLD_UP=10"
+		   echo "AUTOBW_THRESHOLD_DOWN=10"
+		   echo "AUTOBW_AVERAGE_CALC=10"
 		} >> "$SCRIPT_CONF"
 		echo "SPEEDTESTBINARY=$(_GetDefaultSpeedTestBinary_)" >> "$SCRIPT_CONF"
 		return 1
@@ -1551,12 +1629,11 @@ Set_InterfacesUser_State()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Sep-06] ##
+## Modified by Martinski W. [2026-Jan-05] ##
 ##----------------------------------------##
 Generate_Interface_List()
 {
 	local ifaceCount  ifaceEntryNum  ifaceLineStr  interface_UP
-	local doUpdateSavedBak=false
 	printf "\nRetrieving list of interfaces...\n\n"
 
 	_GenerateIFaceList_()
@@ -1567,17 +1644,17 @@ Generate_Interface_List()
 		do
 			Set_InterfacesUser_State "$COUNTER"
 			ifaceLine="$(sed "${COUNTER}!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
-			printf "%2d)  %s\n" "$COUNTER" "$ifaceLine"
+			printf " ${GRNct}%2d${CLRct})  %s\n" "$COUNTER" "$ifaceLine"
 			COUNTER="$((COUNTER + 1))"
 		done
-		printf " e)  Exit to Main Menu\n"
+		printf "\n  ${GRNct}e${CLRct})  Go back\n"
 	}
 
 	while true
 	do
 		ScriptHeader
 		_GenerateIFaceList_
-		printf "\n${BOLD}Select an interface to toggle inclusion in %s [1-%s]:${CLEARFORMAT}  " "$SCRIPT_NAME" "$ifaceCount"
+		printf "\n ${BOLD}Select an interface to toggle inclusion in %s [${GRNct}1-%d${CLRct}]:${CLRct}  " "$SCRIPT_NAME" "$ifaceCount"
 		read -r ifaceEntryNum
 
 		if [ "$ifaceEntryNum" = "e" ]
@@ -1585,11 +1662,11 @@ Generate_Interface_List()
 			break
 		elif ! Validate_Number "$ifaceEntryNum"
 		then
-			printf "\n${ERR}Please enter a valid number [1-${ifaceCount}].${CLEARFORMAT}\n"
+			printf "\n${ERR}Please enter a valid number [1-${ifaceCount}]${CLRct}\n"
 			PressEnter
 		elif [ "$ifaceEntryNum" -lt 1 ] || [ "$ifaceEntryNum" -gt "$ifaceCount" ]
 		then
-			printf "\n${ERR}Please enter a number between 1 and ${ifaceCount}.${CLEARFORMAT}\n"
+			printf "\n${ERR}Please enter a number between 1 and ${ifaceCount}${CLRct}\n"
 			PressEnter
 		else
 			ifaceLineStr="$(sed "$ifaceEntryNum!d" "$SCRIPT_INTERFACES_USER" | awk '{$1=$1};1')"
@@ -1624,12 +1701,10 @@ Generate_Interface_List()
 				fi
 			fi
 			sed -i 's/ *$//' "$SCRIPT_INTERFACES_USER"
-			doUpdateSavedBak=true
-			printf "\n"
+			Save_InterfacesUser_SAVEDBAK
+			echo
 		fi
 	done
-
-	"$doUpdateSavedBak" && Save_InterfacesUser_SAVEDBAK
 }
 
 ##----------------------------------------##
@@ -2031,8 +2106,9 @@ DaysToKeep()
 			while true
 			do
 				ScriptHeader
-				printf "${BOLD}Current number of days to keep data: ${GRNct}${daysToKeep}${CLRct}\n\n"
-				printf "${BOLD}Please enter the maximum number of days\nto keep the data for [${MINvalue}-${MAXvalue}] (e=Exit):${CLEARFORMAT}  "
+				printf " ${BOLD}Current number of days to keep data: ${GRNct}${daysToKeep}${CLRct}\n\n"
+				printf " ${BOLD}Please enter the maximum number of days\n"
+				printf " to keep the data for [${GRNct}${MINvalue}-${MAXvalue}${CLRct}] (e=Exit):${CLRct}  "
 				read -r daystokeep_choice
 				if [ -z "$daystokeep_choice" ] && \
 				   echo "$daysToKeep" | grep -qE "^([1-9][0-9]{1,2})$" && \
@@ -2046,11 +2122,11 @@ DaysToKeep()
 					break
 				elif ! Validate_Number "$daystokeep_choice"
 				then
-					printf "\n${ERR}Please enter a valid number [${MINvalue}-${MAXvalue}].${CLEARFORMAT}\n"
+					printf "\n${ERR}Please enter a valid number [${MINvalue}-${MAXvalue}].${CLRct}\n"
 					PressEnter
 				elif [ "$daystokeep_choice" -lt "$MINvalue" ] || [ "$daystokeep_choice" -gt "$MAXvalue" ]
 				then
-					printf "\n${ERR}Please enter a number between ${MINvalue} and ${MAXvalue}.${CLEARFORMAT}\n"
+					printf "\n${ERR}Please enter a number between ${MINvalue} and ${MAXvalue}.${CLRct}\n"
 					PressEnter
 				else
 					daysToKeep="$daystokeep_choice"
@@ -2087,8 +2163,9 @@ LastXResults()
 			while true
 			do
 				ScriptHeader
-				printf "${BOLD}Current number of results to display: ${GRNct}${lastXResults}${CLRct}\n\n"
-				printf "${BOLD}Please enter the maximum number of results\nto display in the WebUI [${MINvalue}-${MAXvalue}] (e=Exit):${CLEARFORMAT}  "
+				printf " ${BOLD}Current number of results to display: ${GRNct}${lastXResults}${CLRct}\n\n"
+				printf " ${BOLD}Please enter the maximum number of results\n"
+				printf " to display in the WebUI [${GRNct}${MINvalue}-${MAXvalue}${CLRct}] (e=Exit):${CLRct}  "
 				read -r lastx_choice
 				if [ -z "$lastx_choice" ] && \
 				   echo "$lastXResults" | grep -qE "^([1-9][0-9]{0,2})$" && \
@@ -2102,11 +2179,11 @@ LastXResults()
 					break
 				elif ! Validate_Number "$lastx_choice"
 				then
-					printf "\n${ERR}Please enter a valid number [${MINvalue}-${MAXvalue}].${CLEARFORMAT}\n"
+					printf "\n${ERR}Please enter a valid number [${MINvalue}-${MAXvalue}].${CLRct}\n"
 					PressEnter
 				elif [ "$lastx_choice" -lt "$MINvalue" ] || [ "$lastx_choice" -gt "$MAXvalue" ]
 				then
-					printf "\n${ERR}Please enter a number between ${MINvalue} and ${MAXvalue}.${CLEARFORMAT}\n"
+					printf "\n${ERR}Please enter a number between ${MINvalue} and ${MAXvalue}.${CLRct}\n"
 					PressEnter
 				else
 					lastXResults="$lastx_choice"
@@ -2280,7 +2357,7 @@ WriteStats_ToJS()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jul-13] ##
+## Modified by Martinski W. [2026-Jan-05] ##
 ##----------------------------------------##
 GenerateServerList()
 {
@@ -2296,7 +2373,8 @@ GenerateServerList()
 	else promptforservername="$2"
 	fi
 
-	printf "Generating list of closest servers for ${GRNct}${1}${CLRct} interface. Please wait...\n\n"
+	printf " Generating list of closest servers for ${GRNct}${1}${CLRct} interface.\n"
+	printf " Please wait...\n\n"
 	CONFIG_STRING=""
 	LICENSE_STRING="--accept-license --accept-gdpr"
 	SPEEDTEST_BINARY=""
@@ -2326,7 +2404,7 @@ GenerateServerList()
 		serverIDnum="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .id')"
 		serverIDstr="$(echo "$serverList" | jq -r --argjson index "$((COUNTER-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
 
-		printf "%2d) %6d|%s\n" "$COUNTER" "$serverIDnum" "$serverIDstr"
+		printf " ${GRNct}%2d${CLRct}) %6d|%s\n" "$COUNTER" "$serverIDnum" "$serverIDstr"
 		COUNTER="$((COUNTER + 1))"
 	done
 	maxServerCount="$serverCount"
@@ -2336,15 +2414,15 @@ GenerateServerList()
 		serverMsgStr="server"
 	else
 		serverMsgStr="preferred server"
-		printf "\nrs)  Reset to ${GRNct}None configured${CLRct}"
+		printf "\n ${GRNct}rs${CLRct})  Reset to ${MGNTct}None configured${CLRct}"
 	fi
-	printf "\n e)  Go back\n"
+	printf "\n  ${GRNct}e${CLRct})  Go back\n"
 
 	while true
 	do
-		printf "\n${BOLD}Please select a %s from the list above [1-%d].${CLEARFORMAT}" "$serverMsgStr" "$maxServerCount"
-		printf "\n${BOLD}Or press ${GRNct}C${CLRct} key to enter a known server ID.${CLEARFORMAT}"
-		printf "\n${BOLD}Enter answer:${CLEARFORMAT}  "
+		printf "\n${BOLD}Select a %s from the list above [${GRNct}1-%d${CLRct}].${CLRct}" "$serverMsgStr" "$maxServerCount"
+		printf "\n${BOLD}Or press ${GRNct}C${CLRct} key to enter a known speed test server ID.${CLRct}"
+		printf "\n${BOLD}Enter answer:${CLRct}  "
 		read -r serverIndx
 
 		if echo "$serverIndx" | grep -qE "^(e|E)$"
@@ -2360,7 +2438,7 @@ GenerateServerList()
 		then
 				while true
 				do
-					printf "\n${BOLD}Please enter server ID (WARNING: ID is NOT validated) or ${GRNct}e${CLRct} to go back.${CLEARFORMAT}  "
+					printf "\n${BOLD}Please enter server ID (WARNING: ID is NOT validated) or ${GRNct}e${CLRct} to go back.${CLRct}  "
 					read -r customserver
 					if [ "$customserver" = "e" ]
 					then
@@ -2368,14 +2446,14 @@ GenerateServerList()
 						break
 					elif ! Validate_Number "$customserver"
 					then
-						printf "\n${ERR}Please enter a valid number.${CLEARFORMAT}\n"
+						printf "\n${ERR}Please enter a valid number.${CLRct}\n"
 					else
 						serverNum="$customserver"
 						if [ "$promptforservername" != "onetime" ]
 						then
 							while true
 							do
-								printf "\n${BOLD}Would you like to enter a name for this server? (default: Custom) (y/n)?${CLEARFORMAT}  "
+								printf "\n${BOLD}Would you like to enter a name for this server? (default: Custom) (y/n)?${CLRct}  "
 								read -r servername_select
 								
 								if [ "$servername_select" = "n" ] || [ "$servername_select" = "N" ]
@@ -2384,20 +2462,20 @@ GenerateServerList()
 									break
 								elif [ "$servername_select" = "y" ] || [ "$servername_select" = "Y" ]
 								then
-									printf "\n${BOLD}Please enter the name for this server:${CLEARFORMAT}  "
+									printf "\n${BOLD}Please enter the name for this server:${CLRct}  "
 									read -r serverName
-									printf "\n${BOLD}%s${CLEARFORMAT}\n" "$serverName"
-									printf "\n${BOLD}Is that correct (y/n)?${CLEARFORMAT}  "
+									printf "\n${BOLD}%s${CLRct}\n" "$serverName"
+									printf "\n${BOLD}Is that correct (y/n)?${CLRct}  "
 									read -r servername_confirm
 									if [ "$servername_confirm" = "y" ] || \
 									   [ "$servername_confirm" = "Y" ]
 									then
 										break
 									else
-										printf "\n${ERR}Please enter y or n${CLEARFORMAT}\n"
+										printf "\n${ERR}Please enter y or n${CLRct}\n"
 									fi
 								else
-									printf "\n${ERR}Please enter y or n${CLEARFORMAT}\n"
+									printf "\n${ERR}Please enter y or n${CLRct}\n"
 								fi
 							done
 						else
@@ -2409,11 +2487,11 @@ GenerateServerList()
 				done
 		elif ! Validate_Number "$serverIndx"
 		then
-			printf "\n${ERR}Please enter a valid number [1-%d]${CLEARFORMAT}\n" "$maxServerCount"
+			printf "\n${ERR}Please enter a valid number [1-%d]${CLRct}\n" "$maxServerCount"
 		else
 			if [ "$serverIndx" -lt 1 ] || [ "$serverIndx" -gt "$maxServerCount" ]
 			then
-				printf "\n${ERR}Please enter a number between 1 and %d.${CLEARFORMAT}\n" "$maxServerCount"
+				printf "\n${ERR}Please enter a number between 1 and %d.${CLRct}\n" "$maxServerCount"
 			else
 				serverNum="$(echo "$serverList" | jq -r --argjson index "$((serverIndx-1))" '.servers[$index] | .id')"
 				serverName="$(echo "$serverList" | jq -r --argjson index "$((serverIndx-1))" '.servers[$index] | .name + " (" + .location + ", " + .country + ")"')"
@@ -2565,10 +2643,11 @@ PreferredServer()
 		check)
 			USEPREFERRED="$(_GetConfigParam_ "USEPREFERRED_${2}" 'false')"
 			if [ "$USEPREFERRED" = "true" ]
-			then return 0; else return 1; fi
+			then return 0; else return 1
+			fi
 		;;
 		list)
-			PREFERREDSERVER="$(grep "^PREFERREDSERVER_${2}=" "$SCRIPT_CONF" | cut -f2 -d'=')"
+			PREFERREDSERVER="$(grep "^PREFERREDSERVER_${2}=" "$SCRIPT_CONF" | cut -d'=' -f2-)"
 			echo "$PREFERREDSERVER"
 		;;
 	esac
@@ -3259,9 +3338,10 @@ Run_Speedtest()
 				fi
 			fi
 
-			applyAutoBW=false
-			if [ "$mode" = "schedule" ] && [ "$(AutoBWEnable check)" = "true" ]; then
-				applyAutoBW=true
+			applyAutoBandWidth=false
+			if [ "$mode" = "schedule" ] && [ "$(AutoBWEnable check)" = "true" ]
+			then
+				applyAutoBandWidth=true
 			fi
 
 			if [ "$verboseNUM" -eq 0 ]
@@ -3585,9 +3665,9 @@ Run_Speedtest()
 				echo "Stats last updated: $timenowfriendly" > /tmp/spdstatstitle.txt
 				WriteStats_ToJS /tmp/spdstatstitle.txt "$SCRIPT_STORAGE_DIR/spdtitletext.js" SetSPDStatsTitle statstitle
 
-				if [ "$applyAutoBW" = "true" ]
-				then Menu_AutoBW_Update ; fi
-
+				if [ "$applyAutoBandWidth" = "true" ]
+				then Menu_AutoBandWidth_Update
+				fi
 				echo 'var spdteststatus = "Done";' > /tmp/detect_spdtest.js
 			else
 				echo 'var spdteststatus = "Error";' > /tmp/detect_spdtest.js
@@ -4326,36 +4406,144 @@ _CronScheduleHourMinsInfo_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-19] ##
+## Modified by Martinski W. [2026-Jan-05] ##
 ##----------------------------------------##
-MainMenu()
+_HandleInvalidMenuOption_()
 {
-	local menuOption  storageLocStr  automaticModeStatus
-	local jffsFreeSpace  jffsFreeSpaceStr  jffsSpaceMsgTag
+	[ -n "$menuOption" ] && \
+	printf "\n${REDct}INVALID input [$menuOption]${CLRct}"
+	printf "\nPlease choose a valid option.\n\n"
+}
+
+##----------------------------------------##
+## Modified by Martinski W. [2026-Jan-05] ##
+##----------------------------------------##
+_Menu_SpeedTestOptions_()
+{
+	local menuOption  exitMenu=false
+	local OPTION_FOR_QOS  TEST_SCHED_LINE  TEST_SCHED_DAYS
+	local TEST_SCHED_MENU  CRON_SCHED_DAYS  CRON_SCHED_HOUR  CRON_SCHED_MINS
 
 	if [ "$(ExcludeFromQoS check)" = "true" ]
-	then EXCLUDEFROMQOS_MENU="excluded from"
-    else EXCLUDEFROMQOS_MENU="included in"
-    fi
-
-	if AutomaticMode check
-	then automaticModeStatus="${PassBGRNct} ENABLED ${CLRct}"
-	else automaticModeStatus="${CritIREDct} DISABLED ${CLRct}"
+	then OPTION_FOR_QOS="excluded from"
+	else OPTION_FOR_QOS="included in"
 	fi
 
-	TEST_SCHEDULE="$(CronTestSchedule check)"
-    CRON_SCHED_DAYS="$(echo "$TEST_SCHEDULE" | cut -f1 -d'|')"
-	CRON_SCHED_HOUR="$(echo "$TEST_SCHEDULE" | cut -f2 -d'|')"
-	CRON_SCHED_MINS="$(echo "$TEST_SCHEDULE" | cut -f3 -d'|')"
+	TEST_SCHED_LINE="$(CronTestSchedule check)"
+	CRON_SCHED_DAYS="$(echo "$TEST_SCHED_LINE" | cut -f1 -d'|')"
+	CRON_SCHED_HOUR="$(echo "$TEST_SCHED_LINE" | cut -f2 -d'|')"
+	CRON_SCHED_MINS="$(echo "$TEST_SCHED_LINE" | cut -f3 -d'|')"
 	if [ "$CRON_SCHED_DAYS" = "*" ]
-	then TEST_SCHEDULE_DAYS="Every day"
-	else TEST_SCHEDULE_DAYS="Days of Week: $CRON_SCHED_DAYS"
+	then TEST_SCHED_DAYS="Every day"
+	else TEST_SCHED_DAYS="Days of Week: $CRON_SCHED_DAYS"
 	fi
-	TEST_SCHEDULE_MENU="$(_CronScheduleHourMinsInfo_ "$CRON_SCHED_HOUR" "$CRON_SCHED_MINS")"
+	TEST_SCHED_MENU="$(_CronScheduleHourMinsInfo_ "$CRON_SCHED_HOUR" "$CRON_SCHED_MINS")"
+
+	ScriptHeader
+	printf " ${BOLDUNDERLN}${GRNct}Speed Test Options${CLRct}\n\n"
+
+	printf "   ${GRNct}1${CLRct}. Choose a preferred speed test server for an interface\n\n"
+	printf "   ${GRNct}2${CLRct}. Set schedule for automatic speed tests\n"
+	printf "      Currently: ${SETTING}%s - %s${CLRct}\n\n" "$TEST_SCHED_MENU" "$TEST_SCHED_DAYS"
+	printf "   ${GRNct}3${CLRct}. Toggle between built-in Ookla speedtest and speedtest-cli\n"
+	printf "      Currently: ${SETTING}%s${CLRct} binary will be used for speed tests${CLRct}\n\n" "$(SpeedtestBinary check)"
+	printf "   ${GRNct}q${CLRct}. Toggle exclusion of %s speed tests from QoS\n" "$SCRIPT_NAME"
+	printf "      Currently: %s speed tests are ${SETTING}%s${CLRct} QoS\n\n" "$SCRIPT_NAME" "$OPTION_FOR_QOS"
+	printf "   ${GRNct}c${CLRct}. Customise list of interfaces for automatic speed tests\n"
+	printf "  ${GRNct}rs${CLRct}. Reset list of interfaces for automatic speed tests to default\n\n"
+	printf "   ${GRNct}a${CLRct}. Configure Auto Bandwidth\n\n"
+	printf "   ${GRNct}e${CLRct}. Return to Main Menu\n"
+	printf "\n${menuSepStr}\n\n"
+
+	while true
+	do
+		printf "Choose an option:  "
+		read -r menuOption
+		case "$menuOption" in
+			1)
+				printf "\n"
+				Menu_ConfigurePreferred && PressEnter
+				break
+			;;
+			2)
+				printf "\n"
+				Menu_EditCronSchedule
+				PressEnter
+				break
+			;;
+			3)
+				printf "\n"
+				if [ "$(SpeedtestBinary check)" = "builtin" ]
+				then
+					! SpeedtestBinary external && PressEnter
+				elif [ "$(SpeedtestBinary check)" = "external" ]
+				then
+					! SpeedtestBinary builtin && PressEnter
+				fi
+				break
+			;;
+			q)
+				printf "\n"
+				if [ "$(ExcludeFromQoS check)" = "true" ]
+				then
+					if [ "$(AutoBWEnable check)" = "true" ]
+					then
+						Print_Output false "Cannot disable \"Exclude from QoS\" when AutoBW is enabled." "$WARN"
+						PressEnter
+					elif [ "$(AutoBWEnable check)" = "false" ]
+					then
+						ExcludeFromQoS disable
+					fi
+				elif [ "$(ExcludeFromQoS check)" = "false" ]
+				then
+					ExcludeFromQoS enable
+				fi
+				break
+			;;
+			c)
+				Generate_Interface_List
+				printf "\n"
+				Create_Symlinks
+				printf "\n"
+				break
+			;;
+			rs)
+				Create_Symlinks force
+				printf "\n"
+				PressEnter
+				break
+			;;
+			a)
+				printf "\n"
+				Menu_AutoBandWidth
+				break
+			;;
+			e) exitMenu=true
+			   break
+			;;
+			*)
+				_HandleInvalidMenuOption_
+				PressEnter
+				break
+			;;
+		esac
+	done
+
+	"$exitMenu" && return 0
+	_Menu_SpeedTestOptions_
+}
+
+##----------------------------------------##
+## Modified by Martinski W. [2026-Jan-05] ##
+##----------------------------------------##
+_Menu_DatabaseOptions_()
+{
+	local menuOption  exitMenu=false  storageLocStr  storeResultURLstr
+	local jffsFreeSpace  jffsFreeSpaceStr  jffsSpaceMsgTag
 
 	if [ "$(StoreResultURL check)" = "true" ]
-	then STORERESULTURL_MENU="ENABLED"
-	else STORERESULTURL_MENU="DISABLED"
+	then storeResultURLstr="ENABLED"
+	else storeResultURLstr="DISABLED"
 	fi
 
 	storageLocStr="$(ScriptStorageLocation check | tr 'a-z' 'A-Z')"
@@ -4373,42 +4561,24 @@ MainMenu()
 		jffsFreeSpaceStr="${WarnBYLWct} $jffsFreeSpace ${CLRct}  ${jffsSpaceMsgTag}${CLRct}"
 	fi
 
-	printf " WebUI for %s is available at:\n ${SETTING}%s${CLRct}\n\n" "$SCRIPT_NAME" "$(Get_WebUI_URL)"
+	ScriptHeader
+	printf " ${BOLDUNDERLN}${GRNct}Database Options${CLRct}\n\n"
 
-	printf "1.    Run a speedtest now\n"
-	printf "      Database size: ${SETTING}%s${CLEARFORMAT}\n\n" "$(_GetFileSize_ "$SPEEDSTATS_DB" HRx)"
-	printf "2.    Choose a preferred server for an interface\n\n"
-	printf "3.    Toggle automatic speedtests\n"
-	printf "      Currently: ${automaticModeStatus}${CLEARFORMAT}\n\n"
-	printf "4.    Configure schedule for automatic speedtests\n"
-	printf "      Currently: ${SETTING}%s - %s${CLEARFORMAT}\n\n" "$TEST_SCHEDULE_MENU" "$TEST_SCHEDULE_DAYS"
-	printf "5.    Toggle time output mode\n"
-	printf "      Currently: ${SETTING}%s${CLEARFORMAT} time values will be used for CSV exports\n\n" "$(OutputTimeMode check)"
-	printf "6.    Toggle storage of speedtest result URLs\n"
-	printf "      Currently: ${SETTING}%s${CLEARFORMAT}\n\n" "$STORERESULTURL_MENU"
-	printf "7.    Set number of speedtest results to show in WebUI\n"
-	printf "      Currently: ${SETTING}%s results will be shown${CLEARFORMAT}\n\n" "$(LastXResults check)"
-	printf "8.    Set number of days data to keep in database\n"
-	printf "      Currently: ${SETTING}%s days data will be kept${CLEARFORMAT}\n\n" "$(DaysToKeep check)"
-	printf "9.    Toggle between built-in Ookla speedtest and speedtest-cli\n"
-	printf "      Currently: ${SETTING}%s${CLEARFORMAT} binary will be used for speedtests${CLEARFORMAT}\n\n" "$(SpeedtestBinary check)"
-	printf "c.    Customise list of interfaces for automatic speedtests\n"
-	printf "r.    Reset list of interfaces for automatic speedtests to default\n\n"
-	printf "s.    Toggle storage location for stats and config\n"
-	printf "      Current location: ${SETTING}%s${CLEARFORMAT}\n" "$storageLocStr"
-	printf "      JFFS Available: ${jffsFreeSpaceStr}${CLEARFORMAT}\n\n"
-	printf "q.    Toggle exclusion of %s speedtests from QoS\n" "$SCRIPT_NAME"
-	printf "      Currently: %s speedtests are ${SETTING}%s${CLEARFORMAT} QoS\n\n" "$SCRIPT_NAME" "$EXCLUDEFROMQOS_MENU"
-	printf "a.    AutoBW\n\n"
-	printf "u.    Check for updates\n"
-	printf "uf.   Update %s with latest version (force update)\n\n" "$SCRIPT_NAME"
-	printf "rs.   Reset %s database / delete all data\n\n" "$SCRIPT_NAME"
-	printf "e.    Exit %s\n\n" "$SCRIPT_NAME"
-	printf "z.    Uninstall %s\n" "$SCRIPT_NAME"
-	printf "\n"
-	printf "${BOLD}####################################################################${CLEARFORMAT}\n"
-	printf "\n"
-	
+	printf "   ${GRNct}1${CLRct}. Toggle time output mode\n"
+	printf "      Currently: ${SETTING}%s${CLRct} time values will be used for CSV exports\n\n" "$(OutputTimeMode check)"
+	printf "   ${GRNct}2${CLRct}. Toggle storage of speed test result URLs\n"
+	printf "      Currently: ${SETTING}%s${CLRct}\n\n" "$storeResultURLstr"
+	printf "   ${GRNct}3${CLRct}. Set number of speed test database results to show in WebUI\n"
+	printf "      Currently: ${SETTING}%s results will be shown${CLRct}\n\n" "$(LastXResults check)"
+	printf "   ${GRNct}4${CLRct}. Set maximum number of days data to keep in database\n"
+	printf "      Currently: ${SETTING}%s days data will be kept${CLRct}\n\n" "$(DaysToKeep check)"
+	printf "   ${GRNct}s${CLRct}. Toggle storage location for database stats and config\n"
+	printf "      Current location: ${SETTING}%s${CLRct}\n" "$storageLocStr"
+	printf "      JFFS Available: ${jffsFreeSpaceStr}${CLRct}\n\n"
+	printf "  ${GRNct}rs${CLRct}. Reset %s database / delete all data\n\n" "$SCRIPT_NAME"
+	printf "   ${GRNct}e${CLRct}. Return to Main Menu\n"
+	printf "\n${menuSepStr}\n\n"
+
 	while true
 	do
 		printf "Choose an option:  "
@@ -4416,79 +4586,34 @@ MainMenu()
 		case "$menuOption" in
 			1)
 				printf "\n"
-				Menu_RunSpeedtest && PressEnter
-				break
-			;;
-			2)
-				printf "\n"
-				Menu_ConfigurePreferred && PressEnter
-				break
-			;;
-			3)
-				printf "\n"
-				if AutomaticMode check
-				then AutomaticMode disable
-				else AutomaticMode enable
-				fi
-				PressEnter
-				break
-			;;
-			4)
-				printf "\n"
-				Menu_EditSchedule
-				PressEnter
-				break
-			;;
-			5)
-				printf "\n"
-				if [ "$(OutputTimeMode check)" = "unix" ]; then
+				if [ "$(OutputTimeMode check)" = "unix" ]
+				then
 					OutputTimeMode non-unix
-				elif [ "$(OutputTimeMode check)" = "non-unix" ]; then
+				elif [ "$(OutputTimeMode check)" = "non-unix" ]
+				then
 					OutputTimeMode unix
 				fi
 				break
 			;;
-			6)
+			2)
 				printf "\n"
-				if [ "$(StoreResultURL check)" = "true" ]; then
+				if [ "$(StoreResultURL check)" = "true" ]
+				then
 					StoreResultURL disable
-				elif [ "$(StoreResultURL check)" = "false" ]; then
+				elif [ "$(StoreResultURL check)" = "false" ]
+				then
 					StoreResultURL enable
 				fi
 				break
 			;;
-			7)
+			3)
 				printf "\n"
 				LastXResults update && PressEnter
 				break
 			;;
-			8)
+			4)
 				printf "\n"
 				DaysToKeep update && PressEnter
-				break
-			;;
-			9)
-				printf "\n"
-				if [ "$(SpeedtestBinary check)" = "builtin" ]
-				then
-					! SpeedtestBinary external && PressEnter
-				elif [ "$(SpeedtestBinary check)" = "external" ]
-				then
-					! SpeedtestBinary builtin && PressEnter
-				fi
-				break
-			;;
-			c)
-				Generate_Interface_List
-				printf "\n"
-				Create_Symlinks
-				printf "\n"
-				break
-			;;
-			r)
-				Create_Symlinks force
-				printf "\n"
-				PressEnter
 				break
 			;;
 			s)
@@ -4513,32 +4638,89 @@ MainMenu()
 				fi
 				break
 			;;
-			q)
+			rs)
 				printf "\n"
-				if [ "$(ExcludeFromQoS check)" = "true" ]
+				if Check_Lock menu
 				then
-					if [ "$(AutoBWEnable check)" = "true" ]
-					then
-						Print_Output false "Cannot disable \"Exclude from QoS\" when AutoBW is enabled." "$WARN"
-						PressEnter
-					elif [ "$(AutoBWEnable check)" = "false" ]
-					then
-						ExcludeFromQoS disable
-					fi
-				elif [ "$(ExcludeFromQoS check)" = "false" ]
-				then
-					ExcludeFromQoS enable
+					Menu_ResetDB
+					Clear_Lock
 				fi
+				PressEnter
 				break
 			;;
-			a)
-				printf "\\n"
-				Menu_AutoBW
+			e) exitMenu=true
+			   break
+			;;
+			*)
+				_HandleInvalidMenuOption_
+				PressEnter
+				break
+			;;
+		esac
+	done
+
+	"$exitMenu" && return 0
+	_Menu_DatabaseOptions_
+}
+
+##----------------------------------------##
+## Modified by Martinski W. [2026-Jan-05] ##
+##----------------------------------------##
+MainMenu()
+{
+	local menuOption  automaticModeStatus
+
+	if AutomaticMode check
+	then automaticModeStatus="${PassBGRNct} ENABLED ${CLRct}"
+	else automaticModeStatus="${CritIREDct} DISABLED ${CLRct}"
+	fi
+	_UpdateJFFS_FreeSpaceInfo_
+
+	printf " WebUI for %s is available at:\n ${SETTING}%s${CLRct}\n\n" "$SCRIPT_NAME" "$(Get_WebUI_URL)"
+
+	printf "   ${GRNct}1${CLRct}. Run a speed test now\n"
+	printf "      Database size: ${SETTING}%s${CLRct}\n\n" "$(_GetFileSize_ "$SPEEDSTATS_DB" HRx)"
+	printf "   ${GRNct}2${CLRct}. Toggle automatic speed tests\n"
+	printf "      Currently: ${automaticModeStatus}${CLRct}\n\n"
+	printf "   ${GRNct}3${CLRct}. Configure speed test options\n\n"
+	printf "   ${GRNct}4${CLRct}. Configure database options\n\n"
+	printf "   ${GRNct}u${CLRct}. Check for updates\n"
+	printf "  ${GRNct}uf${CLRct}. Update %s with latest version (force update)\n\n" "$SCRIPT_NAME"
+	printf "   ${GRNct}e${CLRct}. Exit %s\n\n" "$SCRIPT_NAME"
+	printf "   ${GRNct}z${CLRct}. Uninstall %s\n" "$SCRIPT_NAME"
+	printf "\n${menuSepStr}\n\n"
+
+	while true
+	do
+		printf "Choose an option:  "
+		read -r menuOption
+		case "$menuOption" in
+			1)
+				printf "\n"
+				Menu_RunSpeedtest && PressEnter
+				break
+			;;
+			2)
+				printf "\n"
+				if AutomaticMode check
+				then AutomaticMode disable
+				else AutomaticMode enable
+				fi
+				PressEnter
+				break
+			;;
+			3)
+				_Menu_SpeedTestOptions_
+				break
+			;;
+			4)
+				_Menu_DatabaseOptions_
 				break
 			;;
 			u)
 				printf "\n"
-				if Check_Lock menu; then
+				if Check_Lock menu
+				then
 					Update_Version
 					Clear_Lock
 				fi
@@ -4547,17 +4729,9 @@ MainMenu()
 			;;
 			uf)
 				printf "\n"
-				if Check_Lock menu; then
+				if Check_Lock menu
+				then
 					Update_Version force
-					Clear_Lock
-				fi
-				PressEnter
-				break
-			;;
-			rs)
-				printf "\n"
-				if Check_Lock menu; then
-					Menu_ResetDB
 					Clear_Lock
 				fi
 				PressEnter
@@ -4565,13 +4739,13 @@ MainMenu()
 			;;
 			e)
 				ScriptHeader
-				printf "\n${BOLD}Thanks for using %s!${CLEARFORMAT}\n\n\n" "$SCRIPT_NAME"
+				printf "\n${BOLD}Thanks for using %s!${CLRct}\n\n\n" "$SCRIPT_NAME"
 				exit 0
 			;;
 			z)
 				while true
 				do
-					printf "\n${BOLD}Are you sure you want to uninstall %s? (y/n)${CLEARFORMAT}  " "$SCRIPT_NAME"
+					printf "\n${BOLD}Are you sure you want to uninstall %s? (y/n)${CLRct}  " "$SCRIPT_NAME"
 					read -r confirm
 					case "$confirm" in
 						y|Y)
@@ -4585,9 +4759,7 @@ MainMenu()
 				done
 			;;
 			*)
-				[ -n "$menuOption" ] && \
-				printf "\n${REDct}INVALID input [$menuOption]${CLEARFORMAT}"
-				printf "\nPlease choose a valid option.\n\n"
+				_HandleInvalidMenuOption_
 				PressEnter
 				break
 			;;
@@ -4927,7 +5099,7 @@ Menu_RunSpeedtest()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jul-11] ##
+## Modified by Martinski W. [2026-Jan-05] ##
 ##----------------------------------------##
 Menu_ConfigurePreferred()
 {
@@ -4936,8 +5108,8 @@ Menu_ConfigurePreferred()
 	while true
 	do
 		ScriptHeader
-		printf "Choose an interface to configure server preference for:\n\n"
-		printf " 1.  ALL (${GRNct}ON${CLRct}/${GRNct}OFF${CLRct} only)\n\n"
+		printf " Choose an interface to configure a speed test server preference for:\n\n"
+		printf "  ${GRNct}1${CLRct}. ALL (${GRNct}ON${CLRct}/${GRNct}OFF${CLRct} only)\n\n"
 		COUNTER="2"
 		while IFS='' read -r line || [ -n "$line" ]
 		do
@@ -4949,15 +5121,17 @@ Menu_ConfigurePreferred()
 				fi
 				pref_server="$(PreferredServer list "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')" | cut -f2 -d'|')"
 
-				printf "%2d.  %s\n" "$COUNTER" "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				printf "     Preferred: ${GRNct}%s${CLRct} - Server: %s\n\n" "$pref_enabled" "$pref_server"
+				printf " ${GRNct}%2d${CLRct}. %s\n" "$COUNTER" "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
+				printf "     Preferred: ${GRNct}%s${CLRct}\n" "$pref_enabled"
+				printf "     Server: ${MGNTct}%s${CLRct}\n\n" "$pref_server"
 				COUNTER="$((COUNTER+1))"
 			fi
 		done < "$SCRIPT_INTERFACES_USER"
+		printf "  ${GRNct}e${CLRct}. Go back\n\n"
 
 		while true
 		do
-			printf "\nChoose an option (e=Exit):  "
+			printf "\nChoose an option:  "
 			read -r iface_choice
 
 			if [ "$iface_choice" = "e" ]
@@ -4997,10 +5171,11 @@ Menu_ConfigurePreferred()
 				while true
 				do
 					ScriptHeader
-					printf "What would you like to do for ${GRNct}ALL${CLRct} interfaces?\n\n"
-					printf " 1.  Turn ${GRNct}ON${CLRct} preferred servers\n"
-					printf " 2.  Turn ${GRNct}OFF${CLRct} preferred servers\n"
-					printf "\nChoose an option (e=Exit):  "
+					printf " What would you like to do for ${GRNct}ALL${CLRct} interfaces?\n\n"
+					printf "  ${GRNct}1${CLRct}. Turn ${GRNct}ON${CLRct} preferred servers\n"
+					printf "  ${GRNct}2${CLRct}. Turn ${GRNct}OFF${CLRct} preferred servers\n"
+					printf "  ${GRNct}e${CLRct}. Go back\n\n"
+					printf "\nChoose an option:  "
 					read -r usepref_choice
 
 					if [ "$usepref_choice" = "e" ]
@@ -5008,12 +5183,12 @@ Menu_ConfigurePreferred()
 						break
 					elif ! Validate_Number "$usepref_choice"
 					then
-						printf "\n${ERR}Please enter a valid number [1-2].${CLEARFORMAT}\n"
+						printf "\n${ERR}Please enter a valid number [1-2].${CLRct}\n"
 						PressEnter
 					else
 						if [ "$usepref_choice" -lt 1 ] || [ "$usepref_choice" -gt 2 ]
 						then
-							printf "\n${ERR}Please enter a number between 1 and 2.${CLEARFORMAT}\n\n"
+							printf "\n${ERR}Please enter a number between 1 and 2.${CLRct}\n\n"
 							PressEnter
 						else
 							prefenabledisable=""
@@ -5043,12 +5218,15 @@ Menu_ConfigurePreferred()
 					then pref_enabled="ON"
 					else pref_enabled="OFF"
 					fi
-					pref_server="$(PreferredServer list "$pref_IFACE" | cut -f2 -d"|")"
+					pref_server="$(PreferredServer list "$pref_IFACE" | cut -d'|' -f2-)"
 
 					printf "What would you like to do for the ${GRNct}${pref_IFACE}${CLRct} interface?\n\n"
-					printf " 1.  Toggle preferred server ${GRNct}ON${CLRct}/${GRNct}OFF${CLRct} - currently: ${GRNct}%s${CLRct}\n" "$pref_enabled"
-					printf " 2.  Set preferred server - currently: %s\n" "$pref_server"
-					printf "\nChoose an option (e=Exit):  "
+					printf "  ${GRNct}1${CLRct}. Toggle preferred speed test server ${GRNct}ON${CLRct}/${GRNct}OFF${CLRct}\n"
+					printf "     Currently: ${GRNct}%s${CLRct}\n\n" "$pref_enabled"
+					printf "  ${GRNct}2${CLRct}. Set a preferred speed test server\n"
+					printf "     Currently: ${MGNTct}%s${CLRct}\n\n" "$pref_server"
+					printf "  ${GRNct}e${CLRct}. Go back\n\n"
+					printf "\nChoose an option:  "
 					read -r ifpref_choice
 
 					if [ "$ifpref_choice" = "e" ]
@@ -5056,12 +5234,12 @@ Menu_ConfigurePreferred()
 						break
 					elif ! Validate_Number "$ifpref_choice"
 					then
-						printf "\n${ERR}Please enter a valid number [1-2].${CLEARFORMAT}\n"
+						printf "\n${ERR}Please enter a valid number [1-2].${CLRct}\n"
 						PressEnter
 					else
 						if [ "$ifpref_choice" -lt 1 ] || [ "$ifpref_choice" -gt 2 ]
 						then
-							printf "\n${ERR}Please enter a number between 1 and 2.${CLEARFORMAT}\n"
+							printf "\n${ERR}Please enter a number between 1 and 2.${CLRct}\n"
 							PressEnter
 						else
 							if [ "$ifpref_choice" -eq 1 ]
@@ -5098,416 +5276,601 @@ Menu_ConfigurePreferred()
 	fi
 }
 
-Menu_EditSchedule()
+##-------------------------------------##
+## Added by Martinski W. [2026-Jan-05] ##
+##-------------------------------------##
+_ValidateCronDAYSofWEEK_()
 {
-	exitmenu=""
-	formattype=""
-	crudays=""
-	crudaysvalidated=""
-	cruhours=""
-	crumins=""
-	
+    if [ $# -eq 0 ] || [ -z "$1" ] ; then return 1 ; fi
+
+    local cruDaysOK  cruDaysTmp1  cruDaysTmp2  tmpDay1  tmpDay2
+
+    [ "$1" = "*" ] && return 0
+
+    _DayOfWeekNameToDayNum_()
+    { echo "$1" | sed 's/Sun/0/;s/Mon/1/;s/Tues/2/;s/Wed/3/;s/Thurs/4/;s/Fri/5/;s/Sat/6/;s/Tue/2/;s/Thu/4/;' ; }
+
+    cruDaysOK=true
+    cruDaysTmp1="$(_DayOfWeekNameToDayNum_ "$1")"
+    cruDaysTmp1="$(echo "$cruDaysTmp1" | sed 's/,/ /g')"
+
+    for tmpDay1 in $cruDaysTmp1
+    do
+        if echo "$tmpDay1" | grep -q '-'
+        then
+            if [ "$tmpDay1" = "-" ]
+            then
+                cruDaysOK=false
+                printf "\n${ERR}Please enter a valid number between 0 and 6${CLRct}\n"
+                break
+            fi
+            cruDaysTmp2="$(echo "$tmpDay1" | sed 's/-/ /')"
+            for tmpDay2 in $cruDaysTmp2
+            do
+                if ! echo "$tmpDay2" | grep -qE "^[0-6]$" || \
+                   [ "$tmpDay2" -lt 0 ] || [ "$tmpDay2" -gt 6 ]
+                then
+                    cruDaysOK=false
+                    printf "\n${ERR}Please enter valid numbers between 0 and 6${CLRct}\n"
+                    break
+                fi
+            done
+            "$cruDaysOK" && continue || break
+        elif ! echo "$tmpDay1" | grep -qE "^[0-6]$" || \
+             [ "$tmpDay1" -lt 0 ] || [ "$tmpDay1" -gt 6 ]
+        then
+            cruDaysOK=false
+            printf "\n${ERR}Please enter a valid number between 0 and 6, or comma-separated numbers${CLRct}\n"
+            break
+        fi
+   done
+
+   "$cruDaysOK" && return 0 || return 1
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jan-05] ##
+##-------------------------------------##
+_ValidateCronFreqHOURS_()
+{
+    local cruHoursOK=true  isVerbose=true
+
+    if [ $# -eq 0 ] || [ -z "$1" ]
+    then return 1
+    fi
+    if [ $# -gt 1 ] && [ "$2" = "-quiet" ]
+    then isVerbose=false
+    fi
+    if ! echo "$1" | grep -qE "^[1-9][0-9]?$" || \
+       [ "$1" -lt 1 ] || [ "$1" -gt 24 ]
+    then
+        cruHoursOK=false
+        "$isVerbose" && \
+        printf "\n${ERR}Please enter a valid number between 1 and 24${CLRct}\n"
+    fi
+    "$cruHoursOK" && return 0 || return 1
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jan-05] ##
+##-------------------------------------##
+_ValidateCronFreqMINS_()
+{
+    local cruMinsOK=true  isVerbose=true
+
+    if [ $# -eq 0 ] || [ -z "$1" ]
+    then return 1
+    fi
+    if [ $# -gt 1 ] && [ "$2" = "-quiet" ]
+    then isVerbose=false
+    fi
+    if ! echo "$1" | grep -qE "^[1-9][0-9]?$" || \
+       [ "$1" -lt 1 ] || [ "$1" -gt 30 ]
+    then
+        cruMinsOK=false
+        "$isVerbose" && \
+        printf "\n${ERR}Please enter a valid number between 1 and 30${CLRct}\n"
+    fi
+    "$cruMinsOK" && return 0 || return 1
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jan-05] ##
+##-------------------------------------##
+_ValidateCronHOURS_()
+{
+    local cruHoursOK  cruHoursTmp1  cruHoursTmp2  cruHoursTmp3
+    local tmpHour1  tmpHour2  isVerbose=true
+
+    if [ $# -eq 0 ] || [ -z "$1" ]
+    then return 1
+    fi
+    if [ $# -gt 1 ] && [ "$2" = "-quiet" ]
+    then isVerbose=false
+    fi
+    [ "$1" = "*" ] && return 0
+
+    cruHoursOK=true
+    cruHoursTmp1="$(echo "$1" | sed 's/,/ /g')"
+
+    for tmpHour1 in $cruHoursTmp1
+    do
+        if echo "$tmpHour1" | grep -q "-"
+        then
+            if [ "$tmpHour1" = "-" ]
+            then
+                cruHoursOK=false
+                "$isVerbose" && \
+                printf "\n${ERR}Please enter a valid number between 0 and 23${CLRct}\n"
+                break
+            fi
+            cruHoursTmp2="$(echo "$tmpHour1" | sed 's/-/ /')"
+            for tmpHour2 in $cruHoursTmp2
+            do
+                if ! echo "$tmpHour2" | grep -qE "^(0|[1-9][0-9]?)$" || \
+                   [ "$tmpHour2" -lt 0 ] || [ "$tmpHour2" -gt 23 ]
+                then
+                    cruHoursOK=false
+                    "$isVerbose" && \
+                    printf "\n${ERR}Please enter valid numbers between 0 and 23${CLRct}\n"
+                    break
+                fi
+            done
+            "$cruHoursOK" && continue || break
+        elif echo "$tmpHour1" | grep -q "[*]/.*"
+        then
+            cruHoursTmp3="$(echo "$tmpHour1" | sed 's/\*\///')"
+            if ! echo "$cruHoursTmp3" | grep -qE "^[1-9][0-9]?$" || \
+               [ "$cruHoursTmp3" -lt 2 ] || [ "$cruHoursTmp3" -gt 23 ]
+            then
+                cruHoursOK=false
+                "$isVerbose" && \
+                printf "\n${ERR}Please enter a valid frequency number between 2 and 23${CLRct}\n"
+                break
+            fi
+        elif ! echo "$tmpHour1" | grep -qE "^(0|[1-9][0-9]?)$" || \
+             [ "$tmpHour1" -lt 0 ] || [ "$tmpHour1" -gt 23 ]
+        then
+            cruHoursOK=false
+            "$isVerbose" && \
+            printf "\n${ERR}Please enter a valid number between 0 and 23, or comma-separated numbers${CLRct}\n"
+            break
+        fi
+    done
+
+    "$cruHoursOK" && return 0 || return 1
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jan-05] ##
+##-------------------------------------##
+_ValidateCronMINS_()
+{
+    local cruMinsOK  cruMinsTmp1  cruMinsTmp2  cruMinsTmp3
+    local tmpMins1  tmpMins2  isVerbose=true
+
+    if [ $# -eq 0 ] || [ -z "$1" ]
+    then return 1
+    fi
+    if [ $# -gt 1 ] && [ "$2" = "-quiet" ]
+    then isVerbose=false
+    fi
+    [ "$1" = "*" ] && return 0
+
+    cruMinsOK=true
+    cruMinsTmp1="$(echo "$1" | sed 's/,/ /g')"
+
+    for tmpMins1 in $cruMinsTmp1
+    do
+        if echo "$tmpMins1" | grep -q "-"
+        then
+            if [ "$tmpMins1" = "-" ]
+            then
+                cruMinsOK=false
+                "$isVerbose" && \
+                printf "\n${ERR}Please enter a valid number between 0 and 59${CLRct}\n"
+                break
+            fi
+            cruMinsTmp2="$(echo "$tmpMins1" | sed 's/-/ /')"
+            for tmpMins2 in $cruMinsTmp2
+            do
+                if ! echo "$tmpMins2" | grep -qE "^(0|[1-9][0-9]?)$" || \
+                   [ "$tmpMins2" -lt 0 ] || [ "$tmpMins2" -gt 59 ]
+                then
+                    cruMinsOK=false
+                    "$isVerbose" && \
+                    printf "\n${ERR}Please enter valid numbers between 0 and 59${CLRct}\n"
+                    break
+                fi
+            done
+            "$cruMinsOK" && continue || break
+        elif echo "$tmpMins1" | grep -q "[*]/.*"
+        then
+            cruMinsTmp3="$(echo "$tmpMins1" | sed 's/\*\///')"
+            if ! echo "$cruMinsTmp3" | grep -qE "^[1-9][0-9]?$" || \
+               [ "$cruMinsTmp3" -lt 2 ] || [ "$cruMinsTmp3" -gt 30 ]
+            then
+                cruMinsOK=false
+                "$isVerbose" && \
+                printf "\n${ERR}Please enter a valid frequency number between 2 and 30${CLRct}\n"
+                break
+            fi
+        elif ! echo "$tmpMins1" | grep -qE "^(0|[1-9][0-9]?)$" || \
+             [ "$tmpMins1" -lt 0 ] || [ "$tmpMins1" -gt 59 ]
+        then
+            cruMinsOK=false
+            "$isVerbose" && \
+            printf "\n${ERR}Please enter a valid number between 0 and 59, or comma-separated numbers${CLRct}\n"
+            break
+        fi
+    done
+
+    "$cruMinsOK" && return 0 || return 1
+}
+
+##----------------------------------------##
+## Modified by Martinski W. [2026-Jan-05] ##
+##----------------------------------------##
+Menu_EditCronSchedule()
+{
+	local exitMenu  testScheduleStr
+	local cruDays  cruHour  cruMins  formatType
+	local cruHoursStr  cruHoursTmp  cruMinsStr  cruMinsTmp
+
+	_DayOfWeekNumToDayName_()
+	{ echo "$1" | sed 's/0/Sun/;s/1/Mon/;s/2/Tue/;s/3/Wed/;s/4/Thu/;s/5/Fri/;s/6/Sat/;' ; }
+
+	_GetSchedDaysHR_()
+	{
+	    local cruSchedDays="$1"
+	    if [ "$1" = "*" ]
+	    then cruSchedDays="Every day"
+	    elif ! echo "$1" | grep -qE "^[*]/.*"
+	    then cruSchedDays="$(_DayOfWeekNumToDayName_ "$1")" 
+	    fi
+	    echo "$cruSchedDays"
+	}
+
+	_GetScheduleHR_()
+	{ echo "$(_CronScheduleHourMinsInfo_ "$1" "$2") - $(_GetSchedDaysHR_ "$3")" ; }
+
+	_ValidateHoursRange_()
+	{
+		local cruHour1st  cruHour2nd  cruHourTmp
+		cruHour1st="$(echo "$1" | cut -f1 -d'-')"
+		cruHour2nd="$(echo "$1" | cut -f2 -d'-')"
+		if [ "$cruHour1st" -eq "$cruHour2nd" ]
+		then cruHourTmp="$cruHour1st"
+		elif [ "$cruHour1st" -lt "$cruHour2nd" ]
+		then cruHourTmp="$1"
+		elif [ "$cruHour1st" -gt "$cruHour2nd" ]
+		then cruHourTmp="0-${cruHour2nd},${cruHour1st}-23"
+		fi
+		echo "$cruHourTmp"
+	}
+
+	_ValidateMinsRange_()
+	{
+		local cruMins1st  cruMins2nd  cruMinsTmp
+		cruMins1st="$(echo "$1" | cut -f1 -d'-')"
+		cruMins2nd="$(echo "$1" | cut -f2 -d'-')"
+		if [ "$cruMins1st" -eq "$cruMins2nd" ]
+		then cruMinsTmp="$cruMins1st"
+		elif [ "$cruMins1st" -lt "$cruMins2nd" ]
+		then cruMinsTmp="$1"
+		elif [ "$cruMins1st" -gt "$cruMins2nd" ]
+		then cruMinsTmp="0-${cruMins2nd},${cruMins1st}-59"
+		fi
+		echo "$cruMinsTmp"
+	}
+
+	testScheduleStr="$(CronTestSchedule check)"
+	cruDays="$(echo "$testScheduleStr" | cut -f1 -d'|')"
+	cruHour="$(echo "$testScheduleStr" | cut -f2 -d'|')"
+	cruMins="$(echo "$testScheduleStr" | cut -f3 -d'|')"
+	exitMenu=false ; formatType=""
+
+	## DAYS of the WEEK ##
 	while true
 	do
-		printf "\n${BOLD}Please choose which day(s) to run speedtest (0-6 - 0 = Sunday, * for every day, or comma separated days):${CLEARFORMAT}  "
+		ScriptHeader
+		printf " ${BOLD}Current schedule: ${GRNct}$(_GetScheduleHR_ "$cruHour" "$cruMins" "$cruDays")${CLRct}\n\n"
+		printf " ${BOLD}Please enter the DAYS of the week when to run the speed tests.\n"
+		printf " [${GRNct}0-6${CLRct}], ${GRNct}0${CLRct}=Sunday, ${GRNct}6${CLRct}=Saturday,"
+		printf " ${GRNct}*${CLRct}=Every day, or comma-separated days.${CLRct}"
+		printf "\n\n ${BOLD}Enter DAYS of the week (${GRNct}e${CLRct}=Exit)${CLRct}:  "
 		read -r day_choice
-		
+
 		if [ "$day_choice" = "e" ]
 		then
-			exitmenu="exit"
-			break
-		elif [ "$day_choice" = "*" ]
-		then
-			crudays="$day_choice"
-			printf "\n"
-			break
+			exitMenu=true ; break
 		elif [ -z "$day_choice" ]
 		then
-			printf "\n${ERR}Please enter a valid number (0-6) or comma separated values${CLEARFORMAT}\n"
+			if _ValidateCronDAYSofWEEK_ "$cruDays"
+			then echo ; break ; fi
+			PressEnter
 		else
-			crudaystmp="$(echo "$day_choice" | sed "s/,/ /g")"
-			crudaysvalidated="true"
-			for i in $crudaystmp
-			do
-				if echo "$i" | grep -q "-"
-				then
-					if [ "$i" = "-" ]
-					then
-						printf "\n${ERR}Please enter a valid number (0-6)${CLEARFORMAT}\n"
-						crudaysvalidated="false"
-						break
-					fi
-					crudaystmp2="$(echo "$i" | sed "s/-/ /")"
-					for i2 in $crudaystmp2
-					do
-						if ! Validate_Number "$i2"
-						then
-							printf "\n${ERR}Please enter a valid number (0-6)${CLEARFORMAT}\n"
-							crudaysvalidated="false"
-							break
-						elif [ "$i2" -lt 0 ] || [ "$i2" -gt 6 ]
-						then
-							printf "\n${ERR}Please enter a number between 0 and 6${CLEARFORMAT}\n"
-							crudaysvalidated="false"
-							break
-						fi
-					done
-				elif ! Validate_Number "$i"
-				then
-					printf "\n${ERR}Please enter a valid number (0-6) or comma separated values${CLEARFORMAT}\n"
-					crudaysvalidated="false"
-					break
-				else
-					if [ "$i" -lt 0 ] || [ "$i" -gt 6 ]
-					then
-						printf "\n${ERR}Please enter a number between 0 and 6 or comma separated values${CLEARFORMAT}\n"
-						crudaysvalidated="false"
-						break
-					fi
-				fi
-			done
-			if [ "$crudaysvalidated" = "true" ]
-			then
-				crudays="$day_choice"
-				printf "\n"
-				break
-			fi
+			if _ValidateCronDAYSofWEEK_ "$day_choice"
+			then cruDays="$day_choice" ; echo ; break ; fi
+			PressEnter
 		fi
 	done
-	
-	if [ "$exitmenu" != "exit" ]
+
+	## FORMAT: "Custom" or "EveryX" ##
+	if [ "$exitMenu" = "false" ]
 	then
 		while true
 		do
-			printf "\n${BOLD}Please choose the format to specify the hour/minute(s) to run speedtest:${CLEARFORMAT}\n"
-			printf "    1. Every X hours/minutes\n"
-			printf "    2. Custom\n\n"
+			ScriptHeader
+			printf " ${BOLD}Please choose the method to specify the hour/minute(s)\n"
+			printf " to run the speed tests:${CLRct}\n\n"
+			printf "  ${GRNct}1${CLRct}. Every X hours/minutes\n"
+			printf "  ${GRNct}2${CLRct}. Custom\n"
+			printf "  ${GRNct}e${CLRct}. Go back\n\n"
 			printf "Choose an option:  "
-			read -r formatmenu
-			
-			case "$formatmenu" in
-				1)
-					formattype="everyx"
-					printf "\n"
-					break
-				;;
-				2)
-					formattype="custom"
-					printf "\n"
-					break
-				;;
-				e)
-					exitmenu="exit"
-					break
-				;;
-				*)
-					printf "\n${ERR}Please enter a valid choice (1-2)${CLEARFORMAT}\n"
-				;;
+			read -r formatChoice
+
+			case "$formatChoice" in
+				1) formatType="everyx" ; echo ; break ;;
+				2) formatType="custom" ; echo ; break ;;
+				e) exitMenu=true ; break ;;
+				*) printf "\n${ERR}Please enter a valid choice [1-2]${CLRct}\n"
+				   PressEnter ;;
 			esac
 		done
 	fi
-	
-	if [ "$exitmenu" != "exit" ]
+
+	if [ "$exitMenu" = "false" ]
 	then
-		if [ "$formattype" = "everyx" ]
+		if [ "$formatType" = "everyx" ]
 		then
 			while true
 			do
-				printf "\n${BOLD}Please choose whether to specify every X hours or every X minutes to run speedtest:${CLEARFORMAT}\n"
-				printf "    1. Hours\n"
-				printf "    2. Minutes\n\n"
+				ScriptHeader
+				printf " ${BOLD}Please choose whether to specify every X hours or every X minutes\n"
+				printf " to run the speed tests:${CLRct}\n\n"
+				printf "  ${GRNct}1${CLRct}. Hours\n"
+				printf "  ${GRNct}2${CLRct}. Minutes\n"
+				printf "  ${GRNct}e${CLRct}. Go back\n\n"
 				printf "Choose an option:  "
-				read -r formatmenu
-				
-				case "$formatmenu" in
-					1)
-						formattype="hours"
-						printf "\\n"
-						break
-					;;
-					2)
-						formattype="mins"
-						printf "\\n"
-						break
-					;;
-					e)
-						exitmenu="exit"
-						break
-					;;
-					*)
-						printf "\n${ERR}Please enter a valid choice (1-2)${CLEARFORMAT}\n"
-					;;
+				read -r formatChoice
+
+				case "$formatChoice" in
+					1) formatType="hours" ; echo ; break ;;
+					2) formatType="mins" ; echo ; break ;;
+					e) exitMenu=true ; break ;;
+					*) printf "\n${ERR}Please enter a valid choice [1-2]${CLRct}\n"
+					   PressEnter ;;
 				esac
 			done
 		fi
 	fi
-	
-	if [ "$exitmenu" != "exit" ]
+
+	if [ "$exitMenu" = "false" ]
 	then
-		if [ "$formattype" = "hours" ]
+		## EVERY X HOURS ##
+		if [ "$formatType" = "hours" ]
 		then
 			while true
 			do
-				printf "\\n${BOLD}Please choose how often to run speedtest (every X hours, where X is 1-24):${CLEARFORMAT}  "
+				ScriptHeader
+				printf " ${BOLD}Current schedule: ${GRNct}$(_GetScheduleHR_ "$cruHour" "$cruMins" "$cruDays")${CLRct}\n\n"
+				printf " ${BOLD}Please enter how often in HOURS to run the speed tests.\n"
+				printf " Every X hours, where X is [${GRNct}1-24${CLRct}], (${GRNct}e${CLRct}=Exit)${CLRct}:  "
 				read -r hour_choice
-				
+
 				if [ "$hour_choice" = "e" ]
 				then
-					exitmenu="exit"
-					break
-				elif ! Validate_Number "$hour_choice"
+					exitMenu=true ; break
+				elif [ -z "$hour_choice" ]
 				then
-						printf "\\n${ERR}Please enter a valid number (1-24)${CLEARFORMAT}\\n"
-				elif [ "$hour_choice" -lt 1 ] || [ "$hour_choice" -gt 24 ]
+					if _ValidateCronHOURS_ "$cruHour" -quiet || \
+					   _ValidateCronFreqHOURS_ "$cruHour" -quiet
+					then echo ; break ; fi
+					printf "\n${ERR}Please enter a number between 1 and 24${CLRct}\n"
+					PressEnter
+				elif ! _ValidateCronFreqHOURS_ "$hour_choice"
 				then
-					printf "\\n${ERR}Please enter a number between 1 and 24${CLEARFORMAT}\\n"
+				    PressEnter
 				elif [ "$hour_choice" -eq 24 ]
 				then
-					cruhours=0
-					crumins=0
-					printf "\\n"
-					break
+					cruHour=0
+					cruMins=0
+					echo ; break
+				elif [ "$hour_choice" -eq 1 ]
+				then
+					cruHour="*"
+					cruMins=0
+					echo ; break
 				else
-					cruhours="*/$hour_choice"
-					crumins=0
-					printf "\\n"
-					break
+					cruHour="*/$hour_choice"
+					cruMins=0
+					echo ; break
 				fi
 			done
-		elif [ "$formattype" = "mins" ]
+
+		## EVERY X MINUTES ##
+		elif [ "$formatType" = "mins" ]
 		then
 			while true
 			do
-				printf "\\n${BOLD}Please choose how often to run speedtest (every X minutes, where X is 1-30):${CLEARFORMAT}  "
-				read -r min_choice
-				
-				if [ "$min_choice" = "e" ]
+				ScriptHeader
+				printf " ${BOLD}Current schedule: ${GRNct}$(_GetScheduleHR_ "$cruHour" "$cruMins" "$cruDays")${CLRct}\n\n"
+				printf " ${BOLD}Please enter how often in MINUTES to run the speed tests.\n"
+				printf " Every X minutes, where X is [${GRNct}1-30${CLRct}], (${GRNct}e${CLRct}=Exit)${CLRct}:  "
+				read -r mins_choice
+
+				if [ "$mins_choice" = "e" ]
 				then
-					exitmenu="exit"
-					break
-				elif ! Validate_Number "$min_choice"
+					exitMenu=true ; break
+				elif [ -z "$mins_choice" ]
 				then
-						printf "\\n${ERR}Please enter a valid number (1-30)${CLEARFORMAT}\\n"
-				elif [ "$min_choice" -lt 1 ] || [ "$min_choice" -gt 30 ]
+					if _ValidateCronMINS_ "$cruMins" -quiet || \
+					   _ValidateCronFreqMINS_ "$cruMins" -quiet
+					then echo ; break ; fi
+					printf "\n${ERR}Please enter a number between 1 and 30${CLRct}\n"
+					PressEnter
+				elif ! _ValidateCronFreqMINS_ "$mins_choice"
 				then
-					printf "\\n${ERR}Please enter a number between 1 and 30${CLEARFORMAT}\\n"
+					PressEnter
+				elif [ "$mins_choice" -eq 1 ]
+				then
+					cruMins="*"
+					cruHour="*"
+					echo ; break
 				else
-					crumins="*/$min_choice"
-					cruhours="*"
-					printf "\\n"
-					break
+					cruMins="*/$mins_choice"
+					cruHour="*"
+					echo ; break
 				fi
 			done
 		fi
 	fi
-	
-	if [ "$exitmenu" != "exit" ]
+
+	if [ "$exitMenu" = "false" ]
 	then
-		if [ "$formattype" = "custom" ]
+		if [ "$formatType" = "custom" ]
 		then
+			## CUSTOM HOURS ##
 			while true
 			do
-				printf "\\n${BOLD}Please choose which hour(s) to run speedtest (0-23, * for every hour, or comma separated hours):${CLEARFORMAT}  "
+				ScriptHeader
+				printf " ${BOLD}Current schedule: ${GRNct}$(_GetScheduleHR_ "$cruHour" "$cruMins" "$cruDays")${CLRct}\n\n"
+				printf " ${BOLD}Please enter the HOURS when to run the speed tests.\n"
+				printf " [${GRNct}0-23${CLRct}], ${GRNct}*${CLRct}=Every hour, or comma-separated hours, (${GRNct}e${CLRct}=Exit)${CLRct}:  "
 				read -r hour_choice
-				
+
 				if [ "$hour_choice" = "e" ]
 				then
-					exitmenu="exit"
-					break
-				elif [ "$hour_choice" = "*" ]
+					exitMenu=true ; break
+				elif [ -z "$hour_choice" ]
 				then
-					cruhours="$hour_choice"
-					printf "\\n"
-					break
+					if _ValidateCronHOURS_ "$cruHour" -quiet || \
+					   _ValidateCronFreqHOURS_ "$cruHour" -quiet
+					then echo ; break ; fi
+					printf "\n${ERR}Please enter a number between 0 and 23${CLRct}\n"
+					PressEnter
 				else
-					cruhourstmp="$(echo "$hour_choice" | sed "s/,/ /g")"
-					cruhoursvalidated="true"
-					for i in $cruhourstmp
-					do
-						if echo "$i" | grep -q "-"
-						then
-							if [ "$i" = "-" ]
-							then
-								printf "\\n${ERR}Please enter a valid number (0-23)${CLEARFORMAT}\\n"
-								cruhoursvalidated="false"
-								break
-							fi
-							cruhourstmp2="$(echo "$i" | sed "s/-/ /")"
-							for i2 in $cruhourstmp2
-							do
-								if ! Validate_Number "$i2"
-								then
-									printf "\\n${ERR}Please enter a valid number (0-23)${CLEARFORMAT}\\n"
-									cruhoursvalidated="false"
-									break
-								elif [ "$i2" -lt 0 ] || [ "$i2" -gt 23 ]
-								then
-									printf "\\n${ERR}Please enter a number between 0 and 23${CLEARFORMAT}\\n"
-									cruhoursvalidated="false"
-									break
-								fi
-							done
-						elif echo "$i" | grep -q "/"
-						then
-							cruhourstmp3="$(echo "$i" | sed "s/\*\///")"
-							if ! Validate_Number "$cruhourstmp3"
-							then
-								printf "\\n${ERR}Please enter a valid number (0-23)${CLEARFORMAT}\\n"
-								cruhoursvalidated="false"
-								break
-							elif [ "$cruhourstmp3" -lt 0 ] || [ "$cruhourstmp3" -gt 23 ]
-							then
-								printf "\\n${ERR}Please enter a number between 0 and 23${CLEARFORMAT}\\n"
-								cruhoursvalidated="false"
-								break
-							fi
-						elif ! Validate_Number "$i"
-						then
-							printf "\\n${ERR}Please enter a valid number (0-23) or comma separated values${CLEARFORMAT}\\n"
-							cruhoursvalidated="false"
-							break
-						elif [ "$i" -lt 0 ] || [ "$i" -gt 23 ]
-						then
-							printf "\\n${ERR}Please enter a number between 0 and 23 or comma separated values${CLEARFORMAT}\\n"
-							cruhoursvalidated="false"
-							break
-						fi
-					done
-					if [ "$cruhoursvalidated" = "true" ]
+					if _ValidateCronHOURS_ "$hour_choice"
 					then
 						if echo "$hour_choice" | grep -q "-"
 						then
-							cruhours1="$(echo "$hour_choice" | cut -f1 -d'-')"
-							cruhours2="$(echo "$hour_choice" | cut -f2 -d'-')"
-							if [ "$cruhours1" -lt "$cruhours2" ]
+							if echo "$hour_choice" | grep -q ","
 							then
-								cruhours="$hour_choice"
-							elif [ "$cruhours2" -lt "$cruhours1" ]
-							then
-								cruhours="$cruhours1-23,0-$cruhours2"
+								cruHour=""
+								cruHoursStr="$(echo "$hour_choice" | sed 's/,/ /g')"
+								for tmpHours in $cruHoursStr 
+								do
+								    if echo "$tmpHours" | grep -q "-"
+								    then
+								        cruHoursTmp="$(_ValidateHoursRange_ "$tmpHours")"
+								        if [ -z "$cruHour" ]
+								        then cruHour="$cruHoursTmp"
+								        else cruHour="${cruHour},${cruHoursTmp}"
+								        fi
+								    else
+								        if [ -z "$cruHour" ]
+								        then cruHour="$tmpHours"
+								        else cruHour="${cruHour},${tmpHours}"
+								        fi
+								    fi
+								done
+							else
+								cruHour="$(_ValidateHoursRange_ "$hour_choice")"
 							fi
+						elif [ "$hour_choice" = "*/1" ]
+						then
+							cruHour="*"
 						else
-							cruhours="$hour_choice"
+							cruHour="$hour_choice"
 						fi
-						printf "\\n"
-						break
+						echo ; break
 					fi
+					PressEnter
 				fi
 			done
 		fi
 	fi
-	
-	if [ "$exitmenu" != "exit" ]
+
+	if [ "$exitMenu" = "false" ]
 	then
-		if [ "$formattype" = "custom" ]
+		if [ "$formatType" = "custom" ]
 		then
+			## CUSTOM MINUTES ##
 			while true
 			do
-				printf "\\n${BOLD}Please choose which minutes(s) to run speedtest (0-59, * for every minute, or comma separated minutes):${CLEARFORMAT}  "
-				read -r min_choice
-				
-				if [ "$min_choice" = "e" ]
+				ScriptHeader
+				printf " ${BOLD}Current schedule: ${GRNct}$(_GetScheduleHR_ "$cruHour" "$cruMins" "$cruDays")${CLRct}\n\n"
+				printf " ${BOLD}Please enter the MINUTES when to run the speed tests.\n"
+				printf " [${GRNct}0-59${CLRct}], ${GRNct}*${CLRct}=Every minute, or comma-separated minutes, (${GRNct}e${CLRct}=Exit)${CLRct}:  "
+				read -r mins_choice
+
+				if [ "$mins_choice" = "e" ]
 				then
-					exitmenu="exit"
-					break
-				elif [ "$min_choice" = "*" ]
+					exitMenu=true ; break
+				elif [ -z "$mins_choice" ]
 				then
-					crumins="$min_choice"
-					printf "\\n"
-					break
+					if _ValidateCronMINS_ "$cruMins" -quiet || \
+					   _ValidateCronFreqMINS_ "$cruMins" -quiet
+					then echo ; break ; fi
+					printf "\n${ERR}Please enter a number between 0 and 59${CLRct}\n"
+					PressEnter
 				else
-					cruminstmp="$(echo "$min_choice" | sed "s/,/ /g")"
-					cruminsvalidated="true"
-					for i in $cruminstmp
-					do
-						if echo "$i" | grep -q "-"
-						then
-							if [ "$i" = "-" ]
-							then
-								printf "\\n${ERR}Please enter a valid number (0-23)${CLEARFORMAT}\\n"
-								cruminsvalidated="false"
-								break
-							fi
-							cruminstmp2="$(echo "$i" | sed "s/-/ /")"
-							for i2 in $cruminstmp2
-							do
-								if ! Validate_Number "$i2"
-								then
-									printf "\\n${ERR}Please enter a valid number (0-59)${CLEARFORMAT}\\n"
-									cruminsvalidated="false"
-									break
-								elif [ "$i2" -lt 0 ] || [ "$i2" -gt 59 ]
-								then
-									printf "\\n${ERR}Please enter a number between 0 and 59${CLEARFORMAT}\\n"
-									cruminsvalidated="false"
-									break
-								fi
-							done
-						elif echo "$i" | grep -q "/"
-						then
-							cruminstmp3="$(echo "$i" | sed "s/\*\///")"
-							if ! Validate_Number "$cruminstmp3"
-							then
-								printf "\\n${ERR}Please enter a valid number (0-30)${CLEARFORMAT}\\n"
-								cruminsvalidated="false"
-								break
-							elif [ "$cruminstmp3" -lt 0 ] || [ "$cruminstmp3" -gt 30 ]
-							then
-								printf "\\n${ERR}Please enter a number between 0 and 30${CLEARFORMAT}\\n"
-								cruminsvalidated="false"
-								break
-							fi
-						elif ! Validate_Number "$i"
-						then
-							printf "\\n${ERR}Please enter a valid number (0-59) or comma separated values${CLEARFORMAT}\\n"
-							cruminsvalidated="false"
-							break
-						elif [ "$i" -lt 0 ] || [ "$i" -gt 59 ]
-						then
-							printf "\\n${ERR}Please enter a number between 0 and 59 or comma separated values${CLEARFORMAT}\\n"
-							cruminsvalidated="false"
-							break
-						fi
-					done
-					
-					if [ "$cruminsvalidated" = "true" ]
+					if _ValidateCronMINS_ "$mins_choice"
 					then
-						if echo "$min_choice" | grep -q "-"
+						if echo "$mins_choice" | grep -q "-"
 						then
-							crumins1="$(echo "$min_choice" | cut -f1 -d'-')"
-							crumins2="$(echo "$min_choice" | cut -f2 -d'-')"
-							if [ "$crumins1" -lt "$crumins2" ]
+							if echo "$mins_choice" | grep -q ","
 							then
-								crumins="$min_choice"
-							elif [ "$crumins2" -lt "$crumins1" ]
-							then
-								crumins="$crumins1-59,0-$crumins2"
+								cruMins=""
+								cruMinsStr="$(echo "$mins_choice" | sed 's/,/ /g')"
+								for tmpMins in $cruMinsStr 
+								do
+								    if echo "$tmpMins" | grep -q "-"
+								    then
+								        cruMinsTmp="$(_ValidateMinsRange_ "$tmpMins")"
+								        if [ -z "$cruMins" ]
+								        then cruMins="$cruMinsTmp"
+								        else cruMins="${cruMins},${cruMinsTmp}"
+								        fi
+								    else
+								        if [ -z "$cruMins" ]
+								        then cruMins="$tmpMins"
+								        else cruMins="${cruMins},${tmpMins}"
+								        fi
+								    fi
+								done
+							else
+								cruMins="$(_ValidateMinsRange_ "$mins_choice")"
 							fi
+						elif [ "$mins_choice" = "*/1" ]
+						then
+							cruMins="*"
 						else
-							crumins="$min_choice"
+							cruMins="$mins_choice"
 						fi
-						printf "\n"
-						break
+						echo ; break
 					fi
+					PressEnter
 				fi
 			done
 		fi
 	fi
-	
-	if [ "$exitmenu" != "exit" ]
-    then
-		CronTestSchedule update "$crudays" "$cruhours" "$crumins"
+
+	if [ "$exitMenu" = "false" ]
+	then
+		CronTestSchedule update "$cruDays" "$cruHour" "$cruMins"
 		return 0
 	else
-		return 1
+		echo ; return 1
 	fi
 }
 
 Menu_ResetDB()
 {
 	printf "${BOLD}${WARN}WARNING: This will reset the %s database by deleting all database records.\n" "$SCRIPT_NAME"
-	printf "A backup of the database will be created if you change your mind.${CLEARFORMAT}\n"
-	printf "\n${BOLD}Do you want to continue? (y/n)${CLEARFORMAT}  "
+	printf "A backup of the database will be created if you change your mind.${CLRct}\n"
+	printf "\n${BOLD}Do you want to continue? (y/n)${CLRct}  "
 	read -r confirm
 	case "$confirm" in
 		y|Y)
@@ -5515,23 +5878,22 @@ Menu_ResetDB()
 			Reset_DB
 		;;
 		*)
-			printf "\n${BOLD}${WARN}Database reset cancelled${CLEARFORMAT}\n\n"
+			printf "\n${BOLD}${WARN}Database reset cancelled${CLRct}\n\n"
 		;;
 	esac
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Jun-06] ##
+## Modified by Martinski W. [2026-Jan-05] ##
 ##----------------------------------------##
-Menu_AutoBW()
+Menu_AutoBandWidth()
 {
-	local AUTOBW_MenuStatus
+	local AUTOBW_MenuStatus  menuOption  exitLoop  updownCFG  updownSTR
 
 	while true
 	do
 		ScriptHeader
-
-		AUTOBW_MenuStatus="UNKNOWN"
+		AUTOBW_MenuStatus="${MGNTct}UNKNOWN${CLRct}"
 
 		if [ "$(AutoBWEnable check)" = "true" ]
 		then
@@ -5541,300 +5903,421 @@ Menu_AutoBW()
 			AUTOBW_MenuStatus="${CritIREDct} DISABLED ${CLRct}"
 		fi
 
-		printf "1.    Update QoS bandwidth values now\n\n"
-		printf "2.    Configure number of speedtests used to calculate average bandwidth\n"
-		printf "      Currently bandwidth is calculated using the average of the last ${SETTING}%s${CLEARFORMAT} speedtest(s)\n\n" "$(AutoBWConf check AVERAGE CALC)"
-		printf "3.    Configure scale factor\n"
-		printf "      Download: ${SETTING}%s%%${CLEARFORMAT}  -  Upload: ${SETTING}%s%%${CLEARFORMAT}\n\n" "$(AutoBWConf check SF DOWN)" "$(AutoBWConf check SF UP)"
-		printf "4.    Configure bandwidth limits\n"
-		printf "      Upper Limit    Download: ${SETTING}%s Mbps${CLEARFORMAT}  -  Upload: ${SETTING}%s Mbps${CLEARFORMAT}\n" "$(AutoBWConf check ULIMIT DOWN)" "$(AutoBWConf check ULIMIT UP)"
-		printf "      Lower Limit    Download: ${SETTING}%s Mbps${CLEARFORMAT}  -  Upload: ${SETTING}%s Mbps${CLEARFORMAT}\n\n" "$(AutoBWConf check LLIMIT DOWN)" "$(AutoBWConf check LLIMIT UP)"
-		printf "5.    Configure threshold for updating QoS bandwidth values\n"
-		printf "      Download: ${SETTING}%s%%${CLEARFORMAT} - Upload: ${SETTING}%s%%${CLEARFORMAT}\n\n" "$(AutoBWConf check THRESHOLD DOWN)" "$(AutoBWConf check THRESHOLD UP)"
-		printf "6.    Toggle AutoBW on/off\n"
-		printf "      Currently: ${AUTOBW_MenuStatus}${CLEARFORMAT}\n\n"
-		printf "e.    Go back\n\n"
-		printf "${BOLD}####################################################################${CLEARFORMAT}\n"
-		printf "\n"
+		printf "  ${GRNct}1${CLRct}. Update QoS bandwidth values now\n\n"
+		printf "  ${GRNct}2${CLRct}. Configure number of speed tests used to calculate average bandwidth\n"
+		printf "     Currently: ${SETTING}%s${CLRct} speed tests are used to calculate average bandwidth\n\n" "$(AutoBWConf check AVERAGE CALC)"
+		printf "  ${GRNct}3${CLRct}. Configure scale factor\n"
+		printf "     Download: ${SETTING}%s%%${CLRct}  -  Upload: ${SETTING}%s%%${CLRct}\n\n" "$(AutoBWConf check SF DOWN)" "$(AutoBWConf check SF UP)"
+		printf "  ${GRNct}4${CLRct}. Configure bandwidth limits\n"
+		printf "     Upper Limit   Download: ${SETTING}%s Mbps${CLRct}  -  Upload: ${SETTING}%s Mbps${CLRct}\n" "$(AutoBWConf check ULIMIT DOWN)" "$(AutoBWConf check ULIMIT UP)"
+		printf "     Lower Limit   Download: ${SETTING}%s Mbps${CLRct}  -  Upload: ${SETTING}%s Mbps${CLRct}\n\n" "$(AutoBWConf check LLIMIT DOWN)" "$(AutoBWConf check LLIMIT UP)"
+		printf "  ${GRNct}5${CLRct}. Configure threshold for updating QoS bandwidth values\n"
+		printf "     Download: ${SETTING}%s%%${CLRct} - Upload: ${SETTING}%s%%${CLRct}\n\n" "$(AutoBWConf check THRESHOLD DOWN)" "$(AutoBWConf check THRESHOLD UP)"
+		printf "  ${GRNct}6${CLRct}. Toggle Auto Bandwidth\n"
+		printf "     Currently: ${AUTOBW_MenuStatus}${CLRct}\n\n"
+		printf "  ${GRNct}e${CLRct}. Go back\n"
+		printf "\n${menuSepStr}\n\n"
 
 		printf "Choose an option:  "
-		read -r autobwmenu
-		case "$autobwmenu" in
+		read -r menuOption
+		case "$menuOption" in
 			1)
 				printf "\n"
-				Menu_AutoBW_Update
+				Menu_AutoBandWidth_Update
 				PressEnter
 			;;
 			2)
 				while true
 				do
-					ScriptHeader
-					exitmenu=""
-					avgnum=""
+					avrgeNum="$(AutoBWConf check AVERAGE CALC)"
+					exitLoop=false
 					while true
 					do
-						printf "\n"
-						printf "Enter number of speedtests to use to calculate avg bandwidth (1-30):  "
-						read -r avgnumvalue
-							if [ "$avgnumvalue" = "e" ]; then
-								exitmenu="exit"
-								break
-							elif ! Validate_Number "$avgnumvalue"; then
-								printf "\\n${ERR}Please enter a valid number (1-30)${CLEARFORMAT}\\n"
-							else
-								if [ "$avgnumvalue" -lt 1 ] || [ "$avgnumvalue" -gt 30 ]; then
-									printf "\\n${ERR}Please enter a number between 1 and 30${CLEARFORMAT}\\n"
-								else
-									avgnum="$avgnumvalue"
-									break
-								fi
-							fi
+						ScriptHeader
+						printf " ${BOLD}Current number of speed tests to calculate average bandwidth: ${GRNct}${avrgeNum}${CLRct}\n\n"
+						printf " ${BOLD}Enter the number of speed tests to be used when calculating\n"
+						printf " the average bandwidth [${GRNct}2-30${CLRct}] (e=Exit)${CLRct}:  "
+						read -r avrgNumInput
+						if [ -z "$avrgNumInput" ] && \
+						   echo "$avrgeNum" | grep -qE "^([1-9][0-9]?)$" && \
+						   [ "$avrgeNum" -ge 2 ] && [ "$avrgeNum" -le 30 ]
+						then
+							exitLoop=true
+							break
+						elif [ "$avrgNumInput" = "e" ]
+						then
+							exitLoop=true
+							break
+						elif ! Validate_Number "$avrgNumInput"
+						then
+							printf "\n${ERR}Please enter a valid number [2-30].${CLRct}\n\n"
+							PressEnter
+						elif [ "$avrgNumInput" -lt 2 ] || [ "$avrgNumInput" -gt 30 ]
+						then
+							printf "\n${ERR}Please enter a number between 2 and 30.${CLRct}\n\n"
+							PressEnter
+						else
+							avrgeNum="$avrgNumInput"
+							break
+						fi
 					done
-					if [ "$exitmenu" != "exit" ]; then
-						AutoBWConf update AVERAGE CALC "$avgnum"
-						break
+
+					if [ "$exitLoop" = "false" ]
+					then
+						AutoBWConf update AVERAGE CALC "$avrgeNum"
 					fi
-					if [ "$exitmenu" = "exit" ]; then
-						break
-					fi
+					break
 				done
-				printf "\\n"
-				PressEnter
+
+				if [ "$exitLoop" = "false" ]
+				then
+					echo ; PressEnter
+				fi
 			;;
 			3)
 				while true
 				do
-					ScriptHeader
-					exitmenu=""
-					updown=""
-					sfvalue=""
-					printf "\\n"
-					printf "Select a scale factor to set\\n"
-					printf "1.    Download\\n"
-					printf "2.    Upload\\n\\n"
+					updownCFG=""
+					updownSTR=""
+					exitLoop=false
+					percntVal=""
+					percntUPL="$(AutoBWConf check SF UP)"
+					percntDWN="$(AutoBWConf check SF DOWN)"
+
 					while true
 					do
+						ScriptHeader
+						printf " ${BOLD}Configure the scale factor for${CLRct}:\n\n"
+						printf "  ${GRNct}1${CLRct}. Download [${SETTING}%s%%${CLRct}]\n" "$percntDWN"
+						printf "  ${GRNct}2${CLRct}. Upload [${SETTING}%s%%${CLRct}]\n\n" "$percntUPL"
+						printf "  ${GRNct}e${CLRct}. Go back\n\n"
 						printf "Choose an option:  "
-						read -r autobwsfchoice
-						if [ "$autobwsfchoice" = "e" ]; then
-							exitmenu="exit"
+						read -r autobwChoiceSF
+
+						if [ -z "$autobwChoiceSF" ] && \
+						   echo "$percntUPL" | grep -qE "^([1-9][0-9]*)$" && \
+						   echo "$percntDWN" | grep -qE "^([1-9][0-9]*)$" && \
+						   [ "$percntUPL" -ge 1 ] && [ "$percntUPL" -le 100 ] && \
+						   [ "$percntDWN" -ge 1 ] && [ "$percntDWN" -le 100 ]
+						then
+							exitLoop=true
 							break
-						elif ! Validate_Number "$autobwsfchoice"; then
-							printf "\\n${ERR}Please enter a valid number (1-2)${CLEARFORMAT}\\n\\n"
-						else
-							if [ "$autobwsfchoice" -lt 1 ] || [ "$autobwsfchoice" -gt 2 ]; then
-								printf "\\n${ERR}Please enter a number between 1 and 2${CLEARFORMAT}\\n\\n"
-							else
-								if [ "$autobwsfchoice" -eq 1 ]; then
-									updown="DOWN"
-									break
-								elif [ "$autobwsfchoice" -eq 2 ]; then
-									updown="UP"
-									break
-								fi
-							fi
+						elif [ "$autobwChoiceSF" = "e" ]
+						then
+							exitLoop=true
+							break
+						elif ! Validate_Number "$autobwChoiceSF"
+						then
+							printf "\n${ERR}Please enter a valid number [1-2].${CLRct}\n\n"
+							PressEnter
+						elif [ "$autobwChoiceSF" -lt 1 ] || [ "$autobwChoiceSF" -gt 2 ]
+						then
+							printf "\n${ERR}Please enter a number between 1 and 2.${CLRct}\n\n"
+							PressEnter
+						elif [ "$autobwChoiceSF" -eq 1 ]
+						then
+							updownCFG="DOWN"
+							updownSTR="Download"
+							break
+						elif [ "$autobwChoiceSF" -eq 2 ]
+						then
+							updownCFG="UP"
+							updownSTR="Upload"
+							break
 						fi
 					done
-					if [ "$exitmenu" != "exit" ]
+
+					if "$exitLoop"
+					then break
+					fi
+
+					printf "\n Enter percentage scale factor for ${GRNct}%s${CLRct} [${GRNct}1-100${CLRct}]:  " "$updownSTR"
+					read -r autobwValueSF
+					if [ -z "$autobwValueSF" ] && \
+					   { { [ "$updownCFG" = "UP" ] && \
+					       echo "$percntUPL" | grep -qE "^([1-9][0-9]*)$" && \
+					       [ "$percntUPL" -ge 1 ] && [ "$percntUPL" -le 100 ]
+					     } || \
+					     { [ "$updownCFG" = "DOWN" ] && \
+					       echo "$percntDWN" | grep -qE "^([1-9][0-9]*)$" && \
+					       [ "$percntDWN" -ge 1 ] && [ "$percntDWN" -le 100 ]
+					     } ; }
 					then
-						while true
-						do
-							printf "\\n"
-							printf "Enter percentage to scale bandwidth by (1-100):  "
-							read -r autobwsfvalue
-								if [ "$autobwsfvalue" = "e" ]; then
-									exitmenu="exit"
-									break
-								elif ! Validate_Number "$autobwsfvalue"; then
-									printf "\\n${ERR}Please enter a valid number (1-100)${CLEARFORMAT}\\n"
-								else
-									if [ "$autobwsfvalue" -lt 1 ] || [ "$autobwsfvalue" -gt 100 ]; then
-										printf "\\n${ERR}Please enter a number between 1 and 100${CLEARFORMAT}\\n"
-									else
-										sfvalue="$autobwsfvalue"
-										break
-									fi
-								fi
-						done
+						exitLoop=false
+					elif [ "$autobwValueSF" = "e" ]
+					then
+						exitLoop=true
+					elif ! Validate_Number "$autobwValueSF"
+					then
+						printf "\n${ERR}Please enter a valid number [1-100].${CLRct}\n\n"
+						PressEnter
+					elif [ "$autobwValueSF" -lt 1 ] || [ "$autobwValueSF" -gt 100 ]
+					then
+						printf "\n${ERR}Please enter a number between 1 and 100.${CLRct}\n\n"
+						PressEnter
+					else
+						percntVal="$autobwValueSF"
 					fi
-					if [ "$exitmenu" != "exit" ]; then
-						AutoBWConf update SF "$updown" "$sfvalue"
-						break
+
+					if "$exitLoop"
+					then break
 					fi
-					
-					if [ "$exitmenu" = "exit" ]; then
-						break
+					if [ -n "$percntVal" ]
+					then
+						AutoBWConf update SF "$updownCFG" "$percntVal"
 					fi
 				done
-				
-				printf "\\n"
-				PressEnter
+
+				if [ "$exitLoop" = "false" ]
+				then
+					echo ; PressEnter
+				fi
 			;;
 			4)
 				while true
 				do
-					ScriptHeader
-					exitmenu=""
-					updown=""
-					limithighlow=""
-					limitvalue=""
-					printf "\\n"
-					printf "Select a bandwidth to set limit for\\n"
-					printf "1.    Download\\n"
-					printf "2.    Upload\\n\\n"
+					updownCFG=""
+					updownSTR=""
+					exitLoopA=false
+					exitLoopB=false
+					limitHiLoVal=""
+					limitHiLoCFG=""
+					limitHiLoSTR=""
+					upperLimitSTR=""
+					lowerLimitSTR=""
+
 					while true
 					do
+						ScriptHeader
+						printf " ${BOLD}Select a bandwidth to set limits for${CLRct}:\n\n"
+						printf "  ${GRNct}1${CLRct}. Download\n"
+						printf "  ${GRNct}2${CLRct}. Upload\n\n"
+						printf "  ${GRNct}e${CLRct}. Go back\n\n"
 						printf "Choose an option:  "
-						read -r autobwchoice
-						if [ "$autobwchoice" = "e" ]; then
-							exitmenu="exit"
+						read -r autobwChoice
+
+						if [ -z "$autobwChoice" ] || [ "$autobwChoice" = "e" ]
+						then
+							exitLoopA=true
 							break
-						elif ! Validate_Number "$autobwchoice"; then
-							printf "\\n${ERR}Please enter a valid number (1-2)${CLEARFORMAT}\\n\\n"
-						else
-							if [ "$autobwchoice" -lt 1 ] || [ "$autobwchoice" -gt 2 ]; then
-								printf "\\n${ERR}Please enter a number between 1 and 2${CLEARFORMAT}\\n\\n"
-							else
-								if [ "$autobwchoice" -eq 1 ]; then
-									updown="DOWN"
-									break
-								elif [ "$autobwchoice" -eq 2 ]; then
-									updown="UP"
-									break
-								fi
-							fi
+						elif ! Validate_Number "$autobwChoice"
+						then
+							printf "\n${ERR}Please enter a valid number [1-2].${CLRct}\n\n"
+							PressEnter
+						elif [ "$autobwChoice" -lt 1 ] || [ "$autobwChoice" -gt 2 ]
+						then
+							printf "\n${ERR}Please enter a number between 1 and 2.${CLRct}\n\n"
+							PressEnter
+						elif [ "$autobwChoice" -eq 1 ]
+						then
+							updownCFG="DOWN"
+							updownSTR="Download"
+							break
+						elif [ "$autobwChoice" -eq 2 ]
+						then
+							updownCFG="UP"
+							updownSTR="Upload"
+							break
 						fi
 					done
-					if [ "$exitmenu" != "exit" ]
-					then
+
+					if "$exitLoopA"
+					then break
+					fi
+
+					while true
+					do
+						exitLoopB=false
+						limitHiLoCFG=""
+						limitHiLoSTR=""
+
 						while true
 						do
-							printf "\\n"
-							printf "Select a limit to set\\n"
-							printf "1.    Upper\\n"
-							printf "2.    Lower\\n\\n"
+							if [ "$updownCFG" = "UP" ]
+							then
+								upperLimitSTR="$(AutoBWConf check ULIMIT UP) Mbps"
+								lowerLimitSTR="$(AutoBWConf check LLIMIT UP) Mbps"
+							else
+								upperLimitSTR="$(AutoBWConf check ULIMIT DOWN) Mbps"
+								lowerLimitSTR="$(AutoBWConf check LLIMIT DOWN) Mbps"
+							fi
+							printf "\n ${BOLD}Select a limit to set for ${GRNct}%s${CLRct}${CLRct}:\n\n" "$updownSTR"
+							printf "  ${GRNct}1${CLRct}. Upper [${SETTING}%s${CLRct}]\n" "$upperLimitSTR"
+							printf "  ${GRNct}2${CLRct}. Lower [${SETTING}%s${CLRct}]\n" "$lowerLimitSTR"
+							printf "\n  ${GRNct}e${CLRct}. Go back\n\n"
 							printf "Choose an option:  "
-							read -r autobwlimit
-								if [ "$autobwlimit" = "e" ]; then
-									exitmenu="exit"
-									break
-								elif ! Validate_Number "$autobwlimit"; then
-									printf "\\n${ERR}Please enter a valid number (1-100)${CLEARFORMAT}\\n"
-								else
-									if [ "$autobwlimit" -lt 1 ] || [ "$autobwlimit" -gt 100 ]; then
-										printf "\\n${ERR}Please enter a number between 1 and 100${CLEARFORMAT}\\n"
-									else
-										if [ "$autobwlimit" -eq 1 ]; then
-											limithighlow="ULIMIT"
-										elif [ "$autobwlimit" -eq 2 ]; then
-											limithighlow="LLIMIT"
-										fi
-									fi
-								fi
-								
-								if [ "$exitmenu" != "exit" ]
-								then
-									while true
-									do
-										printf "\\n"
-										printf "Enter value to set limit to (0 = unlimited for upper):  "
-										read -r autobwlimvalue
-										if [ "$autobwlimvalue" = "e" ]; then
-											exitmenu="exit"
-											break
-										elif ! Validate_Number "$autobwlimvalue"; then
-											printf "\\n${ERR}Please enter a valid number (1-100)${CLEARFORMAT}\\n"
-										else
-											limitvalue="$autobwlimvalue"
-											break
-										fi
-									done
-									if [ "$exitmenu" != "exit" ]; then
-										AutoBWConf update "$limithighlow" "$updown" "$limitvalue"
-										exitmenu="exit"
-										break
-									fi
-								fi
+							read -r autobwLimit
+
+							if [ -z "$autobwLimit" ] || [ "$autobwLimit" = "e" ]
+							then
+								exitLoopB=true
+								break
+							elif ! Validate_Number "$autobwLimit"
+							then
+								printf "\n${ERR}Please enter a valid number [1-2].${CLRct}\n\n"
+								PressEnter ; echo
+							elif [ "$autobwLimit" -lt 1 ] || [ "$autobwLimit" -gt 2 ]
+							then
+								printf "\n${ERR}Please enter a number between 1 and 2.${CLRct}\n\n"
+								PressEnter ; echo
+							elif [ "$autobwLimit" -eq 1 ]
+							then
+								limitHiLoCFG="ULIMIT"
+								limitHiLoSTR="Upper"
+								break
+							elif [ "$autobwLimit" -eq 2 ]
+							then
+								limitHiLoCFG="LLIMIT"
+								limitHiLoSTR="Lower"
+								break
+							fi
 						done
-						if [ "$exitmenu" = "exit" ]; then
-							break
+
+						if "$exitLoopB"
+						then break
 						fi
+
+						while true
+						do
+							printf "\n Enter value to set ${GRNct}%s${CLRct} limit for ${GRNct}%s${CLRct}" "$limitHiLoSTR" "$updownSTR"
+							if [ "$limitHiLoSTR" = "Lower" ]
+							then printf ":  "
+							else printf "\n [0 = Unlimited Upper Limit]:  "
+							fi
+							read -r autobwLimitVal
+
+							if [ -z "$autobwLimitVal" ] || [ "$autobwLimitVal" = "e" ]
+							then
+								exitLoopB=false
+								limitHiLoVal=""
+								break
+							elif ! Validate_Number "$autobwLimitVal"
+							then
+								printf "\n${ERR}Please enter a valid number.${CLRct}\n\n"
+								PressEnter ; echo
+							else
+								limitHiLoVal="$autobwLimitVal"
+								break
+							fi
+						done
+
+						if "$exitLoopB"
+						then break
+						fi
+						if [ -n "$limitHiLoVal" ]
+						then
+							AutoBWConf update "$limitHiLoCFG" "$updownCFG" "$limitHiLoVal"
+						fi
+					done
+
+					if "$exitLoopA"
+					then break
 					fi
 				done
-				
-				printf "\\n"
-				PressEnter
+
+				if [ "$exitLoopA" = "false" ]
+				then
+					echo ; PressEnter
+				fi
 			;;
 			5)
 				while true
 				do
-					ScriptHeader
-					exitmenu=""
-					updown=""
-					thvalue=""
-					printf "\\n"
-					printf "Select a threshold to set\\n"
-					printf "1.    Download\\n"
-					printf "2.    Upload\\n\\n"
+					updownCFG=""
+					updownSTR=""
+					exitLoop=false
+					percntVal=""
+					percntUPL="$(AutoBWConf check THRESHOLD UP)"
+					percntDWN="$(AutoBWConf check THRESHOLD DOWN)"
+
 					while true
 					do
+						ScriptHeader
+						printf " ${BOLD}Configure the threshold for:${CLRct}\n\n"
+						printf "  ${GRNct}1${CLRct}. Download [${SETTING}%s%%${CLRct}]\n" "$percntDWN"
+						printf "  ${GRNct}2${CLRct}. Upload [${SETTING}%s%%${CLRct}]\n\n" "$percntUPL"
+						printf "  ${GRNct}e${CLRct}. Go back\n\n"
 						printf "Choose an option:  "
-						read -r autobwthchoice
-						if [ "$autobwthchoice" = "e" ]; then
-							exitmenu="exit"
+						read -r autobwChoiceTH
+
+						if [ -z "$autobwChoiceTH" ] && \
+						   echo "$percntUPL" | grep -qE "^(0|[1-9][0-9]*)$" && \
+						   echo "$percntDWN" | grep -qE "^(0|[1-9][0-9]*)$" && \
+						   [ "$percntUPL" -ge 0 ] && [ "$percntUPL" -le 100 ] && \
+						   [ "$percntDWN" -ge 0 ] && [ "$percntDWN" -le 100 ]
+						then
+							exitLoop=true
 							break
-						elif ! Validate_Number "$autobwthchoice"; then
-							printf "\\n${ERR}Please enter a valid number (1-2)${CLEARFORMAT}\\n\\n"
-						else
-							if [ "$autobwthchoice" -lt 1 ] || [ "$autobwthchoice" -gt 2 ]; then
-								printf "\\n${ERR}Please enter a number between 1 and 2${CLEARFORMAT}\\n\\n"
-							else
-								if [ "$autobwthchoice" -eq 1 ]; then
-									updown="DOWN"
-									break
-								elif [ "$autobwthchoice" -eq 2 ]; then
-									updown="UP"
-									break
-								fi
-							fi
+						elif [ "$autobwChoiceTH" = "e" ]
+						then
+							exitLoop=true
+							break
+						elif ! Validate_Number "$autobwChoiceTH"
+						then
+							printf "\n${ERR}Please enter a valid number [1-2].${CLRct}\n\n"
+							PressEnter
+						elif [ "$autobwChoiceTH" -lt 1 ] || [ "$autobwChoiceTH" -gt 2 ]
+						then
+							printf "\n${ERR}Please enter a number between 1 and 2.${CLRct}\n\n"
+							PressEnter
+						elif [ "$autobwChoiceTH" -eq 1 ]
+						then
+							updownCFG="DOWN"
+							updownSTR="Download"
+							break
+						elif [ "$autobwChoiceTH" -eq 2 ]
+						then
+							updownCFG="UP"
+							updownSTR="Upload"
+							break
 						fi
 					done
-					
-					if [ "$exitmenu" != "exit" ]
+
+					if "$exitLoop"
+					then break
+					fi
+
+					printf "\n Enter percentage to use for ${GRNct}%s${CLRct} threshold [${GRNct}0-100${CLRct}]:  " "$updownSTR"
+					read -r autobwValueTH
+					if [ -z "$autobwValueTH" ] && \
+					   { { [ "$updownCFG" = "UP" ] && \
+					       echo "$percntUPL" | grep -qE "^(0|[1-9][0-9]*)$" && \
+					       [ "$percntUPL" -ge 0 ] && [ "$percntUPL" -le 100 ]
+					     } || \
+					     { [ "$updownCFG" = "DOWN" ] && \
+					       echo "$percntDWN" | grep -qE "^(0|[1-9][0-9]*)$" && \
+					       [ "$percntDWN" -ge 0 ] && [ "$percntDWN" -le 100 ]
+					     } ; }
 					then
-						while true
-						do
-							printf "\\n"
-							printf "Enter percentage to use for result threshold:  "
-							read -r autobwthvalue
-							if [ "$autobwthvalue" = "e" ]; then
-								exitmenu="exit"
-								break
-							elif ! Validate_Number "$autobwthvalue"; then
-								printf "\\n${ERR}Please enter a valid number (0-100)${CLEARFORMAT}\\n"
-							else
-								if [ "$autobwthvalue" -lt 0 ] || [ "$autobwthvalue" -gt 100 ]; then
-									printf "\\n${ERR}Please enter a number between 0 and 100${CLEARFORMAT}\\n"
-								else
-									thvalue="$autobwthvalue"
-									break
-								fi
-							fi
-						done
+						exitLoop=false
+					elif [ "$autobwValueTH" = "e" ]
+					then
+						exitLoop=true
+					elif ! Validate_Number "$autobwValueTH"
+					then
+						printf "\n${ERR}Please enter a valid number [0-100].${CLRct}\n\n"
+						PressEnter
+					elif [ "$autobwValueTH" -lt 0 ] || [ "$autobwValueTH" -gt 100 ]
+					then
+						printf "\n${ERR}Please enter a number between 0 and 100.${CLRct}\n\n"
+						PressEnter
+					else
+						percntVal="$autobwValueTH"
 					fi
-					
-					if [ "$exitmenu" != "exit" ]; then
-						AutoBWConf update THRESHOLD "$updown" "$thvalue"
-						break
+
+					if "$exitLoop"
+					then break
 					fi
-					
-					if [ "$exitmenu" = "exit" ]; then
-						break
+					if [ -n "$percntVal" ]
+					then
+						AutoBWConf update THRESHOLD "$updownCFG" "$percntVal"
 					fi
 				done
-				
-				printf "\\n"
-				PressEnter
+
+				if [ "$exitLoop" = "false" ]
+				then
+					echo ; PressEnter
+				fi
 			;;
 			6)
 				printf "\n"
@@ -5855,6 +6338,10 @@ Menu_AutoBW()
 			e)
 				break
 			;;
+			*)
+				_HandleInvalidMenuOption_
+				PressEnter
+			;;
 		esac
 	done
 }
@@ -5862,11 +6349,11 @@ Menu_AutoBW()
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
-Menu_AutoBW_Update()
+Menu_AutoBandWidth_Update()
 {
 	if [ "$(nvram get qos_enable)" -eq 0 ]
 	then
-		Print_Output true "QoS is not enabled, please enable this in the Asus WebUI." "$ERR"
+		Print_Output true "QoS is NOT enabled, please enable this in the Asus WebUI." "$ERR"
 		return 1
 	fi
 
