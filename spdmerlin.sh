@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2026-Jun-24
+# Last Modified: 2026-Jul-08
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.20"
-readonly SCRIPT_VERSTAG="26062400"
+readonly SCRIPT_VERSTAG="26070806"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -229,8 +229,25 @@ Clear_Lock()
 	return 0
 }
 
-Check_Swap(){
-	if [ "$(wc -l < /proc/swaps)" -ge 2 ]; then return 0; else return 1; fi
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-08] ##
+##-------------------------------------##
+_HasRouterMoreThan256MBtotalRAM_()
+{
+	local totalRAM_KB
+	totalRAM_KB="$(awk -F ' ' '/^MemTotal:/{print $2}' /proc/meminfo)"
+	if [ -n "$totalRAM_KB" ] && [ "$totalRAM_KB" -gt 262144 ]
+	then return 0
+	else return 1
+	fi
+}
+
+Check_Swap()
+{
+	if [ "$(wc -l < /proc/swaps)" -ge 2 ]
+	then return 0
+	else return 1
+	fi
 }
 
 ##----------------------------------------##
@@ -3232,7 +3249,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Oct-30] ##
+## Modified by Martinski W. [2026-Jul-08] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -3242,7 +3259,8 @@ Run_Speedtest()
 		opkg update
 		opkg install findutils
 	fi
-	if [ -n "$PPID" ]; then
+	if [ -n "$PPID" ]
+	then
 		ps | grep -v grep | grep -v $$ | grep -v "$PPID" | grep -i "$SCRIPT_NAME_LOWER" | grep generate | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
 	else
 		ps | grep -v grep | grep -v $$ | grep -i "$SCRIPT_NAME_LOWER" | grep generate | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
@@ -3311,37 +3329,45 @@ Run_Speedtest()
 	spdTestDBGFile="/tmp/${SCRIPT_NAME}.DEBUG.txt"
 	rm -f "$tmpfile" "$resultfile" "$spdTestLogFile"
 
-	if [ -n "$(pidof "$PROC_NAME")" ]; then
-		killall -q "$PROC_NAME"
+	if [ -n "$(pidof "$PROC_NAME")" ]
+	then killall -q "$PROC_NAME"
 	fi
 
-	if Check_Swap
+	if ! _HasRouterMoreThan256MBtotalRAM_ && ! Check_Swap
 	then
-		IFACELIST=""
-		if [ -z "$specificiface" ]
-		then
-			while IFS='' read -r line || [ -n "$line" ]
-			do
-				if [ "$(echo "$line" | grep -c "#")" -eq 0 ]; then
-					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				fi
-			done < "$SCRIPT_INTERFACES_USER"
-			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
-		elif [ "$specificiface" = "All" ]
-		then
-			while IFS='' read -r line || [ -n "$line" ]
-			do
-				if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]; then
-					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				fi
-			done < "$SCRIPT_INTERFACES_USER"
-			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
-		else
-			IFACELIST="$specificiface"
-		fi
+		echo 'var spdteststatus = "NoSwap";' > /tmp/detect_spdtest.js
+		Print_Output true "Total RAM is less than 512MB and SWAP file NOT detected. Exiting" "$CRIT"
+		Clear_Lock
+		return 1
+	fi
 
-		if [ "$IFACELIST" != "" ]
-		then
+	IFACELIST=""
+	if [ -z "$specificiface" ]
+	then
+			while IFS='' read -r line || [ -n "$line" ]
+			do
+				if [ "$(echo "$line" | grep -c "#")" -eq 0 ]
+				then
+					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
+				fi
+			done < "$SCRIPT_INTERFACES_USER"
+			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
+	elif [ "$specificiface" = "All" ]
+	then
+			while IFS='' read -r line || [ -n "$line" ]
+			do
+				if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
+				then
+					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
+				fi
+			done < "$SCRIPT_INTERFACES_USER"
+			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
+	else
+			IFACELIST="$specificiface"
+	fi
+
+	if [ -n "$IFACELIST" ]
+	then
 			stoppedQoS=false
 			if [ "$(ExcludeFromQoS check)" = "true" ]
 			then
@@ -3719,18 +3745,11 @@ Run_Speedtest()
 
 			rm -f "$tmpfile" /tmp/spdstatstitle.txt
 			Clear_Lock
-		else
+	else
 			echo 'var spdteststatus = "Error";' > /tmp/detect_spdtest.js
-			Print_Output true "No interfaces enabled, exiting" "$CRIT"
+			Print_Output true "No interfaces enabled. Exiting" "$CRIT"
 			Clear_Lock
 			return 1
-		fi
-		Clear_Lock
-	else
-		echo 'var spdteststatus = "NoSwap";' > /tmp/detect_spdtest.js
-		Print_Output true "Swap file not active, exiting" "$CRIT"
-		Clear_Lock
-		return 1
 	fi
 }
 
@@ -4817,9 +4836,12 @@ MainMenu()
 	MainMenu
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2026-Jul-08] ##
+##----------------------------------------##
 Check_Requirements()
 {
-	CHECKSFAILED="false"
+	local CHECKSFAILED=false
 
 	if [ "$(nvram get jffs2_scripts)" -ne 1 ]
 	then
@@ -4828,37 +4850,34 @@ Check_Requirements()
 		Print_Output true "Custom JFFS Scripts enabled" "$WARN"
 	fi
 
-	if ! Check_Swap
+	if ! _HasRouterMoreThan256MBtotalRAM_ && ! Check_Swap
 	then
-		Print_Output false "No Swap file detected!" "$ERR"
-		CHECKSFAILED="true"
+		Print_Output false "Total RAM is less than 512MB and SWAP file NOT detected!" "$ERR"
+		CHECKSFAILED=true
 	fi
 
 	if [ ! -f /opt/bin/opkg ]
 	then
 		Print_Output false "Entware NOT detected!" "$CRIT"
-		CHECKSFAILED="true"
+		CHECKSFAILED=true
 	fi
 
 	if ! Firmware_Version_Check
 	then
 		Print_Output false "Unsupported firmware version detected" "$CRIT"
 		Print_Output false "$SCRIPT_NAME requires Merlin 384.15/384.13_4 or Fork 43E5 (or later)" "$ERR"
-		CHECKSFAILED="true"
+		CHECKSFAILED=true
 	fi
 
-	if [ "$CHECKSFAILED" = "false" ]
-	then
-		Print_Output false "Installing required packages from Entware" "$PASS"
-		opkg update
-		opkg install sqlite3-cli
-		opkg install jq
-		opkg install p7zip
-		opkg install findutils
-		return 0
-	else
-		return 1
-	fi
+	"$CHECKSFAILED" && return 1
+
+	Print_Output false "Installing required packages from Entware" "$PASS"
+	opkg update
+	opkg install sqlite3-cli
+	opkg install jq
+	opkg install p7zip
+	opkg install findutils
+	return 0
 }
 
 ##----------------------------------------##
