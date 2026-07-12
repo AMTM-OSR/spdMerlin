@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2026-Jul-08
+# Last Modified: 2026-Jul-12
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.20"
-readonly SCRIPT_VERSTAG="26070806"
+readonly SCRIPT_VERSTAG="26071209"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -49,11 +49,21 @@ readonly SHARED_DIR="/jffs/addons/shared-jy"
 readonly SHARED_REPO="https://raw.githubusercontent.com/AMTM-OSR/shared-jy/master"
 readonly SHARED_WEB_DIR="$SCRIPT_WEBPAGE_DIR/shared-jy"
 readonly TEMP_MENU_TREE="/tmp/menuTree.js"
-
 readonly HOME_DIR="/home/root"
-readonly OOKLA_DIR="$SCRIPT_DIR/ookla"
-readonly OOKLA_LICENSE_DIR="$SCRIPT_DIR/ooklalicense"
-readonly OOKLA_HOME_DIR="$HOME_DIR/.config/ookla"
+
+# For F/W built-in Ookla CLI Speed Test Binaries #
+readonly BUILTIN_OOKLA_PROC="ookla"
+readonly BUILTIN_OOKLA_BINARY="/usr/sbin/$BUILTIN_OOKLA_PROC"
+readonly BUILTIN_OOKLA_CONFIG1="https://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
+readonly BUILTIN_OOKLA_CONFIG2="https://config.speedtest.net/v1/embed/4tiouex6gsnzq55o/config"
+
+# For external Ookla CLI Speed Test Binaries #
+readonly OOKLA_DIR="${SCRIPT_DIR}/ookla"
+readonly OOKLA_HOME_DIR="${HOME_DIR}/.config/ookla"
+readonly OOKLA_LICENSE_DIR="${SCRIPT_DIR}/ooklalicense"
+readonly EXTERNL_OOKLA_PROC="speedtest"
+readonly EXTERNL_OOKLA_BINARY="${OOKLA_DIR}/$EXTERNL_OOKLA_PROC"
+
 readonly FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 WGVPN4 WGVPN5"
 
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
@@ -74,6 +84,14 @@ readonly ENDIN_MenuAddOnsTag="/\*\*ENDIN:_AddOns_\*\*/"
 readonly branchxStr_TAG="[Branch: $SCRIPT_BRANCH]"
 readonly versionDev_TAG="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
 readonly versionMod_TAG="$SCRIPT_VERSION on $ROUTER_MODEL"
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-12] ##
+##-------------------------------------##
+readonly fwInstalledBaseVers="$(nvram get firmver | sed 's/\.//g')"
+readonly fwInstalledBuildVers="$(nvram get buildno)"
+readonly fwInstalledBuildLong="${fwInstalledBaseVers}.$fwInstalledBuildVers"
+readonly fwInstalledBuildShrt="${fwInstalledBaseVers}.$(echo "$fwInstalledBuildVers" | awk -F'.' '{print $1}')"
 
 # To support automatic script updates from AMTM #
 doScriptUpdateFromAMTM=true
@@ -106,7 +124,8 @@ unset LD_LIBRARY_PATH
 # Give priority to built-in binaries #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
 
-if [ "$(uname -m)" = "aarch64" ]; then
+if [ "$(uname -m)" = "aarch64" ]
+then
 	ARCH="aarch64"
 else
 	/bin/grep -Eq 'Features\s*:.*\s+v?fp\s+' /proc/cpuinfo && ARCH="arm" || ARCH="armel"
@@ -427,17 +446,53 @@ ScriptUpdateFromAMTM()
 ##-------------------------------------##
 ## Added by Martinski W. [2025-Jun-11] ##
 ##-------------------------------------##
-_GetSpeedtestBinaryVersion_()
+_GetExternalSpeedTestBinVersion_()
 {
-   if [ ! -x "$OOKLA_DIR/speedtest" ] ; then echo "[N/A]" ; return 1 ; fi
+   if [ ! -x "$EXTERNL_OOKLA_BINARY" ]
+   then echo "[N/A]" ; return 1
+   fi
    local verLine  verStr="[N/A]"
 
-   verLine="$("$OOKLA_DIR"/speedtest -V | grep -E '^Speedtest by Ookla [1-9]+[.].*')"
+   verLine="$($EXTERNL_OOKLA_BINARY -V | grep -E '^Speedtest by Ookla [1-9]+[.].*')"
    if [ -n "$verLine" ]
-   then
-       verStr="$(echo "$verLine" | awk -F ' ' '{print $4}')"
+   then verStr="$(echo "$verLine" | awk -F ' ' '{print $4}')"
    fi
    echo "$verStr"
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-12] ##
+##-------------------------------------##
+_GetBuiltInSpeedTestBinVersion_()
+{
+   if [ ! -x "$BUILTIN_OOKLA_BINARY" ]
+   then echo "[N/A]" ; return 1
+   fi
+   local verLine  verStr="[N/A]"
+
+   verLine="$($BUILTIN_OOKLA_BINARY -V | grep -E '^ookla [1-9]+[.].*')"
+   if [ -n "$verLine" ]
+   then verStr="$(echo "$verLine" | awk -F ' ' '{print $2}')"
+   fi
+   echo "$verStr"
+}
+
+_FWVersionStrToNum_()
+{ echo "$1" | awk -F '.' '{ printf ("%d%03d%02d%02d\n", $1,$2,$3,$4); }' ; }
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-12] ##
+##-------------------------------------##
+_GetBuiltInSpeedTestConfigURL_()
+{
+   local configURL="$BUILTIN_OOKLA_CONFIG1"
+
+   if [ "$fwInstalledBuildShrt" = "3006.102" ] && \
+       [ "$(_FWVersionStrToNum_ "$fwInstalledBuildLong")" -ge "$(_FWVersionStrToNum_ "3006.102.8")" ]
+   then
+       configURL="$BUILTIN_OOKLA_CONFIG2"
+   fi
+   echo "$configURL"
 }
 
 ##-------------------------------------##
@@ -454,21 +509,21 @@ Update_File()
 	if [ "$1" = "$ARCH.tar.gz" ]
 	then
 		tmpfile="/tmp/$1"
-		Download_File "$SCRIPT_REPO/$1" "$tmpfile"
+		Download_File "${SCRIPT_REPO}/$1" "$tmpfile"
 		tar -xzf "$tmpfile" -C "/tmp"
 		rm -f "$tmpfile"
-		localmd5="$(md5sum "$OOKLA_DIR/speedtest" | awk '{print $1}')"
+		localmd5="$(md5sum "$EXTERNL_OOKLA_BINARY" | awk '{print $1}')"
 		tmpmd5="$(md5sum /tmp/speedtest | awk '{print $1}')"
 		if [ "$localmd5" != "$tmpmd5" ]
 		then
-			rm -f "$OOKLA_DIR"/*
-			Download_File "$SCRIPT_REPO/$1" "$OOKLA_DIR/$1"
-			tar -xzf "$OOKLA_DIR/$1" -C "$OOKLA_DIR"
-			rm -f "$OOKLA_DIR/$1"
-			chmod 0755 "$OOKLA_DIR/speedtest"
-			chown "${theUserName}:root" "$OOKLA_DIR"/*
-			spdTestVer="$(_GetSpeedtestBinaryVersion_)"
-			Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
+			rm -f "${OOKLA_DIR}"/*
+			Download_File "${SCRIPT_REPO}/$1" "${OOKLA_DIR}/$1"
+			tar -xzf "${OOKLA_DIR}/$1" -C "$OOKLA_DIR"
+			rm -f "${OOKLA_DIR}/$1"
+			chmod 0755 "$EXTERNL_OOKLA_BINARY"
+			chown "${theUserName}:root" "${OOKLA_DIR}"/*
+			spdTestVer="$(_GetExternalSpeedTestBinVersion_)"
+			Print_Output true "Ookla Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 		fi
 		rm -f /tmp/speedtest*
 	elif [ "$1" = "spdstats_www.asp" ]
@@ -476,19 +531,19 @@ Update_File()
 		tmpfile="/tmp/$1"
 		if [ -f "$SCRIPT_DIR/$1" ]
 		then
-			Download_File "$SCRIPT_REPO/$1" "$tmpfile"
+			Download_File "${SCRIPT_REPO}/$1" "$tmpfile"
 			if ! diff -q "$tmpfile" "$SCRIPT_DIR/$1" >/dev/null 2>&1
 			then
 				Get_WebUI_Page "$SCRIPT_DIR/$1"
 				sed -i "\\~$MyWebPage~d" "$TEMP_MENU_TREE"
 				rm -f "$SCRIPT_WEBPAGE_DIR/$MyWebPage" 2>/dev/null
-				Download_File "$SCRIPT_REPO/$1" "$SCRIPT_DIR/$1"
+				Download_File "${SCRIPT_REPO}/$1" "$SCRIPT_DIR/$1"
 				Print_Output true "New version of $1 downloaded" "$PASS"
 				Mount_WebUI
 			fi
 			rm -f "$tmpfile"
 		else
-			Download_File "$SCRIPT_REPO/$1" "$SCRIPT_DIR/$1"
+			Download_File "${SCRIPT_REPO}/$1" "$SCRIPT_DIR/$1"
 			Print_Output true "New version of $1 downloaded" "$PASS"
 			Mount_WebUI
 		fi
@@ -1033,7 +1088,7 @@ Interfaces_FromSettings()
 ##-------------------------------------##
 _GetDefaultSpeedTestBinary_()
 {
-   if [ -f /usr/sbin/ookla ]
+   if [ -x "$BUILTIN_OOKLA_BINARY" ]
    then echo "builtin"
    else echo "external"
    fi
@@ -2125,21 +2180,21 @@ SpeedtestBinary()
 
 	case "$1" in
 		builtin)
-			if [ -f /usr/sbin/ookla ]
+			if [ -x "$BUILTIN_OOKLA_BINARY" ]
 			then
 			    sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=builtin/' "$SCRIPT_CONF"
 			else
 			    retCode=1
-			    Print_Output true "The built-in Speedtest binary is NOT found." "$ERR"
+			    Print_Output true "The F/W built-in Ookla speedtest binary is NOT found." "$ERR"
 			fi
 		;;
 		external)
-			if [ -f "$OOKLA_DIR/speedtest" ]
+			if [ -x "$EXTERNL_OOKLA_BINARY" ]
 			then
 			    sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=external/' "$SCRIPT_CONF"
 			else
 			    retCode=1
-			    Print_Output true "The external Speedtest binary is NOT found." "$ERR"
+			    Print_Output true "The external Ookla Speedtest binary is NOT found." "$ERR"
 			fi
 		;;
 		check)
@@ -2420,6 +2475,7 @@ WriteStats_ToJS()
 GenerateServerList()
 {
 	local serverMsgStr  maxServerCount  serverCount  serverIndx  COUNTER
+	local errorLogFile="/tmp/${SCRIPT_NAME}.DEBUG.Servers.LOG"
 
 	if [ ! -f /opt/bin/jq ] && [ -x /opt/bin/opkg ]
 	then
@@ -2430,31 +2486,36 @@ GenerateServerList()
 	then promptforservername=""
 	else promptforservername="$2"
 	fi
+    rm -f "$errorLogFile"
 
 	printf " Generating list of closest servers for ${GRNct}${1}${CLRct} interface.\n"
 	printf " Please wait...\n\n"
+
 	CONFIG_STRING=""
-	LICENSE_STRING="--accept-license --accept-gdpr"
+	LICENSE_STRING=""
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY="/usr/sbin/ookla"
+		SPEEDTEST_BINARY="$BUILTIN_OOKLA_BINARY"
+		CONFIG_STRING="-c $(_GetBuiltInSpeedTestConfigURL_)"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
+		SPEEDTEST_BINARY="$EXTERNL_OOKLA_BINARY"
+		LICENSE_STRING="--accept-license --accept-gdpr"
 	fi
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
-	then
-		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
-		LICENSE_STRING=""
-	fi
-	serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$1")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+
+	serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$1")" --servers --format="json" $LICENSE_STRING)" 2>"$errorLogFile"
 	if [ -z "$serverList" ]
 	then
-		Print_Output true "Error retrieving server list for $1 interface" "$CRIT"
+		Print_Output true "ERROR retrieving server list for $1 interface" "$CRIT"
 		serverNum="ERROR"
+		if [ -s "$errorLogFile" ]
+		then cat "$errorLogFile" ; echo
+		fi
+		rm -f "$errorLogFile"
 		return 1
 	fi
+
 	serverCount="$(echo "$serverList" | jq '.servers | length')"
 	COUNTER=1
 	until [ "$COUNTER" -gt "${serverCount:=0}" ]
@@ -2570,22 +2631,19 @@ GenerateServerList_WebUI()
 	serverlistfile="$2"
 	rm -f "/tmp/${serverlistfile}.txt"
 	rm -f "/tmp/${serverlistfile}.tmp"
-	rm -f "$SCRIPT_WEB_DIR/${serverlistfile}.htm"
+	rm -f "${SCRIPT_WEB_DIR}/${serverlistfile}.htm"
 
+	CONFIG_STRING=""
+	LICENSE_STRING=""
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY="/usr/sbin/ookla"
+		SPEEDTEST_BINARY="$BUILTIN_OOKLA_BINARY"
+		CONFIG_STRING="-c $(_GetBuiltInSpeedTestConfigURL_)"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
-	fi
-	CONFIG_STRING=""
-	LICENSE_STRING="--accept-license --accept-gdpr"
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
-	then
-		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
-		LICENSE_STRING=""
+		SPEEDTEST_BINARY="$EXTERNL_OOKLA_BINARY"
+		LICENSE_STRING="--accept-license --accept-gdpr"
 	fi
 
 	if [ ! -f /opt/bin/jq ] && [ -x /opt/bin/opkg ]
@@ -2618,7 +2676,7 @@ GenerateServerList_WebUI()
 			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$IFACE_NAME")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
 			if [ -z "$serverList" ]
 			then
-				Print_Output true "Error retrieving server list for $IFACE_NAME interface" "$CRIT"
+				Print_Output true "ERROR retrieving server list for $IFACE_NAME interface" "$CRIT"
 				{
 				   echo "0|**ERROR**: Unable to retrieve server list." ; echo "-----"
 				} >> "/tmp/${serverlistfile}.tmp"
@@ -2640,7 +2698,7 @@ GenerateServerList_WebUI()
 		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$spdifacename")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
 		if [ -z "$serverList" ]
 		then
-			Print_Output true "Error retrieving server list for $spdifacename interface" "$CRIT"
+			Print_Output true "ERROR retrieving server list for $spdifacename interface" "$CRIT"
 			serverCount=0
 		else
 			serverCount="$(echo "$serverList" | jq '.servers | length')"
@@ -3249,7 +3307,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2026-Jul-08] ##
+## Modified by Martinski W. [2026-Jul-12] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -3269,10 +3327,10 @@ Run_Speedtest()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	fi
 	Auto_Startup create 2>/dev/null
 	if AutomaticMode check
@@ -3303,24 +3361,21 @@ Run_Speedtest()
 	then verboseNUM=0
 	fi
 
+	PROC_NAME=""
 	CONFIG_STRING=""
-	LICENSE_STRING="--accept-license --accept-gdpr"
-	PROC_NAME="speedtest"
+	LICENSE_STRING=""
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY="/usr/sbin/ookla"
+		PROC_NAME="$BUILTIN_OOKLA_PROC"
+		SPEEDTEST_BINARY="$BUILTIN_OOKLA_BINARY"
+		CONFIG_STRING="-c $(_GetBuiltInSpeedTestConfigURL_)"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
+		PROC_NAME="$EXTERNL_OOKLA_PROC"
+		SPEEDTEST_BINARY="$EXTERNL_OOKLA_BINARY"
+		LICENSE_STRING="--accept-license --accept-gdpr"
 	fi
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
-	then
-		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
-		LICENSE_STRING=""
-		PROC_NAME="ookla"
-	fi
-
 	echo 'var spdteststatus = "InProgress";' > /tmp/detect_spdtest.js
 
 	tmpfile=/tmp/spd-stats.txt
@@ -3476,8 +3531,8 @@ Run_Speedtest()
 
 					if [ "$mode" = "auto" ]
 					then
-						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
-						"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
+						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME [$IFACE] interface. Please wait..." "$PASS"
+						("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$spdTestLogFile" &
 						sleep 2
 						speedTestSecs=0
 						while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
@@ -3486,16 +3541,18 @@ Run_Speedtest()
 						done
 						if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 						then
-							Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
+							Print_Output true "Speedtest for $IFACE_NAME [$IFACE] hung (> 2 mins), killing process" "$CRIT"
 							killall -q "$PROC_NAME"
-							if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+							if [ -s "$spdTestLogFile" ]
+							then cat "$spdTestLogFile" ; echo
+							fi
 							continue
 						fi
 					else
 						if [ "$speedtestServerIDx" -ne 0 ]
 						then
-							Print_Output true "Starting speedtest using $speedtestServerName for $IFACE_NAME interface. Please wait..." "$PASS"
-							"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
+							Print_Output true "Starting speedtest using $speedtestServerName for $IFACE_NAME [$IFACE] interface. Please wait..." "$PASS"
+							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$spdTestLogFile" &
 							sleep 2
 							speedTestSecs=0
 							while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
@@ -3504,14 +3561,16 @@ Run_Speedtest()
 							done
 							if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 							then
-								Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
+								Print_Output true "Speedtest for $IFACE_NAME [$IFACE] hung (> 2 mins), killing process" "$CRIT"
 								killall -q "$PROC_NAME"
-								if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+								if [ -s "$spdTestLogFile" ]
+								then cat "$spdTestLogFile" ; echo
+								fi
 								continue
 							fi
 						else
-							Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
-							"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
+							Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME [$IFACE] interface. Please wait..." "$PASS"
+							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$spdTestLogFile" &
 							sleep 2
 							speedTestSecs=0
 							while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
@@ -3520,9 +3579,11 @@ Run_Speedtest()
 							done
 							if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 							then
-								Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
+								Print_Output true "Speedtest for $IFACE_NAME [$IFACE] hung (> 2 mins), killing process" "$CRIT"
 								killall -q "$PROC_NAME"
-								if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+								if [ -s "$spdTestLogFile" ]
+								then cat "$spdTestLogFile" ; echo
+								fi
 								continue
 							fi
 						fi
@@ -3530,8 +3591,10 @@ Run_Speedtest()
 
 					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c 'FAILED' "$tmpfile")" -gt 0 ]
 					then
-						Print_Output true "ERROR running speedtest for $IFACE_NAME [No Results]" "$CRIT"
-						if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [$IFACE] [No Results]" "$CRIT"
+						if [ -s "$spdTestLogFile" ]
+						then cat "$spdTestLogFile" ; echo
+						fi
 						continue
 					fi
 
@@ -3548,7 +3611,7 @@ Run_Speedtest()
 					serverName="$(echo "$serverLine" | sed 's/^Server: *//' | sed 's/ *(id[: =]\+ [0-9]\+)$//')"
 					serverIDno="$(echo "$serverLine" | grep -Eo '[(]id(:| =)[[:blank:]]+[0-9]+[)]' | awk -F' ' '{print $NF}' | tr -d ')')"
 
-					## if-then-else block added to with ookla output when buffer bloat has been added to the human readable output ##
+					## if-then-else block added to with Ookla output when buffer bloat has been added to the human readable output ##
 					BUFFBLOAT="$(grep "Idle Latency:" "$tmpfile")"
 					if [ -n "$BUFFBLOAT" ]
 					then
@@ -3586,7 +3649,9 @@ Run_Speedtest()
 					then
 						cp -fp "$tmpfile" "$spdTestDBGFile"
 						Print_Output true "ERROR running speedtest for $IFACE_NAME [Empty or Bad Values]" "$CRIT"
-						if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+						if [ -s "$spdTestLogFile" ]
+						then cat "$spdTestLogFile" ; echo
+						fi
 						continue
 					fi
 
@@ -3847,16 +3912,16 @@ Process_Upgrade()
 {
 	local foundError  foundLocked  resultStr  doUpdateDB=false
 
-	if [ ! -f "$OOKLA_DIR/speedtest" ]
+	if [ ! -x "$EXTERNL_OOKLA_BINARY" ]
 	then
-		rm -f "$OOKLA_DIR"/*
-		Download_File "$SCRIPT_REPO/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
-		tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
-		rm -f "$OOKLA_DIR/$ARCH.tar.gz"
-		chmod 0755 "$OOKLA_DIR/speedtest"
-        chown "${theUserName}:root" "$OOKLA_DIR"/*
-		spdTestVer="$(_GetSpeedtestBinaryVersion_)"
-		Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
+		rm -f "${OOKLA_DIR}"/*
+		Download_File "${SCRIPT_REPO}/$ARCH.tar.gz" "${OOKLA_DIR}/$ARCH.tar.gz"
+		tar -xzf "${OOKLA_DIR}/$ARCH.tar.gz" -C "$OOKLA_DIR"
+		rm -f "${OOKLA_DIR}/$ARCH.tar.gz"
+		chmod 0755 "$EXTERNL_OOKLA_BINARY"
+        chown "${theUserName}:root" "${OOKLA_DIR}"/*
+		spdTestVer="$(_GetExternalSpeedTestBinVersion_)"
+		Print_Output true "Ookla Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 	fi
 	rm -f "$SCRIPT_STORAGE_DIR/spdjs.js"
 	rm -f "$SCRIPT_STORAGE_DIR/.tableupgraded"*
@@ -4482,17 +4547,23 @@ _HandleInvalidMenuOption_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2026-Jan-05] ##
+## Modified by Martinski W. [2026-Jul-12] ##
 ##----------------------------------------##
 _Menu_SpeedTestOptions_()
 {
-	local menuOption  exitMenu=false
+	local menuOption  exitMenu=false  speedTestBinaryType="[N/A]"
 	local OPTION_FOR_QOS  TEST_SCHED_LINE  TEST_SCHED_DAYS
 	local TEST_SCHED_MENU  CRON_SCHED_DAYS  CRON_SCHED_HOUR  CRON_SCHED_MINS
 
 	if [ "$(ExcludeFromQoS check)" = "true" ]
 	then OPTION_FOR_QOS="excluded from"
 	else OPTION_FOR_QOS="included in"
+	fi
+
+	if [ "$(SpeedtestBinary check)" = "builtin" ]
+	then speedTestBinaryType="F/W ${SETTING}built-in${CLRct} Ookla speedtest binary"
+	elif [ "$(SpeedtestBinary check)" = "external" ]
+	then speedTestBinaryType="${SETTING}external${CLRct} Ookla binary installed by $SCRIPT_NAME"
 	fi
 
 	TEST_SCHED_LINE="$(CronTestSchedule check)"
@@ -4512,7 +4583,7 @@ _Menu_SpeedTestOptions_()
 	printf "   ${GRNct}2${CLRct}. Set schedule for automatic speed tests\n"
 	printf "      Currently: ${SETTING}%s - %s${CLRct}\n\n" "$TEST_SCHED_MENU" "$TEST_SCHED_DAYS"
 	printf "   ${GRNct}3${CLRct}. Toggle between built-in Ookla speedtest and speedtest-cli\n"
-	printf "      Currently: ${SETTING}%s${CLRct} binary will be used for speed tests${CLRct}\n\n" "$(SpeedtestBinary check)"
+	printf "      [The ${speedTestBinaryType} will be used${CLRct}]\n\n"
 	printf "   ${GRNct}q${CLRct}. Toggle exclusion of %s speed tests from QoS\n" "$SCRIPT_NAME"
 	printf "      Currently: %s speed tests are ${SETTING}%s${CLRct} QoS\n\n" "$SCRIPT_NAME" "$OPTION_FOR_QOS"
 	printf "   ${GRNct}c${CLRct}. Customise list of interfaces for automatic speed tests\n"
@@ -4920,24 +4991,24 @@ Menu_Install()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	fi
 	Set_Version_Custom_Settings local "$SCRIPT_VERSION"
 	Set_Version_Custom_Settings server "$SCRIPT_VERSION"
 	ScriptStorageLocation load
 	Create_Symlinks
 
-	rm -f "$OOKLA_DIR"/*
-	Download_File "$SCRIPT_REPO/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
-	tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
-	rm -f "$OOKLA_DIR/$ARCH.tar.gz"
-	chmod 0755 "$OOKLA_DIR/speedtest"
-	chown "${theUserName}:root" "$OOKLA_DIR"/*
-	spdTestVer="$(_GetSpeedtestBinaryVersion_)"
-	Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
+	rm -f "${OOKLA_DIR}"/*
+	Download_File "${SCRIPT_REPO}/$ARCH.tar.gz" "${OOKLA_DIR}/$ARCH.tar.gz"
+	tar -xzf "${OOKLA_DIR}/$ARCH.tar.gz" -C "$OOKLA_DIR"
+	rm -f "${OOKLA_DIR}/$ARCH.tar.gz"
+	chmod 0755 "$EXTERNL_OOKLA_BINARY"
+	chown "${theUserName}:root" "${OOKLA_DIR}"/*
+	spdTestVer="$(_GetExternalSpeedTestBinVersion_)"
+	Print_Output true "Ookla Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 
 	Update_File README.md
 	Update_File spdstats_www.asp
@@ -5015,10 +5086,10 @@ Menu_Startup()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load true
 	Auto_Startup create 2>/dev/null
@@ -6603,21 +6674,20 @@ Menu_Uninstall()
 		ps | grep -v grep | grep -v $$ | grep -i "$SCRIPT_NAME_LOWER" | grep generate | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
 	fi
 
+	PROC_NAME=""
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY="/usr/sbin/ookla"
+		PROC_NAME="$BUILTIN_OOKLA_PROC"
+		SPEEDTEST_BINARY="$BUILTIN_OOKLA_BINARY"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
+		PROC_NAME="$EXTERNL_OOKLA_PROC"
+		SPEEDTEST_BINARY="$EXTERNL_OOKLA_BINARY"
 	fi
-	PROC_NAME="speedtest"
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
-	then
-		PROC_NAME="ookla"
-	fi
-	if [ -n "$(pidof "$PROC_NAME")" ]; then
-		killall -q "$PROC_NAME"
+
+	if [ -n "$(pidof "$PROC_NAME")" ]
+	then killall -q "$PROC_NAME"
 	fi
 	Print_Output true "Removing $SCRIPT_NAME..." "$PASS"
 	Auto_Startup delete 2>/dev/null
@@ -6850,10 +6920,10 @@ then
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load
 	Create_Symlinks
@@ -7034,10 +7104,10 @@ case "$1" in
 		Conf_Exists
 		if [ "$(SpeedtestBinary check)" = "builtin" ]
 		then
-			echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+			echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 		elif [ "$(SpeedtestBinary check)" = "external" ]
 		then
-			echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+			echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 		fi
 		ScriptStorageLocation load true
 		Create_Symlinks
