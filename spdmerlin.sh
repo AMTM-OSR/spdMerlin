@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2026-Jul-12
+# Last Modified: 2026-Jul-15
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.20"
-readonly SCRIPT_VERSTAG="26071209"
+readonly SCRIPT_VERSTAG="26071512"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -1644,6 +1644,30 @@ Auto_Cron()
 	esac
 }
 
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-15] ##
+##-------------------------------------##
+_Get_Interface_IPv4address_()
+{
+   if [ $# -eq 0 ] || [ -z "$1" ] || \
+      ! echo "$1" | grep -qE "^(wgc|tun1)[1-5]$"
+   then echo ; return 1
+   fi
+   local wgcRegExp="[[:blank:]]+inet[[:blank:]]+.*[[:blank:]]+global[[:blank:]]+${1}$"
+   local tunRegExp="[[:blank:]]+dev[[:blank:]]+${1}[[:blank:]]+proto[[:blank:]]+.*[[:blank:]]+src[[:blank:]]+"
+
+   if echo "$1" | grep -qE "^tun1[1-5]$"
+   then
+       ip route show | grep -E "$tunRegExp" | awk -F' ' '{print $NF}'
+       return 0
+   fi
+   if echo "$1" | grep -qE "^wgc[1-5]$"
+   then
+       ip addr show "$1" | grep -E "$wgcRegExp" | awk -F' ' '{print $2}' | awk -F'/' '{print $1}'
+       return 0
+   fi
+}
+
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Jun-27] ##
 ##----------------------------------------##
@@ -2470,11 +2494,12 @@ WriteStats_ToJS()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2026-Jan-05] ##
+## Modified by Martinski W. [2026-Jul-15] ##
 ##----------------------------------------##
 GenerateServerList()
 {
-	local serverMsgStr  maxServerCount  serverCount  serverIndx  COUNTER
+	local serverMsgStr  maxServerCount  serverCount  serverIndx
+	local IFACE_NAME  IFACE_LOWER  IFACE_IPv4A  COUNTER  serverList
 	local errorLogFile="/tmp/${SCRIPT_NAME}.DEBUG.Servers.LOG"
 
 	if [ ! -f /opt/bin/jq ] && [ -x /opt/bin/opkg ]
@@ -2486,11 +2511,16 @@ GenerateServerList()
 	then promptforservername=""
 	else promptforservername="$2"
 	fi
-    rm -f "$errorLogFile"
 
-	printf " Generating list of closest servers for ${GRNct}${1}${CLRct} interface.\n"
+	rm -f "$errorLogFile"
+	IFACE_NAME="$1"
+	IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
+	IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+
+	printf " Generating list of closest servers for ${GRNct}${IFACE_NAME} [$IFACE_LOWER]${CLRct} interface.\n"
 	printf " Please wait...\n\n"
 
+	serverList=""
 	CONFIG_STRING=""
 	LICENSE_STRING=""
 	SPEEDTEST_BINARY=""
@@ -2504,10 +2534,14 @@ GenerateServerList()
 		LICENSE_STRING="--accept-license --accept-gdpr"
 	fi
 
-	serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$1")" --servers --format="json" $LICENSE_STRING)" 2>"$errorLogFile"
+	serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE_LOWER" --servers --format="json" $LICENSE_STRING)" 2>"$errorLogFile"
+	if [ -z "$serverList" ] && [ -n "$IFACE_IPv4A" ]
+	then
+		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --ip="$IFACE_IPv4A" --servers --format="json" $LICENSE_STRING)" 2>"$errorLogFile"
+	fi
 	if [ -z "$serverList" ]
 	then
-		Print_Output true "ERROR retrieving server list for $1 interface" "$CRIT"
+		Print_Output true "ERROR retrieving server list for $IFACE_NAME [$IFACE_LOWER] interface" "$CRIT"
 		serverNum="ERROR"
 		if [ -s "$errorLogFile" ]
 		then cat "$errorLogFile" ; echo
@@ -2539,9 +2573,9 @@ GenerateServerList()
 
 	while true
 	do
-		printf "\n${BOLD}Select a %s from the list above [${GRNct}1-%d${CLRct}].${CLRct}" "$serverMsgStr" "$maxServerCount"
-		printf "\n${BOLD}Or press ${GRNct}C${CLRct} key to enter a known speed test server ID.${CLRct}"
-		printf "\n${BOLD}Enter answer:${CLRct}  "
+		printf "\n ${BOLD}Select a %s from the list above [${GRNct}1-%d${CLRct}].${CLRct}" "$serverMsgStr" "$maxServerCount"
+		printf "\n ${BOLD}Or press ${GRNct}C${CLRct} key to enter a known speed test server ID.${CLRct}"
+		printf "\n ${BOLD}Enter answer:${CLRct}  "
 		read -r serverIndx
 
 		if echo "$serverIndx" | grep -qE "^(e|E)$"
@@ -2557,7 +2591,7 @@ GenerateServerList()
 		then
 				while true
 				do
-					printf "\n${BOLD}Please enter server ID (WARNING: ID is NOT validated) or ${GRNct}e${CLRct} to go back.${CLRct}  "
+					printf "\n ${BOLD}Please enter server ID (${MGNTct}WARNING: ID is NOT validated${CLRct}) or ${GRNct}e${CLRct} to go back.${CLRct}  "
 					read -r customserver
 					if [ "$customserver" = "e" ]
 					then
@@ -2572,19 +2606,19 @@ GenerateServerList()
 						then
 							while true
 							do
-								printf "\n${BOLD}Would you like to enter a name for this server? (default: Custom) (y/n)?${CLRct}  "
+								printf "\n ${BOLD}Would you like to enter a name for this server? (default: Custom) (y/n)?${CLRct}  "
 								read -r servername_select
 								
-								if [ "$servername_select" = "n" ] || [ "$servername_select" = "N" ]
+								if echo "$servername_select" | grep -qE '^(n|N)$'
 								then
 									serverName="Custom"
 									break
-								elif [ "$servername_select" = "y" ] || [ "$servername_select" = "Y" ]
+								elif echo "$servername_select" | grep -qE '^(y|Y)$'
 								then
-									printf "\n${BOLD}Please enter the name for this server:${CLRct}  "
+									printf "\n ${BOLD}Please enter the name for this server:${CLRct}  "
 									read -r serverName
-									printf "\n${BOLD}%s${CLRct}\n" "$serverName"
-									printf "\n${BOLD}Is that correct (y/n)?${CLRct}  "
+									printf "\n ${BOLD}${GRNct}%s${CLRct}\n" "$serverName"
+									printf "\n ${BOLD}Is that correct (y/n)?${CLRct}  "
 									read -r servername_confirm
 									if [ "$servername_confirm" = "y" ] || \
 									   [ "$servername_confirm" = "Y" ]
@@ -2600,8 +2634,7 @@ GenerateServerList()
 						else
 							serverName="Custom"
 						fi
-						printf "\n"
-						return 0
+						echo ; return 0
 					fi
 				done
 		elif ! Validate_Number "$serverIndx"
@@ -2621,11 +2654,12 @@ GenerateServerList()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Oct-12] ##
+## Modified by Martinski W. [2026-Jul-15] ##
 ##----------------------------------------##
 GenerateServerList_WebUI()
 {
-	local setIFaceUserStatus=false
+	local setIFaceUserStatus=false  serverList
+	local IFACE_NAME  IFACE_LOWER  IFACE_IPv4A  COUNTER
 
 	spdifacename="$1"
 	serverlistfile="$2"
@@ -2633,6 +2667,7 @@ GenerateServerList_WebUI()
 	rm -f "/tmp/${serverlistfile}.tmp"
 	rm -f "${SCRIPT_WEB_DIR}/${serverlistfile}.htm"
 
+	serverList=""
 	CONFIG_STRING=""
 	LICENSE_STRING=""
 	SPEEDTEST_BINARY=""
@@ -2673,10 +2708,16 @@ GenerateServerList_WebUI()
 
 		for IFACE_NAME in $IFACELIST
 		do
-			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$IFACE_NAME")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+			IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
+			IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE_LOWER" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+			if [ -z "$serverList" ] && [ -n "$IFACE_IPv4A" ]
+			then
+				serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --ip="$IFACE_IPv4A" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+			fi
 			if [ -z "$serverList" ]
 			then
-				Print_Output true "ERROR retrieving server list for $IFACE_NAME interface" "$CRIT"
+				Print_Output true "ERROR retrieving server list for $IFACE_NAME [$IFACE_LOWER] interface" "$CRIT"
 				{
 				   echo "0|**ERROR**: Unable to retrieve server list." ; echo "-----"
 				} >> "/tmp/${serverlistfile}.tmp"
@@ -2695,10 +2736,16 @@ GenerateServerList_WebUI()
 			echo "-----" >> "/tmp/${serverlistfile}.tmp"
 		done
 	else
-		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$spdifacename")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+		IFACE_LOWER="$(Get_Interface_From_Name "$spdifacename" | tr 'A-Z' 'a-z')"
+		IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE_LOWER" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+		if [ -z "$serverList" ] && [ -n "$IFACE_IPv4A" ]
+		then
+			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --ip="$IFACE_IPv4A" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+		fi
 		if [ -z "$serverList" ]
 		then
-			Print_Output true "ERROR retrieving server list for $spdifacename interface" "$CRIT"
+			Print_Output true "ERROR retrieving server list for $spdifacename [$IFACE_LOWER] interface" "$CRIT"
 			serverCount=0
 		else
 			serverCount="$(echo "$serverList" | jq '.servers | length')"
@@ -3307,7 +3354,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2026-Jul-12] ##
+## Modified by Martinski W. [2026-Jul-15] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -3356,6 +3403,7 @@ Run_Speedtest()
 	local stoppedQoS  nvramQoSenable  nvramQoStype
 	local spdIndx  spdTestOK  verboseNUM  verboseARG
 	local serverLine  serverIDno
+	local IFACE_NAME  IFACE_LOWER  IFACE_IPv4A
 	verboseNUM="$(_GetConfigParam_ VERBOSE_TEST 0)"
 	if ! echo "$verboseNUM" | grep -qE "^[0-3]$"
 	then verboseNUM=0
@@ -3380,9 +3428,9 @@ Run_Speedtest()
 
 	tmpfile=/tmp/spd-stats.txt
 	resultfile=/tmp/spd-result.txt
-	spdTestLogFile="/tmp/${SCRIPT_NAME}.DEBUG.log"
+	errorLogFile="/tmp/${SCRIPT_NAME}.DEBUG.LOG"
 	spdTestDBGFile="/tmp/${SCRIPT_NAME}.DEBUG.txt"
-	rm -f "$tmpfile" "$resultfile" "$spdTestLogFile"
+	rm -f "$tmpfile" "$resultfile" "$errorLogFile"
 
 	if [ -n "$(pidof "$PROC_NAME")" ]
 	then killall -q "$PROC_NAME"
@@ -3395,6 +3443,15 @@ Run_Speedtest()
 		Clear_Lock
 		return 1
 	fi
+
+	_WaitForSpeedTestProcess_()
+	{
+		sleep 2 ; speedTestSecs=0
+		while [ -n "$(pidof "$PROC_NAME")" ] && \
+		      [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
+		do speedTestSecs="$((speedTestSecs + 1))" ; sleep 1
+		done
+	}
 
 	IFACELIST=""
 	if [ -z "$specificiface" ]
@@ -3474,9 +3531,7 @@ Run_Speedtest()
 
 			for IFACE_NAME in $IFACELIST
 			do
-				IFACE="$(Get_Interface_From_Name "$IFACE_NAME")"
-				IFACE_LOWER="$(echo "$IFACE" | tr "A-Z" "a-z")"
-
+				IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
 				interface_UP=false
 				if echo "$IFACE_NAME" | grep -q "^WGVPN"
 				then 
@@ -3489,9 +3544,10 @@ Run_Speedtest()
 
 				if ! "$interface_UP"
 				then
-					Print_Output true "$IFACE not up, please check. Skipping speedtest for $IFACE_NAME" "$WARN"
+					Print_Output true "$IFACE_LOWER is not up, please check. Skipping speedtest for $IFACE_NAME" "$WARN"
 					continue
 				else
+					IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
 					if [ "$mode" = "webui_user" ]; then
 						mode="user"
 					elif [ "$mode" = "webui_auto" ]; then
@@ -3527,62 +3583,65 @@ Run_Speedtest()
 					fi
 
 					echo 'var spdteststatus = "InProgress_'"$IFACE_NAME"'";' > /tmp/detect_spdtest.js
-					printf '' > "$tmpfile"
+					printf '' > "$tmpfile" ; printf '' > "$errorLogFile"
 
 					if [ "$mode" = "auto" ]
 					then
-						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME [$IFACE] interface. Please wait..." "$PASS"
-						("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$spdTestLogFile" &
-						sleep 2
-						speedTestSecs=0
-						while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
-						do
-							speedTestSecs="$((speedTestSecs + 1))" ; sleep 1
-						done
+						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME [$IFACE_LOWER] interface. Please wait..." "$PASS"
+						("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE_LOWER" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+						_WaitForSpeedTestProcess_
+
+						if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
+						   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
+						then
+							: ##*TBD*##
+						fi
 						if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 						then
-							Print_Output true "Speedtest for $IFACE_NAME [$IFACE] hung (> 2 mins), killing process" "$CRIT"
+							Print_Output true "Speedtest for $IFACE_NAME [$IFACE_LOWER] hung (> 2 mins), killing process" "$CRIT"
 							killall -q "$PROC_NAME"
-							if [ -s "$spdTestLogFile" ]
-							then cat "$spdTestLogFile" ; echo
+							if [ -s "$errorLogFile" ]
+							then cat "$errorLogFile" ; echo
 							fi
 							continue
 						fi
 					else
 						if [ "$speedtestServerIDx" -ne 0 ]
 						then
-							Print_Output true "Starting speedtest using $speedtestServerName for $IFACE_NAME [$IFACE] interface. Please wait..." "$PASS"
-							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$spdTestLogFile" &
-							sleep 2
-							speedTestSecs=0
-							while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
-							do
-								speedTestSecs="$((speedTestSecs + 1))" ; sleep 1
-							done
+							Print_Output true "Starting speedtest using $speedtestServerName for $IFACE_NAME [$IFACE_LOWER] interface. Please wait..." "$PASS"
+							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE_LOWER" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+							_WaitForSpeedTestProcess_
+
+							if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
+							   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
+							then
+								: ##*TBD*##
+							fi
 							if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 							then
-								Print_Output true "Speedtest for $IFACE_NAME [$IFACE] hung (> 2 mins), killing process" "$CRIT"
+								Print_Output true "Speedtest for $IFACE_NAME [$IFACE_LOWER] hung (> 2 mins), killing process" "$CRIT"
 								killall -q "$PROC_NAME"
-								if [ -s "$spdTestLogFile" ]
-								then cat "$spdTestLogFile" ; echo
+								if [ -s "$errorLogFile" ]
+								then cat "$errorLogFile" ; echo
 								fi
 								continue
 							fi
 						else
-							Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME [$IFACE] interface. Please wait..." "$PASS"
-							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$spdTestLogFile" &
-							sleep 2
-							speedTestSecs=0
-							while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
-							do
-								speedTestSecs="$((speedTestSecs + 1))" ; sleep 1
-							done
+							Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME [$IFACE_LOWER] interface. Please wait..." "$PASS"
+							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE_LOWER" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+							_WaitForSpeedTestProcess_
+
+							if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
+							   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
+							then
+								: ##*TBD*##
+							fi
 							if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 							then
-								Print_Output true "Speedtest for $IFACE_NAME [$IFACE] hung (> 2 mins), killing process" "$CRIT"
+								Print_Output true "Speedtest for $IFACE_NAME [$IFACE_LOWER] hung (> 2 mins), killing process" "$CRIT"
 								killall -q "$PROC_NAME"
-								if [ -s "$spdTestLogFile" ]
-								then cat "$spdTestLogFile" ; echo
+								if [ -s "$errorLogFile" ]
+								then cat "$errorLogFile" ; echo
 								fi
 								continue
 							fi
@@ -3591,9 +3650,9 @@ Run_Speedtest()
 
 					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c 'FAILED' "$tmpfile")" -gt 0 ]
 					then
-						Print_Output true "ERROR running speedtest for $IFACE_NAME [$IFACE] [No Results]" "$CRIT"
-						if [ -s "$spdTestLogFile" ]
-						then cat "$spdTestLogFile" ; echo
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [$IFACE_LOWER] [No Results]" "$CRIT"
+						if [ -s "$errorLogFile" ]
+						then cat "$errorLogFile" ; echo
 						fi
 						continue
 					fi
@@ -3648,9 +3707,9 @@ Run_Speedtest()
 					   [ -z "$datadownload" ] || [ -z "$dataupload" ]
 					then
 						cp -fp "$tmpfile" "$spdTestDBGFile"
-						Print_Output true "ERROR running speedtest for $IFACE_NAME [Empty or Bad Values]" "$CRIT"
-						if [ -s "$spdTestLogFile" ]
-						then cat "$spdTestLogFile" ; echo
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [$IFACE_LOWER] [Empty or Bad Values]" "$CRIT"
+						if [ -s "$errorLogFile" ]
+						then cat "$errorLogFile" ; echo
 						fi
 						continue
 					fi
@@ -4077,7 +4136,6 @@ Process_Upgrade()
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
-#$1 IFACE Name
 Generate_LastXResults()
 {
 	local foundError  foundLocked  resultStr  sqlProcSuccess
@@ -5133,25 +5191,28 @@ _Reset_Interface_States_()
 ##----------------------------------------##
 Menu_RunSpeedtest()
 {
-	exitmenu=""
-	validselection=""
-	useiface=""
-	usepreferred=""
-	ScriptHeader
+	local exitmenu=""  validSelection=false  ifaceCountMAX=0
+	local useiface=""  usepreferred=""  iface_choice  ifaceID
+
 	while true
 	do
-		printf "Choose an interface to speedtest:\n\n"
-		printf "1.    All\n"
-		COUNTER="2"
-		while IFS='' read -r line || [ -n "$line" ]
+		ScriptHeader
+		printf " Choose an interface to run a speed test:\n\n"
+		printf "  ${GRNct}1${CLRct})  All\n"
+		COUNTER=2
+		while IFS='' read -r theLINE || [ -n "$theLINE" ]
 		do
-			if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
+			if [ "$(echo "$theLINE" | grep -c "interface not up")" -eq 0 ]
 			then
-				printf "%s.    %s\n" "$COUNTER" "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				COUNTER="$((COUNTER+1))"
+				ifaceID="$(echo "$theLINE" | cut -d'#' -f1 | sed 's/ *$//')"
+				printf " ${GRNct}%2d${CLRct})  %s\n" "$COUNTER" "$ifaceID"
+				COUNTER="$((COUNTER + 1))"
 			fi
 		done < "$SCRIPT_INTERFACES_USER"
-		printf "\nChoose an option (e=Exit):  "
+		printf "\n  ${GRNct}e${CLRct})  Return to Main Menu\n"
+		ifaceCountMAX="$((COUNTER - 1))"
+
+		printf "\n Choose an option:  "
 		read -r iface_choice
 
 		if [ "$iface_choice" = "e" ]
@@ -5160,34 +5221,37 @@ Menu_RunSpeedtest()
 			break
 		elif ! Validate_Number "$iface_choice"
 		then
-			printf "\n${ERR}Please enter a valid number [1-%s].${CLEARFORMAT}\n" "$((COUNTER-1))"
-			validselection="false"
+			validSelection=false
+			printf "\n${ERR}Please enter a valid number [1-%s].${CLRct}\n" "$ifaceCountMAX"
+			PressEnter ; continue
 		else
-			if [ "$iface_choice" -lt 1 ] || [ "$iface_choice" -gt "$((COUNTER-1))" ]
+			if [ "$iface_choice" -lt 1 ] || [ "$iface_choice" -gt "$ifaceCountMAX" ]
 			then
-				printf "\n${ERR}Please enter a number between 1 and %s.${CLEARFORMAT}\n" "$((COUNTER-1))"
-				validselection="false"
+				validSelection=false
+				printf "\n${ERR}Please enter a number between 1 and %s.${CLRct}\n" "$ifaceCountMAX"
+				PressEnter ; continue
 			else
-				if [ "$iface_choice" -gt "1" ]
+				if [ "$iface_choice" -gt 1 ]
 				then
 					useiface="$(grep -v "interface not up" "$SCRIPT_INTERFACES_USER" | sed -n $((iface_choice-1))p | cut -f1 -d"#" | sed 's/ *$//')"
 				else
 					useiface="All"
 				fi
-				validselection="true"
+				validSelection=true
 			fi
 		fi
-		printf "\n"
+		echo
 
-		if [ "$exitmenu" != "exit" ] && [ "$validselection" != "false" ]
+		if [ "$exitmenu" != "exit" ] && "$validSelection"
 		then
 			while true
 			do
-				printf "What mode would you like to use?\n\n"
-				printf "1.    Auto-select\n"
-				printf "2.    Preferred server\n"
-				printf "3.    Choose a server\n"
-				printf "\nChoose an option (e=Exit):  "
+				printf "\n What mode would you like to use?\n\n"
+				printf "  ${GRNct}1${CLRct}.  Auto-select\n"
+				printf "  ${GRNct}2${CLRct}.  Preferred server\n"
+				printf "  ${GRNct}3${CLRct}.  Choose a server\n\n"
+				printf "  ${GRNct}e${CLRct}.  Return to Main Menu\n"
+				printf "\n Choose an option:  "
 				read -r usepref_choice
 
 				if [ "$usepref_choice" = "e" ]
@@ -5196,42 +5260,47 @@ Menu_RunSpeedtest()
 					break
 				elif ! Validate_Number "$usepref_choice"
 				then
-					printf "\n${ERR}Please enter a valid number [1-3].${CLEARFORMAT}\n"
-					validselection="false" ; echo
+					validSelection=false
+					printf "\n${ERR}Please enter a valid number [1-3].${CLRct}\n"
+					PressEnter ; echo
 				else
 					if [ "$usepref_choice" -lt 1 ] || [ "$usepref_choice" -gt 3 ]
 					then
-						printf "\n${ERR}Please enter a number between 1 and 3.${CLEARFORMAT}\n"
-						validselection="false" ; echo
+						validSelection=false
+						printf "\n${ERR}Please enter a number between 1 and 3.${CLRct}\n"
+						PressEnter ; echo
 					else
 						case "$usepref_choice" in
 							1) usepreferred="auto" ;;
 							2) usepreferred="user" ;;
 							3) usepreferred="onetime" ;;
 						esac
-						validselection="true" ; echo
+						validSelection=true ; echo
 						break
 					fi
 				fi
 			done
 		fi
-		if [ "$exitmenu" != "exit" ] && [ "$validselection" != "false" ]
+
+		if [ "$exitmenu" = "exit" ]
+		then break ; fi
+
+		if "$validSelection"
 		then
-			if Check_Lock menu; then
+			if Check_Lock menu
+			then
 				Run_Speedtest "$usepreferred" "$useiface"
 				Clear_Lock
 			fi
-		elif [ "$exitmenu" = "exit" ]; then
-			break
 		fi
-		printf "\n"
-		PressEnter
-		ScriptHeader
+		echo ; PressEnter
 	done
 
 	if [ "$exitmenu" != "exit" ]
-    then return 0
-	else echo ; return 1
+    then
+		return 0
+	else
+		echo ; return 1
 	fi
 }
 
