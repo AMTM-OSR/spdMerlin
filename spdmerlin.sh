@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2026-Jul-15
+# Last Modified: 2026-Aug-09
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -39,7 +39,7 @@
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
 readonly SCRIPT_VERSION="v4.4.20"
-readonly SCRIPT_VERSTAG="26071512"
+readonly SCRIPT_VERSTAG="26080922"
 SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
@@ -1653,17 +1653,17 @@ _Get_Interface_IPv4address_()
       ! echo "$1" | grep -qE "^(wgc|tun1)[1-5]$"
    then echo ; return 1
    fi
-   local wgcRegExp="[[:blank:]]+inet[[:blank:]]+.*[[:blank:]]+global[[:blank:]]+${1}$"
-   local tunRegExp="[[:blank:]]+dev[[:blank:]]+${1}[[:blank:]]+proto[[:blank:]]+.*[[:blank:]]+src[[:blank:]]+"
+   local addrRegExp="[[:blank:]]+inet[[:blank:]]+.*[[:blank:]]+global[[:blank:]]+${1}$"
+   local routRegExp="[[:blank:]]+dev[[:blank:]]+${1}[[:blank:]]+proto[[:blank:]]+.*[[:blank:]]+src[[:blank:]]+"
 
    if echo "$1" | grep -qE "^tun1[1-5]$"
    then
-       ip route show | grep -E "$tunRegExp" | awk -F' ' '{print $NF}'
+       ip route show | grep -E "$routRegExp" | awk -F' ' '{print $NF}'
        return 0
    fi
    if echo "$1" | grep -qE "^wgc[1-5]$"
    then
-       ip addr show "$1" | grep -E "$wgcRegExp" | awk -F' ' '{print $2}' | awk -F'/' '{print $1}'
+       ip addr show "$1" | grep -E "$addrRegExp" | awk -F' ' '{print $2}' | awk -F'/' '{print $1}'
        return 0
    fi
 }
@@ -1684,9 +1684,9 @@ Get_Interface_From_Name()
 			elif [ "$wanProto" = "l2tp" ] || \
 			     [ "$wanProto" = "pptp" ] || \
 			     [ "$wanProto" = "pppoe" ]
-			then
+			then  #(e.g. 'ppp0')#
 				IFACEname="$(nvram get "${wanPrefix}_pppoe_ifname")"
-			else
+			else  #(e.g. 'eth0')#
 				IFACEname="$(nvram get "${wanPrefix}_ifname")"
 			fi
 		;;
@@ -2515,7 +2515,8 @@ GenerateServerList()
 	rm -f "$errorLogFile"
 	IFACE_NAME="$1"
 	IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
-	IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+	IFACE_IPv4A=""  ##DO NOT SET##
+	##OFF## IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
 
 	printf " Generating list of closest servers for ${GRNct}${IFACE_NAME} [$IFACE_LOWER]${CLRct} interface.\n"
 	printf " Please wait...\n\n"
@@ -2709,7 +2710,8 @@ GenerateServerList_WebUI()
 		for IFACE_NAME in $IFACELIST
 		do
 			IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
-			IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+			IFACE_IPv4A=""  ##DO NOT SET##
+			##OFF## IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
 			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE_LOWER" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
 			if [ -z "$serverList" ] && [ -n "$IFACE_IPv4A" ]
 			then
@@ -2737,7 +2739,8 @@ GenerateServerList_WebUI()
 		done
 	else
 		IFACE_LOWER="$(Get_Interface_From_Name "$spdifacename" | tr 'A-Z' 'a-z')"
-		IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+		IFACE_IPv4A=""  ##DO NOT SET##
+		##OFF## IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
 		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE_LOWER" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
 		if [ -z "$serverList" ] && [ -n "$IFACE_IPv4A" ]
 		then
@@ -3547,7 +3550,8 @@ Run_Speedtest()
 					Print_Output true "$IFACE_LOWER is not up, please check. Skipping speedtest for $IFACE_NAME" "$WARN"
 					continue
 				else
-					IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+					IFACE_IPv4A=""  ##DO NOT SET##
+					##OFF## IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
 					if [ "$mode" = "webui_user" ]; then
 						mode="user"
 					elif [ "$mode" = "webui_auto" ]; then
@@ -3594,7 +3598,9 @@ Run_Speedtest()
 						if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
 						   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
 						then
-							: ##*TBD*##
+							printf '' > "$errorLogFile"
+							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --ip="$IFACE_IPv4A" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+							_WaitForSpeedTestProcess_
 						fi
 						if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 						then
@@ -3615,7 +3621,9 @@ Run_Speedtest()
 							if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
 							   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
 							then
-								: ##*TBD*##
+								printf '' > "$errorLogFile"
+								("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --ip="$IFACE_IPv4A" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+								_WaitForSpeedTestProcess_
 							fi
 							if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 							then
@@ -3634,7 +3642,9 @@ Run_Speedtest()
 							if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
 							   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
 							then
-								: ##*TBD*##
+								printf '' > "$errorLogFile"
+								("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --ip="$IFACE_IPv4A" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+								_WaitForSpeedTestProcess_
 							fi
 							if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 							then
