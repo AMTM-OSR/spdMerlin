@@ -14,7 +14,7 @@
 ##     Forked from https://github.com/jackyaz/spdMerlin     ##
 ##                                                          ##
 ##############################################################
-# Last Modified: 2026-Apr-11
+# Last Modified: 2026-Aug-09
 #-------------------------------------------------------------
 
 ##############        Shellcheck directives      #############
@@ -38,9 +38,9 @@
 ### Start of script variables ###
 readonly SCRIPT_NAME="spdMerlin"
 readonly SCRIPT_NAME_LOWER="$(echo "$SCRIPT_NAME" | tr 'A-Z' 'a-z')"
-readonly SCRIPT_VERSION="v4.4.19"
-readonly SCRIPT_VERSTAG="26041103"
-SCRIPT_BRANCH="master"
+readonly SCRIPT_VERSION="v4.4.20"
+readonly SCRIPT_VERSTAG="26080922"
+SCRIPT_BRANCH="develop"
 SCRIPT_REPO="https://raw.githubusercontent.com/AMTM-OSR/$SCRIPT_NAME/$SCRIPT_BRANCH"
 readonly SCRIPT_DIR="/jffs/addons/$SCRIPT_NAME_LOWER.d"
 readonly SCRIPT_WEBPAGE_DIR="$(readlink -f /www/user)"
@@ -49,11 +49,21 @@ readonly SHARED_DIR="/jffs/addons/shared-jy"
 readonly SHARED_REPO="https://raw.githubusercontent.com/AMTM-OSR/shared-jy/master"
 readonly SHARED_WEB_DIR="$SCRIPT_WEBPAGE_DIR/shared-jy"
 readonly TEMP_MENU_TREE="/tmp/menuTree.js"
-
 readonly HOME_DIR="/home/root"
-readonly OOKLA_DIR="$SCRIPT_DIR/ookla"
-readonly OOKLA_LICENSE_DIR="$SCRIPT_DIR/ooklalicense"
-readonly OOKLA_HOME_DIR="$HOME_DIR/.config/ookla"
+
+# For F/W built-in Ookla CLI Speed Test Binaries #
+readonly BUILTIN_OOKLA_PROC="ookla"
+readonly BUILTIN_OOKLA_BINARY="/usr/sbin/$BUILTIN_OOKLA_PROC"
+readonly BUILTIN_OOKLA_CONFIG1="https://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
+readonly BUILTIN_OOKLA_CONFIG2="https://config.speedtest.net/v1/embed/4tiouex6gsnzq55o/config"
+
+# For external Ookla CLI Speed Test Binaries #
+readonly OOKLA_DIR="${SCRIPT_DIR}/ookla"
+readonly OOKLA_HOME_DIR="${HOME_DIR}/.config/ookla"
+readonly OOKLA_LICENSE_DIR="${SCRIPT_DIR}/ooklalicense"
+readonly EXTERNL_OOKLA_PROC="speedtest"
+readonly EXTERNL_OOKLA_BINARY="${OOKLA_DIR}/$EXTERNL_OOKLA_PROC"
+
 readonly FULL_IFACELIST="WAN VPNC1 VPNC2 VPNC3 VPNC4 VPNC5 WGVPN1 WGVPN2 WGVPN3 WGVPN4 WGVPN5"
 
 [ -z "$(nvram get odmpid)" ] && ROUTER_MODEL="$(nvram get productid)" || ROUTER_MODEL="$(nvram get odmpid)"
@@ -74,6 +84,14 @@ readonly ENDIN_MenuAddOnsTag="/\*\*ENDIN:_AddOns_\*\*/"
 readonly branchxStr_TAG="[Branch: $SCRIPT_BRANCH]"
 readonly versionDev_TAG="${SCRIPT_VERSION}_${SCRIPT_VERSTAG}"
 readonly versionMod_TAG="$SCRIPT_VERSION on $ROUTER_MODEL"
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-12] ##
+##-------------------------------------##
+readonly fwInstalledBaseVers="$(nvram get firmver | sed 's/\.//g')"
+readonly fwInstalledBuildVers="$(nvram get buildno)"
+readonly fwInstalledBuildLong="${fwInstalledBaseVers}.$fwInstalledBuildVers"
+readonly fwInstalledBuildShrt="${fwInstalledBaseVers}.$(echo "$fwInstalledBuildVers" | awk -F'.' '{print $1}')"
 
 # To support automatic script updates from AMTM #
 doScriptUpdateFromAMTM=true
@@ -106,7 +124,8 @@ unset LD_LIBRARY_PATH
 # Give priority to built-in binaries #
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:$PATH"
 
-if [ "$(uname -m)" = "aarch64" ]; then
+if [ "$(uname -m)" = "aarch64" ]
+then
 	ARCH="aarch64"
 else
 	/bin/grep -Eq 'Features\s*:.*\s+v?fp\s+' /proc/cpuinfo && ARCH="arm" || ARCH="armel"
@@ -229,8 +248,25 @@ Clear_Lock()
 	return 0
 }
 
-Check_Swap(){
-	if [ "$(wc -l < /proc/swaps)" -ge 2 ]; then return 0; else return 1; fi
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-08] ##
+##-------------------------------------##
+_HasRouterMoreThan256MBtotalRAM_()
+{
+	local totalRAM_KB
+	totalRAM_KB="$(awk -F ' ' '/^MemTotal:/{print $2}' /proc/meminfo)"
+	if [ -n "$totalRAM_KB" ] && [ "$totalRAM_KB" -gt 262144 ]
+	then return 0
+	else return 1
+	fi
+}
+
+Check_Swap()
+{
+	if [ "$(wc -l < /proc/swaps)" -ge 2 ]
+	then return 0
+	else return 1
+	fi
 }
 
 ##----------------------------------------##
@@ -410,17 +446,53 @@ ScriptUpdateFromAMTM()
 ##-------------------------------------##
 ## Added by Martinski W. [2025-Jun-11] ##
 ##-------------------------------------##
-_GetSpeedtestBinaryVersion_()
+_GetExternalSpeedTestBinVersion_()
 {
-   if [ ! -x "$OOKLA_DIR/speedtest" ] ; then echo "[N/A]" ; return 1 ; fi
+   if [ ! -x "$EXTERNL_OOKLA_BINARY" ]
+   then echo "[N/A]" ; return 1
+   fi
    local verLine  verStr="[N/A]"
 
-   verLine="$("$OOKLA_DIR"/speedtest -V | grep -E '^Speedtest by Ookla [1-9]+[.].*')"
+   verLine="$($EXTERNL_OOKLA_BINARY -V | grep -E '^Speedtest by Ookla [1-9]+[.].*')"
    if [ -n "$verLine" ]
-   then
-       verStr="$(echo "$verLine" | awk -F ' ' '{print $4}')"
+   then verStr="$(echo "$verLine" | awk -F ' ' '{print $4}')"
    fi
    echo "$verStr"
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-12] ##
+##-------------------------------------##
+_GetBuiltInSpeedTestBinVersion_()
+{
+   if [ ! -x "$BUILTIN_OOKLA_BINARY" ]
+   then echo "[N/A]" ; return 1
+   fi
+   local verLine  verStr="[N/A]"
+
+   verLine="$($BUILTIN_OOKLA_BINARY -V | grep -E '^ookla [1-9]+[.].*')"
+   if [ -n "$verLine" ]
+   then verStr="$(echo "$verLine" | awk -F ' ' '{print $2}')"
+   fi
+   echo "$verStr"
+}
+
+_FWVersionStrToNum_()
+{ echo "$1" | awk -F '.' '{ printf ("%d%03d%02d%02d\n", $1,$2,$3,$4); }' ; }
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-12] ##
+##-------------------------------------##
+_GetBuiltInSpeedTestConfigURL_()
+{
+   local configURL="$BUILTIN_OOKLA_CONFIG1"
+
+   if [ "$fwInstalledBuildShrt" = "3006.102" ] && \
+       [ "$(_FWVersionStrToNum_ "$fwInstalledBuildLong")" -ge "$(_FWVersionStrToNum_ "3006.102.8")" ]
+   then
+       configURL="$BUILTIN_OOKLA_CONFIG2"
+   fi
+   echo "$configURL"
 }
 
 ##-------------------------------------##
@@ -437,21 +509,21 @@ Update_File()
 	if [ "$1" = "$ARCH.tar.gz" ]
 	then
 		tmpfile="/tmp/$1"
-		Download_File "$SCRIPT_REPO/$1" "$tmpfile"
+		Download_File "${SCRIPT_REPO}/$1" "$tmpfile"
 		tar -xzf "$tmpfile" -C "/tmp"
 		rm -f "$tmpfile"
-		localmd5="$(md5sum "$OOKLA_DIR/speedtest" | awk '{print $1}')"
+		localmd5="$(md5sum "$EXTERNL_OOKLA_BINARY" | awk '{print $1}')"
 		tmpmd5="$(md5sum /tmp/speedtest | awk '{print $1}')"
 		if [ "$localmd5" != "$tmpmd5" ]
 		then
-			rm -f "$OOKLA_DIR"/*
-			Download_File "$SCRIPT_REPO/$1" "$OOKLA_DIR/$1"
-			tar -xzf "$OOKLA_DIR/$1" -C "$OOKLA_DIR"
-			rm -f "$OOKLA_DIR/$1"
-			chmod 0755 "$OOKLA_DIR/speedtest"
-			chown "${theUserName}:root" "$OOKLA_DIR"/*
-			spdTestVer="$(_GetSpeedtestBinaryVersion_)"
-			Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
+			rm -f "${OOKLA_DIR}"/*
+			Download_File "${SCRIPT_REPO}/$1" "${OOKLA_DIR}/$1"
+			tar -xzf "${OOKLA_DIR}/$1" -C "$OOKLA_DIR"
+			rm -f "${OOKLA_DIR}/$1"
+			chmod 0755 "$EXTERNL_OOKLA_BINARY"
+			chown "${theUserName}:root" "${OOKLA_DIR}"/*
+			spdTestVer="$(_GetExternalSpeedTestBinVersion_)"
+			Print_Output true "Ookla Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 		fi
 		rm -f /tmp/speedtest*
 	elif [ "$1" = "spdstats_www.asp" ]
@@ -459,19 +531,19 @@ Update_File()
 		tmpfile="/tmp/$1"
 		if [ -f "$SCRIPT_DIR/$1" ]
 		then
-			Download_File "$SCRIPT_REPO/$1" "$tmpfile"
+			Download_File "${SCRIPT_REPO}/$1" "$tmpfile"
 			if ! diff -q "$tmpfile" "$SCRIPT_DIR/$1" >/dev/null 2>&1
 			then
 				Get_WebUI_Page "$SCRIPT_DIR/$1"
 				sed -i "\\~$MyWebPage~d" "$TEMP_MENU_TREE"
 				rm -f "$SCRIPT_WEBPAGE_DIR/$MyWebPage" 2>/dev/null
-				Download_File "$SCRIPT_REPO/$1" "$SCRIPT_DIR/$1"
+				Download_File "${SCRIPT_REPO}/$1" "$SCRIPT_DIR/$1"
 				Print_Output true "New version of $1 downloaded" "$PASS"
 				Mount_WebUI
 			fi
 			rm -f "$tmpfile"
 		else
-			Download_File "$SCRIPT_REPO/$1" "$SCRIPT_DIR/$1"
+			Download_File "${SCRIPT_REPO}/$1" "$SCRIPT_DIR/$1"
 			Print_Output true "New version of $1 downloaded" "$PASS"
 			Mount_WebUI
 		fi
@@ -1016,7 +1088,7 @@ Interfaces_FromSettings()
 ##-------------------------------------##
 _GetDefaultSpeedTestBinary_()
 {
-   if [ -f /usr/sbin/ookla ]
+   if [ -x "$BUILTIN_OOKLA_BINARY" ]
    then echo "builtin"
    else echo "external"
    fi
@@ -1058,7 +1130,7 @@ Conf_Exists()
 {
 	local AUTOMATEDopt  delCRON=false
 
-	if [ -f "$SCRIPT_CONF" ]
+	if [ -s "$SCRIPT_CONF" ]
 	then
 		dos2unix "$SCRIPT_CONF"
 		chmod 0644 "$SCRIPT_CONF"
@@ -1248,7 +1320,7 @@ Auto_ServiceEvent()
 	local theScriptFilePath="/jffs/scripts/$SCRIPT_NAME_LOWER"
 	case $1 in
 		create)
-			if [ -f /jffs/scripts/service-event ]
+			if [ -s /jffs/scripts/service-event ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/service-event)"
 				STARTUPLINECOUNTEX="$(grep -cx 'if echo "$2" | /bin/grep -qE "('"$SCRIPT_NAME_LOWER"'|vpnclient)" ; then { '"$theScriptFilePath"' service_event "$@" & }; fi # '"$SCRIPT_NAME" /jffs/scripts/service-event)"
@@ -1269,14 +1341,15 @@ Auto_ServiceEvent()
 				  echo 'if echo "$2" | /bin/grep -qE "('"$SCRIPT_NAME_LOWER"'|vpnclient)" ; then { '"$theScriptFilePath"' service_event "$@" & }; fi # '"$SCRIPT_NAME"
 				  echo
 				} > /jffs/scripts/service-event
-				chmod 0755 /jffs/scripts/service-event
 			fi
+			chmod 0755 /jffs/scripts/service-event
 		;;
 		delete)
-			if [ -f /jffs/scripts/service-event ]
+			if [ -s /jffs/scripts/service-event ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/service-event)"
-				if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+				if [ "$STARTUPLINECOUNT" -gt 0 ]
+				then
 					sed -i -e '/# '"$SCRIPT_NAME"'/d' /jffs/scripts/service-event
 				fi
 			fi
@@ -1318,9 +1391,11 @@ Auto_OpenVPN_Event()
 	case $1 in
 		create)
 			# Check if any OpenVPN Client is set up/available in NVRAM #
-			if ! _CheckForOpenVPN_ClientsAvailable_ ; then return 1 ; fi
+			if ! _CheckForOpenVPN_ClientsAvailable_
+			then return 1
+			fi
 
-			if [ -f /jffs/scripts/openvpn-event ]
+			if [ -s /jffs/scripts/openvpn-event ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/openvpn-event)"
                 STARTUPLINECOUNTEX="$(grep -cx '\[ -x '"$theScriptFilePath"' \] && '"$theScriptFilePath"' openvpn_event "$1" "$script_type" & # '"$SCRIPT_NAME" /jffs/scripts/openvpn-event)"
@@ -1341,14 +1416,15 @@ Auto_OpenVPN_Event()
 				  echo '[ -x '"$theScriptFilePath"' ] && '"$theScriptFilePath"' openvpn_event "$1" "$script_type" & # '"$SCRIPT_NAME"
                   echo
 				} > /jffs/scripts/openvpn-event
-				chmod 0755 /jffs/scripts/openvpn-event
 			fi
+			chmod 0755 /jffs/scripts/openvpn-event
 		;;
 		delete)
-			if [ -f /jffs/scripts/openvpn-event ]
+			if [ -s /jffs/scripts/openvpn-event ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/openvpn-event)"
-				if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+				if [ "$STARTUPLINECOUNT" -gt 0 ]
+				then
 					sed -i -e '/# '"$SCRIPT_NAME"'/d' /jffs/scripts/openvpn-event
 				fi
 			fi
@@ -1396,12 +1472,14 @@ Auto_WG_ClientEvent()
 	case $1 in
 		create)
 			# Check if any WireGuard Client is set up/available in NVRAM #
-			if ! _CheckForWireGuard_ClientsAvailable_ ; then return 1 ; fi
+			if ! _CheckForWireGuard_ClientsAvailable_
+			then return 1
+			fi
 
             for wgClientEvent in stop start
             do
 				wgClientFilePath="/jffs/scripts/wgclient-$wgClientEvent"
-				if [ -f "$wgClientFilePath" ]
+				if [ -s "$wgClientFilePath" ]
 				then
 					STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" "$wgClientFilePath")"
                 	STARTUPLINECOUNTEX="$(grep -cx '\[ -x '"$theScriptFilePath"' \] && '"$theScriptFilePath"' wgclient_event '"$wgClientEvent"' "$@" & # '"$SCRIPT_NAME" "$wgClientFilePath")"
@@ -1422,18 +1500,19 @@ Auto_WG_ClientEvent()
 					  echo '[ -x '"$theScriptFilePath"' ] && '"$theScriptFilePath"' wgclient_event '"$wgClientEvent"' "$@" & # '"$SCRIPT_NAME"
                 	  echo
 					} > "$wgClientFilePath"
-					chmod 0755 "$wgClientFilePath"
 				fi
+				chmod 0755 "$wgClientFilePath"
 			done
 		;;
 		delete)
 			for wgClientEvent in stop start
 			do
 				wgClientFilePath="/jffs/scripts/wgclient-$wgClientEvent"
-				if [ -f "$wgClientFilePath" ]
+				if [ -s "$wgClientFilePath" ]
 				then
 					STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" "$wgClientFilePath")"
-					if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+					if [ "$STARTUPLINECOUNT" -gt 0 ]
+					then
 						sed -i -e '/# '"$SCRIPT_NAME"'/d' "$wgClientFilePath"
 					fi
 				fi
@@ -1450,14 +1529,15 @@ Auto_Startup()
 	local theScriptFilePath="/jffs/scripts/$SCRIPT_NAME_LOWER"
 	case $1 in
 		create)
-			if [ -f /jffs/scripts/services-start ]
+			if [ -s /jffs/scripts/services-start ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/services-start)"
-				if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+				if [ "$STARTUPLINECOUNT" -gt 0 ]
+				then
 					sed -i -e '/# '"$SCRIPT_NAME"'/d' /jffs/scripts/services-start
 				fi
 			fi
-			if [ -f /jffs/scripts/post-mount ]
+			if [ -s /jffs/scripts/post-mount ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/post-mount)"
 				STARTUPLINECOUNTEX="$(grep -cx '\[ -x "${1}/entware/bin/opkg" \] && \[ -x '"$theScriptFilePath"' \] && '"$theScriptFilePath"' startup "$@" & # '"$SCRIPT_NAME" /jffs/scripts/post-mount)"
@@ -1479,21 +1559,23 @@ Auto_Startup()
 				  echo '[ -x "${1}/entware/bin/opkg" ] && [ -x '"$theScriptFilePath"' ] && '"$theScriptFilePath"' startup "$@" & # '"$SCRIPT_NAME"
 				  echo
 				} > /jffs/scripts/post-mount
-				chmod 0755 /jffs/scripts/post-mount
 			fi
+			chmod 0755 /jffs/scripts/post-mount
 		;;
 		delete)
-			if [ -f /jffs/scripts/services-start ]
+			if [ -s /jffs/scripts/services-start ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/services-start)"
-				if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+				if [ "$STARTUPLINECOUNT" -gt 0 ]
+				then
 					sed -i -e '/# '"$SCRIPT_NAME"'/d' /jffs/scripts/services-start
 				fi
 			fi
-			if [ -f /jffs/scripts/post-mount ]
+			if [ -s /jffs/scripts/post-mount ]
 			then
 				STARTUPLINECOUNT="$(grep -c '# '"$SCRIPT_NAME" /jffs/scripts/post-mount)"
-				if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+				if [ "$STARTUPLINECOUNT" -gt 0 ]
+				then
 					sed -i -e '/# '"$SCRIPT_NAME"'/d' /jffs/scripts/post-mount
 				fi
 			fi
@@ -1510,9 +1592,11 @@ Auto_Cron()
 	case $1 in
 		create)
 			STARTUPLINECOUNT="$(cru l | grep -c "#${SCRIPT_NAME}#")"
-			if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+			if [ "$STARTUPLINECOUNT" -gt 0 ]
+			then
 				cru d "${SCRIPT_NAME}"
 			fi
+
 			STARTUPLINECOUNTGEN="$(cru l | grep -c "${SCRIPT_NAME}_generate")"
 			CRU_SCHHOUR="$(_GetConfigParam_ SCHHOURS '*')"
 			CRU_SCHMINS="$(_GetConfigParam_ SCHMINS '12,42')"
@@ -1535,25 +1619,53 @@ Auto_Cron()
 				cru d "${SCRIPT_NAME}_trimDB"
 				STARTUPLINECOUNTTRIM="$(cru l | grep -c "${SCRIPT_NAME}_trimDB")"
 			fi
-			if [ "$STARTUPLINECOUNTTRIM" -eq 0 ]; then
+			if [ "$STARTUPLINECOUNTTRIM" -eq 0 ]
+			then
 				cru a "${SCRIPT_NAME}_trimDB" "$defTrimDB_Mins $defTrimDB_Hour * * * $theScriptFilePath trimdb"
 			fi
 		;;
 		delete)
 			STARTUPLINECOUNT="$(cru l | grep -c "#${SCRIPT_NAME}#")"
-			if [ "$STARTUPLINECOUNT" -gt 0 ]; then
+			if [ "$STARTUPLINECOUNT" -gt 0 ]
+			then
 				cru d "$SCRIPT_NAME"
 			fi
 			STARTUPLINECOUNTGEN="$(cru l | grep -c "#${SCRIPT_NAME}_generate#")"
-			if [ "$STARTUPLINECOUNTGEN" -gt 0 ]; then
+			if [ "$STARTUPLINECOUNTGEN" -gt 0 ]
+			then
 				cru d "${SCRIPT_NAME}_generate"
 			fi
 			STARTUPLINECOUNTTRIM="$(cru l | grep -c "#${SCRIPT_NAME}_trimDB#")"
-			if [ "$STARTUPLINECOUNTTRIM" -gt 0 ]; then
+			if [ "$STARTUPLINECOUNTTRIM" -gt 0 ]
+			then
 				cru d "${SCRIPT_NAME}_trimDB"
 			fi
 		;;
 	esac
+}
+
+##-------------------------------------##
+## Added by Martinski W. [2026-Jul-15] ##
+##-------------------------------------##
+_Get_Interface_IPv4address_()
+{
+   if [ $# -eq 0 ] || [ -z "$1" ] || \
+      ! echo "$1" | grep -qE "^(wgc|tun1)[1-5]$"
+   then echo ; return 1
+   fi
+   local addrRegExp="[[:blank:]]+inet[[:blank:]]+.*[[:blank:]]+global[[:blank:]]+${1}$"
+   local routRegExp="[[:blank:]]+dev[[:blank:]]+${1}[[:blank:]]+proto[[:blank:]]+.*[[:blank:]]+src[[:blank:]]+"
+
+   if echo "$1" | grep -qE "^tun1[1-5]$"
+   then
+       ip route show | grep -E "$routRegExp" | awk -F' ' '{print $NF}'
+       return 0
+   fi
+   if echo "$1" | grep -qE "^wgc[1-5]$"
+   then
+       ip addr show "$1" | grep -E "$addrRegExp" | awk -F' ' '{print $2}' | awk -F'/' '{print $1}'
+       return 0
+   fi
 }
 
 ##----------------------------------------##
@@ -1572,9 +1684,9 @@ Get_Interface_From_Name()
 			elif [ "$wanProto" = "l2tp" ] || \
 			     [ "$wanProto" = "pptp" ] || \
 			     [ "$wanProto" = "pppoe" ]
-			then
+			then  #(e.g. 'ppp0')#
 				IFACEname="$(nvram get "${wanPrefix}_pppoe_ifname")"
-			else
+			else  #(e.g. 'eth0')#
 				IFACEname="$(nvram get "${wanPrefix}_ifname")"
 			fi
 		;;
@@ -2092,21 +2204,21 @@ SpeedtestBinary()
 
 	case "$1" in
 		builtin)
-			if [ -f /usr/sbin/ookla ]
+			if [ -x "$BUILTIN_OOKLA_BINARY" ]
 			then
 			    sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=builtin/' "$SCRIPT_CONF"
 			else
 			    retCode=1
-			    Print_Output true "The built-in Speedtest binary is NOT found." "$ERR"
+			    Print_Output true "The F/W built-in Ookla speedtest binary is NOT found." "$ERR"
 			fi
 		;;
 		external)
-			if [ -f "$OOKLA_DIR/speedtest" ]
+			if [ -x "$EXTERNL_OOKLA_BINARY" ]
 			then
 			    sed -i 's/^SPEEDTESTBINARY=.*$/SPEEDTESTBINARY=external/' "$SCRIPT_CONF"
 			else
 			    retCode=1
-			    Print_Output true "The external Speedtest binary is NOT found." "$ERR"
+			    Print_Output true "The external Ookla Speedtest binary is NOT found." "$ERR"
 			fi
 		;;
 		check)
@@ -2382,11 +2494,13 @@ WriteStats_ToJS()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2026-Jan-05] ##
+## Modified by Martinski W. [2026-Jul-15] ##
 ##----------------------------------------##
 GenerateServerList()
 {
-	local serverMsgStr  maxServerCount  serverCount  serverIndx  COUNTER
+	local serverMsgStr  maxServerCount  serverCount  serverIndx
+	local IFACE_NAME  IFACE_LOWER  IFACE_IPv4A  COUNTER  serverList
+	local errorLogFile="/tmp/${SCRIPT_NAME}.DEBUG.Servers.LOG"
 
 	if [ ! -f /opt/bin/jq ] && [ -x /opt/bin/opkg ]
 	then
@@ -2398,30 +2512,45 @@ GenerateServerList()
 	else promptforservername="$2"
 	fi
 
-	printf " Generating list of closest servers for ${GRNct}${1}${CLRct} interface.\n"
+	rm -f "$errorLogFile"
+	IFACE_NAME="$1"
+	IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
+	IFACE_IPv4A=""  ##DO NOT SET##
+	##OFF## IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+
+	printf " Generating list of closest servers for ${GRNct}${IFACE_NAME} [$IFACE_LOWER]${CLRct} interface.\n"
 	printf " Please wait...\n\n"
+
+	serverList=""
 	CONFIG_STRING=""
-	LICENSE_STRING="--accept-license --accept-gdpr"
+	LICENSE_STRING=""
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY="/usr/sbin/ookla"
+		SPEEDTEST_BINARY="$BUILTIN_OOKLA_BINARY"
+		CONFIG_STRING="-c $(_GetBuiltInSpeedTestConfigURL_)"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
+		SPEEDTEST_BINARY="$EXTERNL_OOKLA_BINARY"
+		LICENSE_STRING="--accept-license --accept-gdpr"
 	fi
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
+
+	serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE_LOWER" --servers --format="json" $LICENSE_STRING)" 2>"$errorLogFile"
+	if [ -z "$serverList" ] && [ -n "$IFACE_IPv4A" ]
 	then
-		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
-		LICENSE_STRING=""
+		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --ip="$IFACE_IPv4A" --servers --format="json" $LICENSE_STRING)" 2>"$errorLogFile"
 	fi
-	serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$1")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
 	if [ -z "$serverList" ]
 	then
-		Print_Output true "Error retrieving server list for $1 interface" "$CRIT"
+		Print_Output true "ERROR retrieving server list for $IFACE_NAME [$IFACE_LOWER] interface" "$CRIT"
 		serverNum="ERROR"
+		if [ -s "$errorLogFile" ]
+		then cat "$errorLogFile" ; echo
+		fi
+		rm -f "$errorLogFile"
 		return 1
 	fi
+
 	serverCount="$(echo "$serverList" | jq '.servers | length')"
 	COUNTER=1
 	until [ "$COUNTER" -gt "${serverCount:=0}" ]
@@ -2445,9 +2574,9 @@ GenerateServerList()
 
 	while true
 	do
-		printf "\n${BOLD}Select a %s from the list above [${GRNct}1-%d${CLRct}].${CLRct}" "$serverMsgStr" "$maxServerCount"
-		printf "\n${BOLD}Or press ${GRNct}C${CLRct} key to enter a known speed test server ID.${CLRct}"
-		printf "\n${BOLD}Enter answer:${CLRct}  "
+		printf "\n ${BOLD}Select a %s from the list above [${GRNct}1-%d${CLRct}].${CLRct}" "$serverMsgStr" "$maxServerCount"
+		printf "\n ${BOLD}Or press ${GRNct}C${CLRct} key to enter a known speed test server ID.${CLRct}"
+		printf "\n ${BOLD}Enter answer:${CLRct}  "
 		read -r serverIndx
 
 		if echo "$serverIndx" | grep -qE "^(e|E)$"
@@ -2463,7 +2592,7 @@ GenerateServerList()
 		then
 				while true
 				do
-					printf "\n${BOLD}Please enter server ID (WARNING: ID is NOT validated) or ${GRNct}e${CLRct} to go back.${CLRct}  "
+					printf "\n ${BOLD}Please enter server ID (${MGNTct}WARNING: ID is NOT validated${CLRct}) or ${GRNct}e${CLRct} to go back.${CLRct}  "
 					read -r customserver
 					if [ "$customserver" = "e" ]
 					then
@@ -2478,19 +2607,19 @@ GenerateServerList()
 						then
 							while true
 							do
-								printf "\n${BOLD}Would you like to enter a name for this server? (default: Custom) (y/n)?${CLRct}  "
+								printf "\n ${BOLD}Would you like to enter a name for this server? (default: Custom) (y/n)?${CLRct}  "
 								read -r servername_select
 								
-								if [ "$servername_select" = "n" ] || [ "$servername_select" = "N" ]
+								if echo "$servername_select" | grep -qE '^(n|N)$'
 								then
 									serverName="Custom"
 									break
-								elif [ "$servername_select" = "y" ] || [ "$servername_select" = "Y" ]
+								elif echo "$servername_select" | grep -qE '^(y|Y)$'
 								then
-									printf "\n${BOLD}Please enter the name for this server:${CLRct}  "
+									printf "\n ${BOLD}Please enter the name for this server:${CLRct}  "
 									read -r serverName
-									printf "\n${BOLD}%s${CLRct}\n" "$serverName"
-									printf "\n${BOLD}Is that correct (y/n)?${CLRct}  "
+									printf "\n ${BOLD}${GRNct}%s${CLRct}\n" "$serverName"
+									printf "\n ${BOLD}Is that correct (y/n)?${CLRct}  "
 									read -r servername_confirm
 									if [ "$servername_confirm" = "y" ] || \
 									   [ "$servername_confirm" = "Y" ]
@@ -2506,8 +2635,7 @@ GenerateServerList()
 						else
 							serverName="Custom"
 						fi
-						printf "\n"
-						return 0
+						echo ; return 0
 					fi
 				done
 		elif ! Validate_Number "$serverIndx"
@@ -2527,32 +2655,31 @@ GenerateServerList()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Oct-12] ##
+## Modified by Martinski W. [2026-Jul-15] ##
 ##----------------------------------------##
 GenerateServerList_WebUI()
 {
-	local setIFaceUserStatus=false
+	local setIFaceUserStatus=false  serverList
+	local IFACE_NAME  IFACE_LOWER  IFACE_IPv4A  COUNTER
 
 	spdifacename="$1"
 	serverlistfile="$2"
 	rm -f "/tmp/${serverlistfile}.txt"
 	rm -f "/tmp/${serverlistfile}.tmp"
-	rm -f "$SCRIPT_WEB_DIR/${serverlistfile}.htm"
+	rm -f "${SCRIPT_WEB_DIR}/${serverlistfile}.htm"
 
+	serverList=""
+	CONFIG_STRING=""
+	LICENSE_STRING=""
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY="/usr/sbin/ookla"
+		SPEEDTEST_BINARY="$BUILTIN_OOKLA_BINARY"
+		CONFIG_STRING="-c $(_GetBuiltInSpeedTestConfigURL_)"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
-	fi
-	CONFIG_STRING=""
-	LICENSE_STRING="--accept-license --accept-gdpr"
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
-	then
-		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
-		LICENSE_STRING=""
+		SPEEDTEST_BINARY="$EXTERNL_OOKLA_BINARY"
+		LICENSE_STRING="--accept-license --accept-gdpr"
 	fi
 
 	if [ ! -f /opt/bin/jq ] && [ -x /opt/bin/opkg ]
@@ -2582,10 +2709,17 @@ GenerateServerList_WebUI()
 
 		for IFACE_NAME in $IFACELIST
 		do
-			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$IFACE_NAME")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+			IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
+			IFACE_IPv4A=""  ##DO NOT SET##
+			##OFF## IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE_LOWER" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+			if [ -z "$serverList" ] && [ -n "$IFACE_IPv4A" ]
+			then
+				serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --ip="$IFACE_IPv4A" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+			fi
 			if [ -z "$serverList" ]
 			then
-				Print_Output true "Error retrieving server list for $IFACE_NAME interface" "$CRIT"
+				Print_Output true "ERROR retrieving server list for $IFACE_NAME [$IFACE_LOWER] interface" "$CRIT"
 				{
 				   echo "0|**ERROR**: Unable to retrieve server list." ; echo "-----"
 				} >> "/tmp/${serverlistfile}.tmp"
@@ -2604,10 +2738,17 @@ GenerateServerList_WebUI()
 			echo "-----" >> "/tmp/${serverlistfile}.tmp"
 		done
 	else
-		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$(Get_Interface_From_Name "$spdifacename")" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+		IFACE_LOWER="$(Get_Interface_From_Name "$spdifacename" | tr 'A-Z' 'a-z')"
+		IFACE_IPv4A=""  ##DO NOT SET##
+		##OFF## IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
+		serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --interface="$IFACE_LOWER" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+		if [ -z "$serverList" ] && [ -n "$IFACE_IPv4A" ]
+		then
+			serverList="$("$SPEEDTEST_BINARY" $CONFIG_STRING --ip="$IFACE_IPv4A" --servers --format="json" $LICENSE_STRING)" 2>/dev/null
+		fi
 		if [ -z "$serverList" ]
 		then
-			Print_Output true "Error retrieving server list for $spdifacename interface" "$CRIT"
+			Print_Output true "ERROR retrieving server list for $spdifacename [$IFACE_LOWER] interface" "$CRIT"
 			serverCount=0
 		else
 			serverCount="$(echo "$serverList" | jq '.servers | length')"
@@ -3216,7 +3357,7 @@ _Trim_Database_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2025-Oct-30] ##
+## Modified by Martinski W. [2026-Jul-15] ##
 ##----------------------------------------##
 Run_Speedtest()
 {
@@ -3226,7 +3367,8 @@ Run_Speedtest()
 		opkg update
 		opkg install findutils
 	fi
-	if [ -n "$PPID" ]; then
+	if [ -n "$PPID" ]
+	then
 		ps | grep -v grep | grep -v $$ | grep -v "$PPID" | grep -i "$SCRIPT_NAME_LOWER" | grep generate | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
 	else
 		ps | grep -v grep | grep -v $$ | grep -i "$SCRIPT_NAME_LOWER" | grep generate | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
@@ -3235,10 +3377,10 @@ Run_Speedtest()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	fi
 	Auto_Startup create 2>/dev/null
 	if AutomaticMode check
@@ -3264,68 +3406,83 @@ Run_Speedtest()
 	local stoppedQoS  nvramQoSenable  nvramQoStype
 	local spdIndx  spdTestOK  verboseNUM  verboseARG
 	local serverLine  serverIDno
+	local IFACE_NAME  IFACE_LOWER  IFACE_IPv4A
 	verboseNUM="$(_GetConfigParam_ VERBOSE_TEST 0)"
 	if ! echo "$verboseNUM" | grep -qE "^[0-3]$"
 	then verboseNUM=0
 	fi
 
+	PROC_NAME=""
 	CONFIG_STRING=""
-	LICENSE_STRING="--accept-license --accept-gdpr"
-	PROC_NAME="speedtest"
+	LICENSE_STRING=""
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY="/usr/sbin/ookla"
+		PROC_NAME="$BUILTIN_OOKLA_PROC"
+		SPEEDTEST_BINARY="$BUILTIN_OOKLA_BINARY"
+		CONFIG_STRING="-c $(_GetBuiltInSpeedTestConfigURL_)"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
+		PROC_NAME="$EXTERNL_OOKLA_PROC"
+		SPEEDTEST_BINARY="$EXTERNL_OOKLA_BINARY"
+		LICENSE_STRING="--accept-license --accept-gdpr"
 	fi
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
-	then
-		CONFIG_STRING="-c http://www.speedtest.net/api/embed/vz0azjarf5enop8a/config"
-		LICENSE_STRING=""
-		PROC_NAME="ookla"
-	fi
-
 	echo 'var spdteststatus = "InProgress";' > /tmp/detect_spdtest.js
 
 	tmpfile=/tmp/spd-stats.txt
 	resultfile=/tmp/spd-result.txt
-	spdTestLogFile="/tmp/${SCRIPT_NAME}.DEBUG.log"
+	errorLogFile="/tmp/${SCRIPT_NAME}.DEBUG.LOG"
 	spdTestDBGFile="/tmp/${SCRIPT_NAME}.DEBUG.txt"
-	rm -f "$tmpfile" "$resultfile" "$spdTestLogFile"
+	rm -f "$tmpfile" "$resultfile" "$errorLogFile"
 
-	if [ -n "$(pidof "$PROC_NAME")" ]; then
-		killall -q "$PROC_NAME"
+	if [ -n "$(pidof "$PROC_NAME")" ]
+	then killall -q "$PROC_NAME"
 	fi
 
-	if Check_Swap
+	if ! _HasRouterMoreThan256MBtotalRAM_ && ! Check_Swap
 	then
-		IFACELIST=""
-		if [ -z "$specificiface" ]
-		then
-			while IFS='' read -r line || [ -n "$line" ]
-			do
-				if [ "$(echo "$line" | grep -c "#")" -eq 0 ]; then
-					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				fi
-			done < "$SCRIPT_INTERFACES_USER"
-			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
-		elif [ "$specificiface" = "All" ]
-		then
-			while IFS='' read -r line || [ -n "$line" ]
-			do
-				if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]; then
-					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				fi
-			done < "$SCRIPT_INTERFACES_USER"
-			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
-		else
-			IFACELIST="$specificiface"
-		fi
+		echo 'var spdteststatus = "NoSwap";' > /tmp/detect_spdtest.js
+		Print_Output true "Total RAM is less than 512MB and SWAP file NOT detected. Exiting" "$CRIT"
+		Clear_Lock
+		return 1
+	fi
 
-		if [ "$IFACELIST" != "" ]
-		then
+	_WaitForSpeedTestProcess_()
+	{
+		sleep 2 ; speedTestSecs=0
+		while [ -n "$(pidof "$PROC_NAME")" ] && \
+		      [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
+		do speedTestSecs="$((speedTestSecs + 1))" ; sleep 1
+		done
+	}
+
+	IFACELIST=""
+	if [ -z "$specificiface" ]
+	then
+			while IFS='' read -r line || [ -n "$line" ]
+			do
+				if [ "$(echo "$line" | grep -c "#")" -eq 0 ]
+				then
+					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
+				fi
+			done < "$SCRIPT_INTERFACES_USER"
+			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
+	elif [ "$specificiface" = "All" ]
+	then
+			while IFS='' read -r line || [ -n "$line" ]
+			do
+				if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
+				then
+					IFACELIST="$IFACELIST $(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
+				fi
+			done < "$SCRIPT_INTERFACES_USER"
+			IFACELIST="$(echo "$IFACELIST" | cut -c2-)"
+	else
+			IFACELIST="$specificiface"
+	fi
+
+	if [ -n "$IFACELIST" ]
+	then
 			stoppedQoS=false
 			if [ "$(ExcludeFromQoS check)" = "true" ]
 			then
@@ -3377,9 +3534,7 @@ Run_Speedtest()
 
 			for IFACE_NAME in $IFACELIST
 			do
-				IFACE="$(Get_Interface_From_Name "$IFACE_NAME")"
-				IFACE_LOWER="$(echo "$IFACE" | tr "A-Z" "a-z")"
-
+				IFACE_LOWER="$(Get_Interface_From_Name "$IFACE_NAME" | tr 'A-Z' 'a-z')"
 				interface_UP=false
 				if echo "$IFACE_NAME" | grep -q "^WGVPN"
 				then 
@@ -3392,9 +3547,11 @@ Run_Speedtest()
 
 				if ! "$interface_UP"
 				then
-					Print_Output true "$IFACE not up, please check. Skipping speedtest for $IFACE_NAME" "$WARN"
+					Print_Output true "$IFACE_LOWER is not up, please check. Skipping speedtest for $IFACE_NAME" "$WARN"
 					continue
 				else
+					IFACE_IPv4A=""  ##DO NOT SET##
+					##OFF## IFACE_IPv4A="$(_Get_Interface_IPv4address_ "$IFACE_LOWER")"
 					if [ "$mode" = "webui_user" ]; then
 						mode="user"
 					elif [ "$mode" = "webui_auto" ]; then
@@ -3430,57 +3587,72 @@ Run_Speedtest()
 					fi
 
 					echo 'var spdteststatus = "InProgress_'"$IFACE_NAME"'";' > /tmp/detect_spdtest.js
-					printf '' > "$tmpfile"
+					printf '' > "$tmpfile" ; printf '' > "$errorLogFile"
 
 					if [ "$mode" = "auto" ]
 					then
-						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
-						"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
-						sleep 2
-						speedTestSecs=0
-						while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
-						do
-							speedTestSecs="$((speedTestSecs + 1))" ; sleep 1
-						done
+						Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME [$IFACE_LOWER] interface. Please wait..." "$PASS"
+						("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE_LOWER" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+						_WaitForSpeedTestProcess_
+
+						if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
+						   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
+						then
+							printf '' > "$errorLogFile"
+							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --ip="$IFACE_IPv4A" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+							_WaitForSpeedTestProcess_
+						fi
 						if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 						then
-							Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
+							Print_Output true "Speedtest for $IFACE_NAME [$IFACE_LOWER] hung (> 2 mins), killing process" "$CRIT"
 							killall -q "$PROC_NAME"
-							if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+							if [ -s "$errorLogFile" ]
+							then cat "$errorLogFile" ; echo
+							fi
 							continue
 						fi
 					else
 						if [ "$speedtestServerIDx" -ne 0 ]
 						then
-							Print_Output true "Starting speedtest using $speedtestServerName for $IFACE_NAME interface. Please wait..." "$PASS"
-							"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
-							sleep 2
-							speedTestSecs=0
-							while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
-							do
-								speedTestSecs="$((speedTestSecs + 1))" ; sleep 1
-							done
+							Print_Output true "Starting speedtest using $speedtestServerName for $IFACE_NAME [$IFACE_LOWER] interface. Please wait..." "$PASS"
+							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE_LOWER" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+							_WaitForSpeedTestProcess_
+
+							if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
+							   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
+							then
+								printf '' > "$errorLogFile"
+								("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --ip="$IFACE_IPv4A" --server-id="$speedtestServerIDx" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+								_WaitForSpeedTestProcess_
+							fi
 							if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 							then
-								Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
+								Print_Output true "Speedtest for $IFACE_NAME [$IFACE_LOWER] hung (> 2 mins), killing process" "$CRIT"
 								killall -q "$PROC_NAME"
-								if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+								if [ -s "$errorLogFile" ]
+								then cat "$errorLogFile" ; echo
+								fi
 								continue
 							fi
 						else
-							Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME interface. Please wait..." "$PASS"
-							"$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING 2>"$spdTestLogFile" | tee "$tmpfile" &
-							sleep 2
-							speedTestSecs=0
-							while [ -n "$(pidof "$PROC_NAME")" ] && [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ]
-							do
-								speedTestSecs="$((speedTestSecs + 1))" ; sleep 1
-							done
+							Print_Output true "Starting speedtest using auto-selected server for $IFACE_NAME [$IFACE_LOWER] interface. Please wait..." "$PASS"
+							("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --interface="$IFACE_LOWER" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+							_WaitForSpeedTestProcess_
+
+							if [ "$speedTestSecs" -lt "$MAXwaitTestSecs" ] && \
+							   [ ! -s "$tmpfile" ] && [ -s "$errorLogFile" ] && [ -n "$IFACE_IPv4A" ]
+							then
+								printf '' > "$errorLogFile"
+								("$SPEEDTEST_BINARY" $verboseARG $CONFIG_STRING --ip="$IFACE_IPv4A" --format="human-readable" --unit="Mbps" -p $LICENSE_STRING | tee "$tmpfile") 2>"$errorLogFile" &
+								_WaitForSpeedTestProcess_
+							fi
 							if [ "$speedTestSecs" -ge "$MAXwaitTestSecs" ]
 							then
-								Print_Output true "Speedtest for $IFACE_NAME hung (> 2 mins), killing process" "$CRIT"
+								Print_Output true "Speedtest for $IFACE_NAME [$IFACE_LOWER] hung (> 2 mins), killing process" "$CRIT"
 								killall -q "$PROC_NAME"
-								if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+								if [ -s "$errorLogFile" ]
+								then cat "$errorLogFile" ; echo
+								fi
 								continue
 							fi
 						fi
@@ -3488,8 +3660,10 @@ Run_Speedtest()
 
 					if [ ! -s "$tmpfile" ] || [ -z "$(cat "$tmpfile")" ] || [ "$(grep -c 'FAILED' "$tmpfile")" -gt 0 ]
 					then
-						Print_Output true "ERROR running speedtest for $IFACE_NAME [No Results]" "$CRIT"
-						if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [$IFACE_LOWER] [No Results]" "$CRIT"
+						if [ -s "$errorLogFile" ]
+						then cat "$errorLogFile" ; echo
+						fi
 						continue
 					fi
 
@@ -3506,7 +3680,7 @@ Run_Speedtest()
 					serverName="$(echo "$serverLine" | sed 's/^Server: *//' | sed 's/ *(id[: =]\+ [0-9]\+)$//')"
 					serverIDno="$(echo "$serverLine" | grep -Eo '[(]id(:| =)[[:blank:]]+[0-9]+[)]' | awk -F' ' '{print $NF}' | tr -d ')')"
 
-					## if-then-else block added to with ookla output when buffer bloat has been added to the human readable output ##
+					## if-then-else block added to with Ookla output when buffer bloat has been added to the human readable output ##
 					BUFFBLOAT="$(grep "Idle Latency:" "$tmpfile")"
 					if [ -n "$BUFFBLOAT" ]
 					then
@@ -3543,8 +3717,10 @@ Run_Speedtest()
 					   [ -z "$datadownload" ] || [ -z "$dataupload" ]
 					then
 						cp -fp "$tmpfile" "$spdTestDBGFile"
-						Print_Output true "ERROR running speedtest for $IFACE_NAME [Empty or Bad Values]" "$CRIT"
-						if [ -s "$spdTestLogFile" ] ; then echo ; cat "$spdTestLogFile" ; echo ; fi
+						Print_Output true "ERROR running speedtest for $IFACE_NAME [$IFACE_LOWER] [Empty or Bad Values]" "$CRIT"
+						if [ -s "$errorLogFile" ]
+						then cat "$errorLogFile" ; echo
+						fi
 						continue
 					fi
 
@@ -3703,18 +3879,11 @@ Run_Speedtest()
 
 			rm -f "$tmpfile" /tmp/spdstatstitle.txt
 			Clear_Lock
-		else
+	else
 			echo 'var spdteststatus = "Error";' > /tmp/detect_spdtest.js
-			Print_Output true "No interfaces enabled, exiting" "$CRIT"
+			Print_Output true "No interfaces enabled. Exiting" "$CRIT"
 			Clear_Lock
 			return 1
-		fi
-		Clear_Lock
-	else
-		echo 'var spdteststatus = "NoSwap";' > /tmp/detect_spdtest.js
-		Print_Output true "Swap file not active, exiting" "$CRIT"
-		Clear_Lock
-		return 1
 	fi
 }
 
@@ -3812,16 +3981,16 @@ Process_Upgrade()
 {
 	local foundError  foundLocked  resultStr  doUpdateDB=false
 
-	if [ ! -f "$OOKLA_DIR/speedtest" ]
+	if [ ! -x "$EXTERNL_OOKLA_BINARY" ]
 	then
-		rm -f "$OOKLA_DIR"/*
-		Download_File "$SCRIPT_REPO/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
-		tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
-		rm -f "$OOKLA_DIR/$ARCH.tar.gz"
-		chmod 0755 "$OOKLA_DIR/speedtest"
-        chown "${theUserName}:root" "$OOKLA_DIR"/*
-		spdTestVer="$(_GetSpeedtestBinaryVersion_)"
-		Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
+		rm -f "${OOKLA_DIR}"/*
+		Download_File "${SCRIPT_REPO}/$ARCH.tar.gz" "${OOKLA_DIR}/$ARCH.tar.gz"
+		tar -xzf "${OOKLA_DIR}/$ARCH.tar.gz" -C "$OOKLA_DIR"
+		rm -f "${OOKLA_DIR}/$ARCH.tar.gz"
+		chmod 0755 "$EXTERNL_OOKLA_BINARY"
+        chown "${theUserName}:root" "${OOKLA_DIR}"/*
+		spdTestVer="$(_GetExternalSpeedTestBinVersion_)"
+		Print_Output true "Ookla Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 	fi
 	rm -f "$SCRIPT_STORAGE_DIR/spdjs.js"
 	rm -f "$SCRIPT_STORAGE_DIR/.tableupgraded"*
@@ -3977,7 +4146,6 @@ Process_Upgrade()
 ##----------------------------------------##
 ## Modified by Martinski W. [2025-Jun-20] ##
 ##----------------------------------------##
-#$1 IFACE Name
 Generate_LastXResults()
 {
 	local foundError  foundLocked  resultStr  sqlProcSuccess
@@ -4447,17 +4615,23 @@ _HandleInvalidMenuOption_()
 }
 
 ##----------------------------------------##
-## Modified by Martinski W. [2026-Jan-05] ##
+## Modified by Martinski W. [2026-Jul-12] ##
 ##----------------------------------------##
 _Menu_SpeedTestOptions_()
 {
-	local menuOption  exitMenu=false
+	local menuOption  exitMenu=false  speedTestBinaryType="[N/A]"
 	local OPTION_FOR_QOS  TEST_SCHED_LINE  TEST_SCHED_DAYS
 	local TEST_SCHED_MENU  CRON_SCHED_DAYS  CRON_SCHED_HOUR  CRON_SCHED_MINS
 
 	if [ "$(ExcludeFromQoS check)" = "true" ]
 	then OPTION_FOR_QOS="excluded from"
 	else OPTION_FOR_QOS="included in"
+	fi
+
+	if [ "$(SpeedtestBinary check)" = "builtin" ]
+	then speedTestBinaryType="F/W ${SETTING}built-in${CLRct} Ookla speedtest binary"
+	elif [ "$(SpeedtestBinary check)" = "external" ]
+	then speedTestBinaryType="${SETTING}external${CLRct} Ookla binary installed by $SCRIPT_NAME"
 	fi
 
 	TEST_SCHED_LINE="$(CronTestSchedule check)"
@@ -4477,7 +4651,7 @@ _Menu_SpeedTestOptions_()
 	printf "   ${GRNct}2${CLRct}. Set schedule for automatic speed tests\n"
 	printf "      Currently: ${SETTING}%s - %s${CLRct}\n\n" "$TEST_SCHED_MENU" "$TEST_SCHED_DAYS"
 	printf "   ${GRNct}3${CLRct}. Toggle between built-in Ookla speedtest and speedtest-cli\n"
-	printf "      Currently: ${SETTING}%s${CLRct} binary will be used for speed tests${CLRct}\n\n" "$(SpeedtestBinary check)"
+	printf "      [The ${speedTestBinaryType} will be used${CLRct}]\n\n"
 	printf "   ${GRNct}q${CLRct}. Toggle exclusion of %s speed tests from QoS\n" "$SCRIPT_NAME"
 	printf "      Currently: %s speed tests are ${SETTING}%s${CLRct} QoS\n\n" "$SCRIPT_NAME" "$OPTION_FOR_QOS"
 	printf "   ${GRNct}c${CLRct}. Customise list of interfaces for automatic speed tests\n"
@@ -4801,9 +4975,12 @@ MainMenu()
 	MainMenu
 }
 
+##----------------------------------------##
+## Modified by Martinski W. [2026-Jul-08] ##
+##----------------------------------------##
 Check_Requirements()
 {
-	CHECKSFAILED="false"
+	local CHECKSFAILED=false
 
 	if [ "$(nvram get jffs2_scripts)" -ne 1 ]
 	then
@@ -4812,37 +4989,34 @@ Check_Requirements()
 		Print_Output true "Custom JFFS Scripts enabled" "$WARN"
 	fi
 
-	if ! Check_Swap
+	if ! _HasRouterMoreThan256MBtotalRAM_ && ! Check_Swap
 	then
-		Print_Output false "No Swap file detected!" "$ERR"
-		CHECKSFAILED="true"
+		Print_Output false "Total RAM is less than 512MB and SWAP file NOT detected!" "$ERR"
+		CHECKSFAILED=true
 	fi
 
 	if [ ! -f /opt/bin/opkg ]
 	then
 		Print_Output false "Entware NOT detected!" "$CRIT"
-		CHECKSFAILED="true"
+		CHECKSFAILED=true
 	fi
 
 	if ! Firmware_Version_Check
 	then
 		Print_Output false "Unsupported firmware version detected" "$CRIT"
 		Print_Output false "$SCRIPT_NAME requires Merlin 384.15/384.13_4 or Fork 43E5 (or later)" "$ERR"
-		CHECKSFAILED="true"
+		CHECKSFAILED=true
 	fi
 
-	if [ "$CHECKSFAILED" = "false" ]
-	then
-		Print_Output false "Installing required packages from Entware" "$PASS"
-		opkg update
-		opkg install sqlite3-cli
-		opkg install jq
-		opkg install p7zip
-		opkg install findutils
-		return 0
-	else
-		return 1
-	fi
+	"$CHECKSFAILED" && return 1
+
+	Print_Output false "Installing required packages from Entware" "$PASS"
+	opkg update
+	opkg install sqlite3-cli
+	opkg install jq
+	opkg install p7zip
+	opkg install findutils
+	return 0
 }
 
 ##----------------------------------------##
@@ -4885,24 +5059,24 @@ Menu_Install()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	fi
 	Set_Version_Custom_Settings local "$SCRIPT_VERSION"
 	Set_Version_Custom_Settings server "$SCRIPT_VERSION"
 	ScriptStorageLocation load
 	Create_Symlinks
 
-	rm -f "$OOKLA_DIR"/*
-	Download_File "$SCRIPT_REPO/$ARCH.tar.gz" "$OOKLA_DIR/$ARCH.tar.gz"
-	tar -xzf "$OOKLA_DIR/$ARCH.tar.gz" -C "$OOKLA_DIR"
-	rm -f "$OOKLA_DIR/$ARCH.tar.gz"
-	chmod 0755 "$OOKLA_DIR/speedtest"
-	chown "${theUserName}:root" "$OOKLA_DIR"/*
-	spdTestVer="$(_GetSpeedtestBinaryVersion_)"
-	Print_Output true "Speedtest CLI $spdTestVer version was downloaded." "$PASS"
+	rm -f "${OOKLA_DIR}"/*
+	Download_File "${SCRIPT_REPO}/$ARCH.tar.gz" "${OOKLA_DIR}/$ARCH.tar.gz"
+	tar -xzf "${OOKLA_DIR}/$ARCH.tar.gz" -C "$OOKLA_DIR"
+	rm -f "${OOKLA_DIR}/$ARCH.tar.gz"
+	chmod 0755 "$EXTERNL_OOKLA_BINARY"
+	chown "${theUserName}:root" "${OOKLA_DIR}"/*
+	spdTestVer="$(_GetExternalSpeedTestBinVersion_)"
+	Print_Output true "Ookla Speedtest CLI $spdTestVer version was downloaded." "$PASS"
 
 	Update_File README.md
 	Update_File spdstats_www.asp
@@ -4980,10 +5154,10 @@ Menu_Startup()
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load true
 	Auto_Startup create 2>/dev/null
@@ -5027,25 +5201,28 @@ _Reset_Interface_States_()
 ##----------------------------------------##
 Menu_RunSpeedtest()
 {
-	exitmenu=""
-	validselection=""
-	useiface=""
-	usepreferred=""
-	ScriptHeader
+	local exitmenu=""  validSelection=false  ifaceCountMAX=0
+	local useiface=""  usepreferred=""  iface_choice  ifaceID
+
 	while true
 	do
-		printf "Choose an interface to speedtest:\n\n"
-		printf "1.    All\n"
-		COUNTER="2"
-		while IFS='' read -r line || [ -n "$line" ]
+		ScriptHeader
+		printf " Choose an interface to run a speed test:\n\n"
+		printf "  ${GRNct}1${CLRct})  All\n"
+		COUNTER=2
+		while IFS='' read -r theLINE || [ -n "$theLINE" ]
 		do
-			if [ "$(echo "$line" | grep -c "interface not up")" -eq 0 ]
+			if [ "$(echo "$theLINE" | grep -c "interface not up")" -eq 0 ]
 			then
-				printf "%s.    %s\n" "$COUNTER" "$(echo "$line" | cut -f1 -d"#" | sed 's/ *$//')"
-				COUNTER="$((COUNTER+1))"
+				ifaceID="$(echo "$theLINE" | cut -d'#' -f1 | sed 's/ *$//')"
+				printf " ${GRNct}%2d${CLRct})  %s\n" "$COUNTER" "$ifaceID"
+				COUNTER="$((COUNTER + 1))"
 			fi
 		done < "$SCRIPT_INTERFACES_USER"
-		printf "\nChoose an option (e=Exit):  "
+		printf "\n  ${GRNct}e${CLRct})  Return to Main Menu\n"
+		ifaceCountMAX="$((COUNTER - 1))"
+
+		printf "\n Choose an option:  "
 		read -r iface_choice
 
 		if [ "$iface_choice" = "e" ]
@@ -5054,34 +5231,37 @@ Menu_RunSpeedtest()
 			break
 		elif ! Validate_Number "$iface_choice"
 		then
-			printf "\n${ERR}Please enter a valid number [1-%s].${CLEARFORMAT}\n" "$((COUNTER-1))"
-			validselection="false"
+			validSelection=false
+			printf "\n${ERR}Please enter a valid number [1-%s].${CLRct}\n" "$ifaceCountMAX"
+			PressEnter ; continue
 		else
-			if [ "$iface_choice" -lt 1 ] || [ "$iface_choice" -gt "$((COUNTER-1))" ]
+			if [ "$iface_choice" -lt 1 ] || [ "$iface_choice" -gt "$ifaceCountMAX" ]
 			then
-				printf "\n${ERR}Please enter a number between 1 and %s.${CLEARFORMAT}\n" "$((COUNTER-1))"
-				validselection="false"
+				validSelection=false
+				printf "\n${ERR}Please enter a number between 1 and %s.${CLRct}\n" "$ifaceCountMAX"
+				PressEnter ; continue
 			else
-				if [ "$iface_choice" -gt "1" ]
+				if [ "$iface_choice" -gt 1 ]
 				then
 					useiface="$(grep -v "interface not up" "$SCRIPT_INTERFACES_USER" | sed -n $((iface_choice-1))p | cut -f1 -d"#" | sed 's/ *$//')"
 				else
 					useiface="All"
 				fi
-				validselection="true"
+				validSelection=true
 			fi
 		fi
-		printf "\n"
+		echo
 
-		if [ "$exitmenu" != "exit" ] && [ "$validselection" != "false" ]
+		if [ "$exitmenu" != "exit" ] && "$validSelection"
 		then
 			while true
 			do
-				printf "What mode would you like to use?\n\n"
-				printf "1.    Auto-select\n"
-				printf "2.    Preferred server\n"
-				printf "3.    Choose a server\n"
-				printf "\nChoose an option (e=Exit):  "
+				printf "\n What mode would you like to use?\n\n"
+				printf "  ${GRNct}1${CLRct}.  Auto-select\n"
+				printf "  ${GRNct}2${CLRct}.  Preferred server\n"
+				printf "  ${GRNct}3${CLRct}.  Choose a server\n\n"
+				printf "  ${GRNct}e${CLRct}.  Return to Main Menu\n"
+				printf "\n Choose an option:  "
 				read -r usepref_choice
 
 				if [ "$usepref_choice" = "e" ]
@@ -5090,42 +5270,47 @@ Menu_RunSpeedtest()
 					break
 				elif ! Validate_Number "$usepref_choice"
 				then
-					printf "\n${ERR}Please enter a valid number [1-3].${CLEARFORMAT}\n"
-					validselection="false" ; echo
+					validSelection=false
+					printf "\n${ERR}Please enter a valid number [1-3].${CLRct}\n"
+					PressEnter ; echo
 				else
 					if [ "$usepref_choice" -lt 1 ] || [ "$usepref_choice" -gt 3 ]
 					then
-						printf "\n${ERR}Please enter a number between 1 and 3.${CLEARFORMAT}\n"
-						validselection="false" ; echo
+						validSelection=false
+						printf "\n${ERR}Please enter a number between 1 and 3.${CLRct}\n"
+						PressEnter ; echo
 					else
 						case "$usepref_choice" in
 							1) usepreferred="auto" ;;
 							2) usepreferred="user" ;;
 							3) usepreferred="onetime" ;;
 						esac
-						validselection="true" ; echo
+						validSelection=true ; echo
 						break
 					fi
 				fi
 			done
 		fi
-		if [ "$exitmenu" != "exit" ] && [ "$validselection" != "false" ]
+
+		if [ "$exitmenu" = "exit" ]
+		then break ; fi
+
+		if "$validSelection"
 		then
-			if Check_Lock menu; then
+			if Check_Lock menu
+			then
 				Run_Speedtest "$usepreferred" "$useiface"
 				Clear_Lock
 			fi
-		elif [ "$exitmenu" = "exit" ]; then
-			break
 		fi
-		printf "\n"
-		PressEnter
-		ScriptHeader
+		echo ; PressEnter
 	done
 
 	if [ "$exitmenu" != "exit" ]
-    then return 0
-	else echo ; return 1
+    then
+		return 0
+	else
+		echo ; return 1
 	fi
 }
 
@@ -6568,21 +6753,20 @@ Menu_Uninstall()
 		ps | grep -v grep | grep -v $$ | grep -i "$SCRIPT_NAME_LOWER" | grep generate | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
 	fi
 
+	PROC_NAME=""
 	SPEEDTEST_BINARY=""
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		SPEEDTEST_BINARY="/usr/sbin/ookla"
+		PROC_NAME="$BUILTIN_OOKLA_PROC"
+		SPEEDTEST_BINARY="$BUILTIN_OOKLA_BINARY"
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		SPEEDTEST_BINARY="$OOKLA_DIR/speedtest"
+		PROC_NAME="$EXTERNL_OOKLA_PROC"
+		SPEEDTEST_BINARY="$EXTERNL_OOKLA_BINARY"
 	fi
-	PROC_NAME="speedtest"
-	if [ "$SPEEDTEST_BINARY" = "/usr/sbin/ookla" ]
-	then
-		PROC_NAME="ookla"
-	fi
-	if [ -n "$(pidof "$PROC_NAME")" ]; then
-		killall -q "$PROC_NAME"
+
+	if [ -n "$(pidof "$PROC_NAME")" ]
+	then killall -q "$PROC_NAME"
 	fi
 	Print_Output true "Removing $SCRIPT_NAME..." "$PASS"
 	Auto_Startup delete 2>/dev/null
@@ -6815,10 +6999,10 @@ then
 	Conf_Exists
 	if [ "$(SpeedtestBinary check)" = "builtin" ]
 	then
-		echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+		echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	elif [ "$(SpeedtestBinary check)" = "external" ]
 	then
-		echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+		echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 	fi
 	ScriptStorageLocation load
 	Create_Symlinks
@@ -6999,10 +7183,10 @@ case "$1" in
 		Conf_Exists
 		if [ "$(SpeedtestBinary check)" = "builtin" ]
 		then
-			echo "/usr/sbin/ookla" > /tmp/spdmerlin-binary
+			echo "$BUILTIN_OOKLA_BINARY" > /tmp/spdmerlin-binary
 		elif [ "$(SpeedtestBinary check)" = "external" ]
 		then
-			echo "$OOKLA_DIR/speedtest" > /tmp/spdmerlin-binary
+			echo "$EXTERNL_OOKLA_BINARY" > /tmp/spdmerlin-binary
 		fi
 		ScriptStorageLocation load true
 		Create_Symlinks
